@@ -152,7 +152,7 @@ void main() {
 
       // Android 分支的说明文案
       expect(
-        find.textContaining('应用内部存储或应用外部存储'),
+        find.textContaining('契约保存在应用的私有空间'),
         findsOneWidget,
       );
       // 存储切换按钮存在（而非隐藏/删除）

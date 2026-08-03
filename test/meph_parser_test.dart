@@ -24,7 +24,7 @@ void main() {
       // 状态（含类型推断）
       expect(contract.state, hasLength(3));
       expect(contract.state[0].key, '灵魂完整度');
-      expect(contract.state[0].value, const IntValue(50));
+      expect(contract.state[0].value, const IntValue(100));
       expect(contract.state[1].value, const StringValue('永不满足'));
       expect(contract.state[2].value, const StringValue('书斋'));
 
