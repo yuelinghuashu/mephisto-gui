@@ -91,9 +91,9 @@ jobs:
         if: matrix.artifact == 'mephisto-linux'
         shell: bash
         run: |
-          # 版本号去前导 v（dpkg 要求版本号以数字开头）
+          # 版本号去前导 v/V（dpkg 要求版本号以数字开头）
           DEB_VERSION=${{ github.event.inputs.version }}
-          DEB_VERSION=${DEB_VERSION#v}
+          DEB_VERSION=${DEB_VERSION#[vV]}
 
           # SVG → PNG 应用图标
           rsvg-convert -w 256 -h 256 assets/images/mephisto_icon.svg -o /tmp/mephisto.png
