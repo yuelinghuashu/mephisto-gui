@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 允许应用访问网络（连接 OpenAI 兼容服务，如 DeepSeek API） -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="Mephisto"
         android:name="${applicationName}"
