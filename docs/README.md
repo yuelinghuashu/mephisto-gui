@@ -12,7 +12,7 @@
 | [存档系统](save-system.md)          | 母版/子版快照、分支命名、切换与恢复              | 理解子版存档机制     |
 | [平台存储策略](platform-storage.md) | 各平台契约目录方案与沙盒限制                     | 理解跨平台存储行为   |
 
-> 💡 编写与校验 `.meph` 契约，推荐搭配 [**VSCode Mephisto 插件**](<(https://marketplace.visualstudio.com/items?itemName=yuelinghuashu.vscode-mephisto)>)（语法高亮 / 自动补全 / 实时校验）。
+> 💡 编写与校验 `.meph` 契约，推荐搭配 **[VSCode Mephisto 插件](<(https://marketplace.visualstudio.com/items?itemName=yuelinghuashu.vscode-mephisto)>)**（语法高亮 / 自动补全 / 实时校验）。
 
 ## 🧭 导航关系
 
