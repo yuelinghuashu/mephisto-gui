@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   release:
-    name: Build & Publish ${{ matrix.artifact }}
+    name: Build & Package ${{ matrix.artifact }}
     strategy:
       fail-fast: false
       matrix:
@@ -53,11 +53,15 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libgtk-3-dev
+          sudo apt-get install -y ninja-build libgtk-3-dev librsvg2-bin
         shell: bash
 
       - name: Install dependencies
         run: flutter pub get
+
+      # ============================================================
+      # 构建各平台
+      # ============================================================
 
       - name: Build Linux
         if: matrix.artifact == 'mephisto-linux'
@@ -79,44 +83,153 @@ jobs:
         if: matrix.artifact == 'mephisto-ios'
         run: flutter build ios --release --no-codesign -t lib/app/main.dart
 
-      # ---- 打包上传产物 ----
-      - name: Package Linux bundle
+      # ============================================================
+      # 打包：Linux → .deb（SVG 转 PNG 图标 + dpkg-deb）
+      # ============================================================
+
+      - name: Package Linux → .deb
         if: matrix.artifact == 'mephisto-linux'
-        run: |
-          cd build/linux/x64/release/bundle
-          zip -r "$GITHUB_WORKSPACE/mephisto-linux.zip" .
-          echo "upload_file=$GITHUB_WORKSPACE/mephisto-linux.zip" >> "$GITHUB_ENV"
         shell: bash
+        run: |
+          # 版本号去前导 v（dpkg 要求版本号以数字开头）
+          DEB_VERSION=${{ github.event.inputs.version }}
+          DEB_VERSION=${DEB_VERSION#v}
+
+          # SVG → PNG 应用图标
+          rsvg-convert -w 256 -h 256 assets/images/mephisto_icon.svg -o /tmp/mephisto.png
+
+          # 构造 deb 目录结构
+          DEB_ROOT=build/debian
+          mkdir -p "$DEB_ROOT/DEBIAN"
+          mkdir -p "$DEB_ROOT/usr/local/lib/mephisto"
+          mkdir -p "$DEB_ROOT/usr/local/bin"
+          mkdir -p "$DEB_ROOT/usr/share/applications"
+          mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/256x256/apps"
+
+          # 复制应用文件（bundle 完整目录）
+          cp -r build/linux/x64/release/bundle/* "$DEB_ROOT/usr/local/lib/mephisto/"
+
+          # 相对路径符号链接（/usr/local/bin/mephisto → /usr/local/lib/mephisto/mephisto）
+          ln -s ../lib/mephisto/mephisto "$DEB_ROOT/usr/local/bin/mephisto"
+
+          # 复制应用图标
+          cp /tmp/mephisto.png "$DEB_ROOT/usr/share/icons/hicolor/256x256/apps/mephisto.png"
+
+          # .desktop 文件（应用出现在系统菜单）
+          cat > "$DEB_ROOT/usr/share/applications/mephisto.desktop" << EOF
+          [Desktop Entry]
+          Version=1.0
+          Type=Application
+          Name=Mephisto
+          Comment=Mephisto 叙事引擎——在契约框架内驱动命运持续推进的 AI 叙事应用
+          Exec=/usr/local/bin/mephisto
+          Icon=mephisto
+          Categories=Utility;
+          EOF
+
+          # DEBIAN/control
+          cat > "$DEB_ROOT/DEBIAN/control" << EOF
+          Package: mephisto
+          Version: $DEB_VERSION
+          Architecture: amd64
+          Maintainer: yuelinghuashu <1263476185@qq.com>
+          Description: Mephisto 叙事引擎——用契约书写命运，在 AI 驱动下推进长线叙事。
+          Depends: libgtk-3-0
+          EOF
+
+          # dpkg-deb 打包
+          dpkg-deb --build "$DEB_ROOT" "$GITHUB_WORKSPACE/mephisto_linux_$DEB_VERSION_amd64.deb"
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto_linux_$DEB_VERSION_amd64.deb" >> "$GITHUB_ENV"
+
+      # ============================================================
+      # 打包：Windows → .zip 整包 + Inno Setup 安装器 .exe
+      # ============================================================
+
+      - name: Package Windows → .zip + .exe
+        if: matrix.artifact == 'mephisto-windows'
+        shell: pwsh
+        run: |
+          $ver = "${{ github.event.inputs.version }}"
+
+          # 1) zip 整包（解压即用）
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "$env:GITHUB_WORKSPACE/mephisto_windows_$ver.zip"
+
+          # 2) 生成 Inno Setup 脚本（windows-latest 预装 Inno Setup 6）
+          $iss = @"
+          [Setup]
+          AppName=Mephisto
+          AppVersion=$ver
+          AppPublisher=yuelinghuashu
+          DefaultDirName={autopf}\Mephisto
+          DefaultGroupName=Mephisto
+          OutputDir=$env:GITHUB_WORKSPACE
+          OutputBaseFilename=mephisto_setup_$ver
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64compatible
+          DisableProgramGroupPage=yes
+
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+          [Icons]
+          Name: "{autoprograms}\Mephisto"; Filename: "{app}\mephisto.exe"
+          Name: "{autodesktop}\Mephisto"; Filename: "{app}\mephisto.exe"
+          "@
+          $iss | Out-File -Encoding utf8 "$env:GITHUB_WORKSPACE/mephisto.iss"
+
+          # 3) 运行 ISCC 编译安装器
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "$env:GITHUB_WORKSPACE/mephisto.iss"
+
+          # 4) 上传变量（逗号分隔两个文件）
+          "upload_file=$env:GITHUB_WORKSPACE\mephisto_windows_$ver.zip,$env:GITHUB_WORKSPACE\mephisto_setup_$ver.exe" | Out-File -Append -Encoding utf8 -FilePath $env:GITHUB_ENV
+
+      # ============================================================
+      # 打包：macOS → .dmg（产物名为小写 mephisto.app）
+      # ============================================================
+
+      - name: Package macOS → .dmg
+        if: matrix.artifact == 'mephisto-macos'
+        shell: bash
+        run: |
+          brew install create-dmg
+          create-dmg \
+            --volname "Mephisto" \
+            --window-pos 200 120 \
+            --window-size 600 300 \
+            --app-drop-link 460 95 \
+            "$GITHUB_WORKSPACE/mephisto_macos_${{ github.event.inputs.version }}.dmg" \
+            "build/macos/Build/Products/Release/mephisto.app"
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto_macos_${{ github.event.inputs.version }}.dmg" >> "$GITHUB_ENV"
+
+      # ============================================================
+      # 打包：Android → .apk（不变）
+      # ============================================================
 
       - name: Package Android APK
         if: matrix.artifact == 'mephisto-android'
-        run: |
-          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/mephisto-android.apk"
-          echo "upload_file=$GITHUB_WORKSPACE/mephisto-android.apk" >> "$GITHUB_ENV"
         shell: bash
-
-      - name: Package Windows Release
-        if: matrix.artifact == 'mephisto-windows'
         run: |
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "$env:GITHUB_WORKSPACE/mephisto-windows.zip"
-          "upload_file=$env:GITHUB_WORKSPACE/mephisto-windows.zip" | Out-File -Append -Encoding utf8 -FilePath $env:GITHUB_ENV
-        shell: pwsh
+          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/mephisto_android_${{ github.event.inputs.version }}.apk"
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto_android_${{ github.event.inputs.version }}.apk" >> "$GITHUB_ENV"
 
-      - name: Package macOS app
-        if: matrix.artifact == 'mephisto-macos'
-        run: |
-          cd build/macos/Build/Products/Release
-          zip -r "$GITHUB_WORKSPACE/mephisto-macos.zip" .
-          echo "upload_file=$GITHUB_WORKSPACE/mephisto-macos.zip" >> "$GITHUB_ENV"
-        shell: bash
+      # ============================================================
+      # 打包：iOS → .ipa（标准 Payload 结构）
+      # ============================================================
 
-      - name: Package iOS app
+      - name: Package iOS → .ipa
         if: matrix.artifact == 'mephisto-ios'
+        shell: bash
         run: |
           cd build/ios/iphoneos
-          zip -r "$GITHUB_WORKSPACE/mephisto-ios.zip" .
-          echo "upload_file=$GITHUB_WORKSPACE/mephisto-ios.zip" >> "$GITHUB_ENV"
-        shell: bash
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r "$GITHUB_WORKSPACE/mephisto_ios_${{ github.event.inputs.version }}.ipa" Payload
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto_ios_${{ github.event.inputs.version }}.ipa" >> "$GITHUB_ENV"
+
+      # ============================================================
+      # 上传到 GitHub Release（每个 job 只上传自己的产物）
+      # ============================================================
 
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
