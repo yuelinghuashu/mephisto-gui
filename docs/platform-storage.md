@@ -13,7 +13,7 @@
 
 ## 2. 优先级
 
-```
+```text
 用户自定义目录（shared_preferences 中 'mephisto_contracts_directory'）
   ↓ 未设置时
 默认目录（平台自适应的默认位置）

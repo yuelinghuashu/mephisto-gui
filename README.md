@@ -1,4 +1,17 @@
+<p align="center">
+  <img src="assets/images/mephisto_logo.svg" width="160" alt="Mephisto" />
+</p>
+
 # 📜 Mephisto 叙事引擎
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter" alt="Flutter" />
+  <img src="https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart" alt="Dart" />
+  <img src="https://img.shields.io/github/v/release/yuelinghuashu/mephisto-gui" alt="GitHub Release" />
+  <img src="https://img.shields.io/github/license/yuelinghuashu/mephisto-gui" alt="License" />
+  <img src="https://img.shields.io/github/actions/workflow/status/yuelinghuashu/mephisto-gui/ci.yml" alt="CI" />
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-blue" alt="Platforms" />
+</p>
 
 > **你写下角色的灵魂，梅菲斯特让它活过来，然后看它会走向何方。**
 
@@ -71,16 +84,20 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 [契约觉醒] if 包含 "契约" && roll(1d100) -> 状态.灵魂完整度 += 10
 ```
 
-区块说明：
+> 完整区块说明、值类型与错误处理见 [docs/contract-syntax.md](docs/contract-syntax.md)，
+> 规则引擎（条件 / 动作 / 骰子 / 互斥组）详见 [docs/rule-engine.md](docs/rule-engine.md)。
 
-| 区块         | 必选 | 说明                                          |
-| ------------ | ---- | --------------------------------------------- |
-| 【角色名】   | ✅   | 角色名                                        |
-| 【锚点】     | 推荐 | 核心人格设定                                  |
-| 【状态】     | 可选 | 初始状态（支持 int / double / bool / 字符串） |
-| 【世界观】   | 可选 | 世界背景                                      |
-| 【开局场景】 | 可选 | 叙事起始场景                                  |
-| 【规则】     | 可选 | 条件 → 动作（支持 `[组名:xxx]` 互斥组）       |
+## 📚 文档中心
+
+深入了解 Mephisto 的机制，请阅读 [docs](docs/README.md) 文档中心：
+
+| 文档 | 内容 |
+| ---- | ---- |
+| [契约语法参考](docs/contract-syntax.md) | `.meph` 格式、区块、值类型、错误处理 |
+| [规则引擎详解](docs/rule-engine.md) | 条件、动作、骰子（1d2 / 1d100）、互斥组 |
+| [记忆系统](docs/memory-system.md) | 记忆提取、去重、压缩 |
+| [存档系统](docs/save-system.md) | 母版只读、子版快照、分支 |
+| [平台存储策略](docs/platform-storage.md) | 各平台契约目录与沙盒限制 |
 
 ## 🧩 VSCode 插件联动
 
@@ -128,12 +145,7 @@ flutter analyze
 flutter test
 ```
 
-测试覆盖：
-
-| 层级       | 覆盖范围                                                                                                                                                                                                     |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **逻辑层** | 规则引擎、Meph 解析、LLM 客户端、LLM 配置、契约 Provider、子版存档、提示词渲染、叙事状态、记忆管理、叙事 Provider                                                                                            |
-| **UI 层**  | 叙事页（空状态/发送闭环/生成中禁用/跳转）、首页（分组渲染/子版展开/多选级联/删除确认）、设置页（区块/主题持久化/规则编辑/LLM 切换/Android·iOS 平台分支）、契约编辑器（实时校验/格式化/保存错误）、通用对话框 |
+测试覆盖规则引擎、Meph 解析、LLM、记忆、存档、Provider 与 UI 全链路。
 
 ## 🚀 CI / CD
 
@@ -197,7 +209,5 @@ flutter test
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 📜 许可证
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 本项目采用 [MIT License](LICENSE) 开源，详见 [LICENSE](LICENSE) 文件。

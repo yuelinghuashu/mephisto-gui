@@ -53,7 +53,7 @@
 
 母版重命名时，其下所有子版文件名前缀同步更新：
 
-```
+```text
 faust.meph → 歌德.meph
 faust.child.meph → 歌德.child.meph   （前缀同步）
 faust.dark.meph → 歌德.dark.meph
