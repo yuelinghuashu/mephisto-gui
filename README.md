@@ -82,6 +82,18 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 | 【开局场景】 | 可选 | 叙事起始场景                                  |
 | 【规则】     | 可选 | 条件 → 动作（支持 `[组名:xxx]` 互斥组）       |
 
+## 🧩 VSCode 插件联动
+
+编写 `.meph` 契约推荐使用 **Mephisto VSCode 插件**，获得更专业的编辑体验：
+
+- **语法高亮**：区块标题、规则、条件、动作一目了然
+- **自动补全**：内联提示关键字与结构
+- **实时校验**：输入即反馈语法错误，减少保存后的返工
+
+[![VSCode Marketplace](https://img.shields.io/badge/VSCode-Mephisto%20插件-blue)](https://marketplace.visualstudio.com/items?itemName=yuelinghuashu.vscode-mephisto)
+
+> 应用内编辑器适合快速调整；需要行号、语法高亮、自动补全等专业能力时，使用 VSCode + 插件效率更高。
+
 ## 🧩 技术栈
 
 - **Flutter**（多端 UI）
