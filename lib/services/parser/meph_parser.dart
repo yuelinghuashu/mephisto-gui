@@ -357,18 +357,19 @@ void _validateKeywordSpacing(
       message: "roll 表达式缺少 ')'，应写作 roll(1dN)（如 roll(1d100)）",
     );
   }
-  // roll 表达式必须为 `roll(1dN)`（N>=1 整数）：
+  // roll 表达式必须为 `roll(1d2)` 或 `roll(1d100)`：
   //   - `roll( 1d100)` / `roll(1 d100)` / `roll(1d 100)`：括号内/d 两侧空格
   //   - `roll(2d100)`：多骰个数（不支持，静默按 1 骰处理是妥协）
+  //   - `roll(1d6)` / `roll(1d20)`：非受支持的面数（仅 1d2 二元判定 / 1d100 高精度判定）
   //   - `roll(d100)` / `roll(1dx)` / `roll(1d)`：非法格式
   // 以上任一情况都导致引擎静默妥协或条件从不匹配，必须尽早报错。
   for (final m in RegExp(r'roll\(([^)]*)\)').allMatches(masked)) {
     final inner = m[1]!;
-    if (!RegExp(r'^1d\d+$').hasMatch(inner)) {
+    if (!RegExp(r'^(1d2|1d100)$').hasMatch(inner)) {
       throw MephParseError(
         line: lineNumber,
         blockName: blockName,
-        message: "骰子表达式格式无效，仅支持 roll(1dN)（如 roll(1d100)）",
+        message: "骰子表达式格式无效，仅支持 roll(1d2)（二元判定）与 roll(1d100)（高精度判定）",
       );
     }
   }

@@ -410,6 +410,26 @@ void main() {
       );
     });
 
+    test('roll 非受支持面数（1d6）报错（仅支持 1d2 / 1d100）', () {
+      expect(
+        () => parseMeph('【规则】\n[错误] if roll(1d6) >= 4 -> 注入 "x"'),
+        throwsA(
+          isA<MephParseError>()
+              .having((e) => e.message, 'message', contains('骰子表达式')),
+        ),
+      );
+      // 合法面数不误报：1d2 与 1d100
+      final ok = parseMeph('''
+【角色名】
+测试
+
+【规则】
+[合法1] if roll(1d2) >= 2 -> 注入 "x"
+[合法2] if roll(1d100) >= 70 -> 注入 "y"
+''');
+      expect(ok.rules, hasLength(2));
+    });
+
     test('roll 非法格式（缺 d / 非数字 / 缺面数）报错', () {
       // roll(d100) 缺骰子个数
       expect(

@@ -94,13 +94,13 @@ void main() {
 
   test('骰子判定信息被返回（roll 必然成功）', () async {
     final s = serviceReturning('回应');
-    // 直接用 roll(1d1) 保证必然 1，>= 1 必然成功
+    // 用 roll(1d100) >= 1 保证必然成功（1d100 掷出 1~100 恒满足）
     const c2 = Contract(
       roleName: '浮士德',
       rules: [
         Rule(
           name: '命运骰',
-          condition: 'roll(1d1) >= 1',
+          condition: 'roll(1d100) >= 1',
           action: '注入 "命运骰已掷"',
           line: 1,
         ),

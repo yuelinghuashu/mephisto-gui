@@ -160,10 +160,10 @@ void main() {
 
     test('RollStore 缓存保证同值', () {
       final rs = RollStore();
-      final a = rs.roll('roll(1d6)');
-      final b = rs.roll('roll(1d6)');
+      final a = rs.roll('roll(1d100)');
+      final b = rs.roll('roll(1d100)');
       expect(a, b);
-      expect(a, inInclusiveRange(1, 6));
+      expect(a, inInclusiveRange(1, 100));
 
       // 条件判定与提取使用同一骰值
       rs.roll('roll(1d100)');

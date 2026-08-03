@@ -37,15 +37,18 @@ class RollStore {
 
 /// 从 `roll(1d100)` 中解析骰子面数。
 ///
-/// 只接受 `roll(1dN)` 形式，`N` 为有效的正整数面数。
-/// 解析失败时返回 0（调用方做无效判断）。
+/// 只接受 `roll(1d2)` 与 `roll(1d100)`（与解析器的一致硬限制）：
+///   - 1d2：二元判定（是/否、成功/失败）
+///   - 1d100：高精度命运判定（1-100）
+/// 其他面数或非法格式返回 0（调用方做无效判断）。
 int parseRollDice(String expr) {
   var inner = expr.startsWith('roll(') ? expr.substring(5) : expr;
   if (inner.endsWith(')')) inner = inner.substring(0, inner.length - 1);
   final parts = inner.split('d');
   if (parts.length != 2) return 0;
   final sides = int.tryParse(parts[1].trim()) ?? 0;
-  return sides > 0 ? sides : 0;
+  // 硬限制：仅 2（1d2 二元判定）与 100（1d100 高精度判定）合法
+  return (sides == 2 || sides == 100) ? sides : 0;
 }
 
 /// 解析后的骰子表达式。
