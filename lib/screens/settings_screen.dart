@@ -327,8 +327,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               Text(
                 switch (defaultTargetPlatform) {
                   TargetPlatform.android =>
-                    '契约可保存在应用内部存储或应用外部存储（卸载应用时清除）。'
-                        '导入和默认加载都使用当前存储位置。',
+                    '契约保存在应用的私有空间，不受 Android 存储权限限制。'
+                        '“内部存储”使用应用专用分区；“外部存储”使用设备大容量分区'
+                        '——两者都在应用私有目录内，卸载应用时都会被清除。'
+                        'Android 系统限制应用直接读写用户公共目录（如下载、文档、SD 卡），'
+                        '因此无法像桌面端那样自由指定契约文件夹。'
+                        '如需从手机其他位置使用契约，请用首页的“导入”功能。',
                   TargetPlatform.iOS =>
                     '契约保存在应用内目录（iOS 系统沙盒限制）。'
                         '导入和默认加载都使用此目录。',
@@ -344,13 +348,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 当前路径显示
-                    Text(
-                      _contractsDirPath ?? '加载中...',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontFamily: 'monospace',
-                        fontSize: 13,
-                      ),
+                    // 当前路径显示（始终显示真实完整路径，不隐藏）
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _contractsDirPath ?? '加载中...',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontFamily: 'monospace',
+                            fontSize: 13,
+                          ),
+                        ),
+                        // 移动端附加上下文说明（不替代路径，仅补充解释）
+                        if (defaultTargetPlatform == TargetPlatform.android) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            _useExternalStorage
+                                ? '位置说明：应用外部存储（Android/data 应用私有目录）'
+                                : '位置说明：应用内部存储（应用私有目录）',
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(color: theme.hintColor),
+                          ),
+                        ],
+                        if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '位置说明：应用内目录（iOS 沙盒）',
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(color: theme.hintColor),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 12),
                     switch (defaultTargetPlatform) {
@@ -360,8 +388,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           Expanded(
                             child: Text(
                               _useExternalStorage
-                                  ? '当前：应用外部存储'
-                                  : '当前：应用内部存储',
+                                  ? '存储位置：应用外部空间'
+                                  : '存储位置：应用内部空间',
                               style: theme.textTheme.labelMedium,
                             ),
                           ),
