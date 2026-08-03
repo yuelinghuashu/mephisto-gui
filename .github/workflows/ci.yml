@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  analyze-and-test:
+    name: Flutter Analyze & Test + Release Build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop (ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev
+        shell: bash
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      # ---- Release 构建（入口为 lib/app/main.dart，必须显式指定 -t） ----
+      - name: Build Linux (ubuntu only)
+        if: runner.os == 'Linux'
+        run: flutter build linux --release -t lib/app/main.dart
+
+      - name: Build Android APK (ubuntu only)
+        if: runner.os == 'Linux'
+        run: flutter build apk --release -t lib/app/main.dart
+
+      - name: Build Windows (windows only)
+        if: runner.os == 'Windows'
+        run: flutter build windows --release -t lib/app/main.dart
+
+      - name: Build macOS (macos only)
+        if: runner.os == 'macOS'
+        run: flutter build macos --release -t lib/app/main.dart
+
+      - name: Build iOS (macos only, no codesign)
+        if: runner.os == 'macOS'
+        run: flutter build ios --release --no-codesign -t lib/app/main.dart
+
+      # ---- 上传构建产物 ----
+      - name: Upload Linux artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mephisto-linux
+          path: build/linux/x64/release/bundle/
+
+      - name: Upload Android APK artifact
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mephisto-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload Windows artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mephisto-windows
+          path: build/windows/x64/runner/Release/
+
+      - name: Upload macOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mephisto-macos
+          path: build/macos/Build/Products/Release/
+
+      - name: Upload iOS artifact
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mephisto-ios
+          path: build/ios/iphoneos/

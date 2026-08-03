@@ -1,0 +1,41 @@
+/// Mephisto 叙事引擎 - 枚举定义
+///
+/// 包含游戏引擎中所有枚举类型及其扩展方法。
+library;
+
+// ============================================================
+// 消息角色
+// ============================================================
+
+/// 消息角色
+///
+/// 区分对话中不同消息的来源：
+///   - [fate]：用户/命运的指引（叙事推动者）
+///   - [assistant]：AI/角色的回应（叙事演绎者）
+///   - [system]：引擎的系统输出（骰子、规则、状态变化）
+///
+/// 对应《浮士德》原典意象：
+///   - fate：⭐ 星辰（浮士德仰望星空）
+///   - assistant：🎭 面具（人间戏剧）
+///   - system：📜 契约（血契文书）
+enum MessageRole { fate, assistant, system }
+
+/// 消息角色扩展
+extension MessageRoleExtension on MessageRole {
+  /// 判断是否为命运（用户）消息
+  bool get isFate => this == MessageRole.fate;
+}
+
+// ============================================================
+// LLM 后端类型
+// ============================================================
+
+/// LLM 后端类型
+///
+/// 区分底层 API 协议差异：
+///   - [openaiCompatible]：OpenAI 兼容协议（DeepSeek, OpenAI, 通义千问, Groq 等）
+///     需要 API Key，走 `/v1/chat/completions` 标准 endpoint
+///   - [ollama]：本地 Ollama 服务
+///     不需要 API Key，API 格式与 OpenAI 不兼容
+enum LlmBackend { openaiCompatible, ollama }
+

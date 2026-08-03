@@ -1,0 +1,117 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish ${{ matrix.artifact }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact: mephisto-linux
+            path: build/linux/x64/release/bundle/
+          - os: ubuntu-latest
+            artifact: mephisto-android
+            path: build/app/outputs/flutter-apk/app-release.apk
+          - os: windows-latest
+            artifact: mephisto-windows
+            path: build/windows/x64/runner/Release/
+          - os: macos-latest
+            artifact: mephisto-macos
+            path: build/macos/Build/Products/Release/
+          - os: macos-latest
+            artifact: mephisto-ios
+            path: build/ios/iphoneos/
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Linux desktop (ubuntu only)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libgtk-3-dev
+        shell: bash
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Linux
+        if: matrix.artifact == 'mephisto-linux'
+        run: flutter build linux --release -t lib/app/main.dart
+
+      - name: Build Android APK
+        if: matrix.artifact == 'mephisto-android'
+        run: flutter build apk --release -t lib/app/main.dart
+
+      - name: Build Windows
+        if: matrix.artifact == 'mephisto-windows'
+        run: flutter build windows --release -t lib/app/main.dart
+
+      - name: Build macOS
+        if: matrix.artifact == 'mephisto-macos'
+        run: flutter build macos --release -t lib/app/main.dart
+
+      - name: Build iOS (no codesign)
+        if: matrix.artifact == 'mephisto-ios'
+        run: flutter build ios --release --no-codesign -t lib/app/main.dart
+
+      # ---- 打包上传产物 ----
+      - name: Package Linux bundle
+        if: matrix.artifact == 'mephisto-linux'
+        run: |
+          cd build/linux/x64/release/bundle
+          zip -r "$GITHUB_WORKSPACE/mephisto-linux.zip" .
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto-linux.zip" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Package Android APK
+        if: matrix.artifact == 'mephisto-android'
+        run: |
+          cp build/app/outputs/flutter-apk/app-release.apk "$GITHUB_WORKSPACE/mephisto-android.apk"
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto-android.apk" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Package Windows Release
+        if: matrix.artifact == 'mephisto-windows'
+        run: |
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "$env:GITHUB_WORKSPACE/mephisto-windows.zip"
+          "upload_file=$env:GITHUB_WORKSPACE/mephisto-windows.zip" | Out-File -Append -Encoding utf8 -FilePath $env:GITHUB_ENV
+        shell: pwsh
+
+      - name: Package macOS app
+        if: matrix.artifact == 'mephisto-macos'
+        run: |
+          cd build/macos/Build/Products/Release
+          zip -r "$GITHUB_WORKSPACE/mephisto-macos.zip" .
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto-macos.zip" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Package iOS app
+        if: matrix.artifact == 'mephisto-ios'
+        run: |
+          cd build/ios/iphoneos
+          zip -r "$GITHUB_WORKSPACE/mephisto-ios.zip" .
+          echo "upload_file=$GITHUB_WORKSPACE/mephisto-ios.zip" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.upload_file }}
+          generate_release_notes: true

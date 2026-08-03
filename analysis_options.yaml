@@ -1,0 +1,27 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # ---- 代码质量 ----
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+
+    # ---- 导入规范 ----
+    directives_ordering: true
+    sort_child_properties_last: true
+
+    # ---- 可维护性 ----
+    avoid_print: true
+    avoid_dynamic_calls: true
+    avoid_redundant_argument_values: true
+    avoid_unnecessary_containers: true
+
+    # ---- 类型安全 ----
+    always_declare_return_types: true
+    prefer_final_fields: true
+    unnecessary_lambdas: true
+    unnecessary_null_checks: true
+
+    # ---- 代码风格（Dart 3 已内置于语言特性） ----
+    use_super_parameters: true

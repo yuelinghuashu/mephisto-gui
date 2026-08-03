@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="100%" height="100%">
+  <defs>
+    <!-- 深邃的暗色方形底（无圆角） -->
+    <radialGradient id="iconBgSquare" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#2A2430"/>
+      <stop offset="100%" stop-color="#0E0C10"/>
+    </radialGradient>
+    
+    <!-- 金色渐变 -->
+    <linearGradient id="goldBold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F4E6C1"/>
+      <stop offset="50%" stop-color="#D4A84C"/>
+      <stop offset="100%" stop-color="#B8860B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 1. 纯直角方形底托（无 rx，无圆角） -->
+  <rect width="64" height="64" fill="url(#iconBgSquare)"/>
+
+  <!-- 2. 核心视觉：极简“命运之眼” -->
+  <g transform="translate(32, 32)">
+    
+    <!-- 外圈：粗犷的契约边界 -->
+    <circle cx="0" cy="0" r="24" fill="none" stroke="url(#goldBold)" stroke-width="3" opacity="0.85"/>
+    
+    <!-- 内圈：存在的核心 -->
+    <circle cx="0" cy="0" r="11" fill="none" stroke="url(#goldBold)" stroke-width="3" opacity="0.95"/>
+    
+    <!-- 核心光点 -->
+    <circle cx="0" cy="0" r="3.5" fill="#F4E6C1"/>
+
+    <!-- 四正轴方向锚点（保留锋利感） -->
+    <g fill="#D4A84C" opacity="0.9">
+      <polygon points="0,-24 -4,-20 4,-20" />
+      <polygon points="0,24 -4,20 4,20" />
+      <polygon points="-24,0 -20,-4 -20,4" />
+      <polygon points="24,0 20,-4 20,4" />
+    </g>
+    
+  </g>
+</svg>
