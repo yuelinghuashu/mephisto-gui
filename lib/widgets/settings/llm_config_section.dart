@@ -247,9 +247,11 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
             ),
             const SizedBox(height: 16),
 
-            // 操作按钮（右对齐紧凑布局，避免桌面端拉伸）
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            // 操作按钮（右对齐；窄屏自动换行，避免第三个按钮被裁剪）
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 12,
+              runSpacing: 8,
               children: [
                 OutlinedButton.icon(
                   icon: _testing
@@ -262,13 +264,11 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
                   label: Text(_testing ? '测试中...' : '测试连接'),
                   onPressed: _testing ? null : _testConnection,
                 ),
-                const SizedBox(width: 12),
                 FilledButton.icon(
                   icon: const Icon(Icons.save_outlined),
                   label: const Text('保存配置'),
                   onPressed: _saveLlmConfig,
                 ),
-                const SizedBox(width: 12),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.restart_alt),
                   label: const Text('恢复默认'),
