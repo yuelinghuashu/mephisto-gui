@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 import '../../providers/contract_provider.dart';
@@ -138,12 +139,14 @@ class ContractCard extends StatelessWidget {
                           size: 20,
                         ),
                         onPressed: onToggleChildren,
-                        tooltip: childrenExpanded ? '收起子版' : '展开子版',
+                        tooltip: childrenExpanded
+                            ? AppLocalizations.of(context).contractCardCollapseChildren
+                            : AppLocalizations.of(context).contractCardExpandChildren,
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(8),
                       ),
                     // ⋮ 操作菜单（进入/预览/重命名/删除）
-                    _buildMasterMenu(),
+                    _buildMasterMenu(context),
                   ],
                 ],
               ),
@@ -176,12 +179,14 @@ class ContractCard extends StatelessWidget {
   }
 
   /// 母版行 ⋮ 操作菜单（进入/预览/编辑/重命名/删除）
-  PopupMenuButton<String> _buildMasterMenu() {
+  PopupMenuButton<String> _buildMasterMenu(BuildContext context) {
     return _buildContractMenu(
       iconColor: AppTheme.gold,
       iconSize: 18,
       onSelected: onMasterMenu,
       includeEdit: true,
+      tooltip: AppLocalizations.of(context).contractCardOperations,
+      l10n: AppLocalizations.of(context),
     );
   }
 }
@@ -287,6 +292,8 @@ class _ChildTile extends StatelessWidget {
       iconSize: 16,
       onSelected: onMenuSelected,
       includeEdit: false,
+      tooltip: AppLocalizations.of(context).contractCardOperations,
+      l10n: AppLocalizations.of(context),
     );
   }
 }
@@ -300,20 +307,22 @@ PopupMenuButton<String> _buildContractMenu({
   required double iconSize,
   required ValueChanged<String> onSelected,
   required bool includeEdit,
+  required String tooltip,
+  required AppLocalizations l10n,
 }) {
   return PopupMenuButton<String>(
     icon: Icon(Icons.more_vert, size: iconSize, color: iconColor),
-    tooltip: '操作',
+    tooltip: tooltip,
     onSelected: onSelected,
     // 缩短动画时长，菜单弹出更快更流畅（共享样式见 AppTheme.popupAnimationStyle）
     popUpAnimationStyle: AppTheme.popupAnimationStyle,
     itemBuilder: (context) => [
-      ContractMenuItem('enter', Icons.play_arrow_outlined, '进入'),
-      ContractMenuItem('preview', Icons.visibility_outlined, '预览'),
+      ContractMenuItem('enter', Icons.play_arrow_outlined, l10n.contractCardEnter),
+      ContractMenuItem('preview', Icons.visibility_outlined, l10n.contractCardPreview),
       if (includeEdit)
-        ContractMenuItem('edit', Icons.edit_outlined, '编辑'),
-      ContractMenuItem('rename', Icons.drive_file_rename_outline, '重命名'),
-      ContractMenuItem('delete', Icons.delete_outline, '删除'),
+        ContractMenuItem('edit', Icons.edit_outlined, l10n.contractCardEdit),
+      ContractMenuItem('rename', Icons.drive_file_rename_outline, l10n.contractCardRename),
+      ContractMenuItem('delete', Icons.delete_outline, l10n.contractCardDelete),
     ],
   );
 }

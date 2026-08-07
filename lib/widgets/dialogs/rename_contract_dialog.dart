@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../services/storage/contract_repo.dart';
 import 'text_input_dialog.dart';
@@ -21,19 +22,20 @@ class RenameContractDialog {
     BuildContext context, {
     required String currentName,
   }) {
+    final l10n = AppLocalizations.of(context);
     return TextInputDialog.show(
       context,
-      title: '✏️ 重命名契约',
-      labelText: '新文件名',
-      helperText: '需以 .meph 结尾',
-      confirmText: '重命名',
+      title: l10n.renameDialogTitle,
+      labelText: l10n.renameDialogLabel,
+      helperText: l10n.renameDialogHelper,
+      confirmText: l10n.renameDialogConfirm,
       initialValue: currentName,
       validate: (value) => value.isNotEmpty && value.endsWith('.meph'),
       // 异步重名校验：目标名存在且不是当前文件名时拦截并展示错误
       validateAsync: (newName) async {
         if (newName == currentName) return null; // 重命名为自身合法
         final available = await isContractNameAvailable(newName);
-        return available ? null : '该文件名已存在，请更换';
+        return available ? null : l10n.renameDialogNameExists;
       },
     );
   }

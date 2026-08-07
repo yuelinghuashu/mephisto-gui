@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mephisto/domain/models.dart';
+import 'package:mephisto/domain/narrative_reducer.dart';
 import 'package:mephisto/providers/providers.dart';
 import 'package:mephisto/services/session/session_saver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -386,7 +387,7 @@ void main() {
         HistoryEntry(role: MessageRole.assistant, content: '回复'),
         HistoryEntry(role: MessageRole.system, content: '骰子结算'),
       ];
-      final messages = NarrativeNotifier.historyToMessages(history);
+      final messages = historyToMessages(history);
       expect(messages, hasLength(3));
       expect(messages[0].role, MessageRole.fate);
       expect(messages[1].role, MessageRole.assistant);

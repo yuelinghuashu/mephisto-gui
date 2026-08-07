@@ -142,19 +142,16 @@ jobs:
           echo "upload_file=$GITHUB_WORKSPACE/mephisto_linux_$DEB_VERSION_amd64.deb" >> "$GITHUB_ENV"
 
       # ============================================================
-      # 打包：Windows → .zip 整包 + Inno Setup 安装器 .exe
+      # 打包：Windows → Inno Setup 安装器 .exe
       # ============================================================
 
-      - name: Package Windows → .zip + .exe
+      - name: Package Windows → .exe
         if: matrix.artifact == 'mephisto-windows'
         shell: pwsh
         run: |
           $ver = "${{ github.event.inputs.version }}"
 
-          # 1) zip 整包（解压即用）
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "$env:GITHUB_WORKSPACE/mephisto_windows_$ver.zip"
-
-          # 2) 生成 Inno Setup 脚本（windows-latest 预装 Inno Setup 6）
+          # 1) 生成 Inno Setup 脚本（windows-latest 预装 Inno Setup 6）
           $iss = @"
           [Setup]
           AppName=Mephisto
@@ -178,11 +175,11 @@ jobs:
           "@
           $iss | Out-File -Encoding utf8 "$env:GITHUB_WORKSPACE/mephisto.iss"
 
-          # 3) 运行 ISCC 编译安装器
+          # 2) 运行 ISCC 编译安装器
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "$env:GITHUB_WORKSPACE/mephisto.iss"
 
-          # 4) 上传变量（逗号分隔两个文件）
-          "upload_file=$env:GITHUB_WORKSPACE\mephisto_windows_$ver.zip,$env:GITHUB_WORKSPACE\mephisto_setup_$ver.exe" | Out-File -Append -Encoding utf8 -FilePath $env:GITHUB_ENV
+          # 3) 上传变量（仅 exe 安装器）
+          "upload_file=$env:GITHUB_WORKSPACE\mephisto_setup_$ver.exe" | Out-File -Append -Encoding utf8 -FilePath $env:GITHUB_ENV
 
       # ============================================================
       # 打包：macOS → .dmg（产物名为小写 mephisto.app）

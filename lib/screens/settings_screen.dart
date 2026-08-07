@@ -4,6 +4,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../app/theme.dart';
 import '../providers/narrative_rule_provider.dart';
@@ -56,18 +57,24 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 保存叙事规则
   Future<void> _saveNarrativeRules() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
     await ref
         .read(narrativeRuleProvider.notifier)
         .save(_narrativeRulesController.text);
-    messenger.showSnackBar(const SnackBar(content: Text('✦ 叙事规则已保存')));
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.settingsRulesSaved)),
+    );
   }
 
   /// 恢复默认叙事规则
   Future<void> _resetNarrativeRules() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
     await ref.read(narrativeRuleProvider.notifier).reset();
     _narrativeRulesController.text = ref.read(narrativeRuleProvider);
-    messenger.showSnackBar(const SnackBar(content: Text('⇄ 已恢复默认叙事规则')));
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.settingsRulesReset)),
+    );
   }
 
   /// 加载当前契约目录路径 + 外部存储状态
@@ -110,6 +117,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 选择新的契约目录（桌面端：系统目录选择器）。
   Future<void> _changeContractsDir() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
 
     // 打开系统目录选择器
     final selected = await getDirectoryPath(
@@ -121,31 +129,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     // 保存新目录
     final ok = await setContractsDirectory(selected);
     if (!ok) {
-      messenger.showSnackBar(const SnackBar(content: Text('╳ 设置契约目录失败')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsDirChangeFail)));
       return;
     }
 
     // 刷新显示 + 提示
     await _loadContractsDir();
-    messenger.showSnackBar(SnackBar(content: Text('✦ 契约目录已更新: $selected')));
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.settingsDirChanged(selected))),
+    );
   }
 
   /// iOS：「更改目录」提示（iOS 系统沙盒限制，仅应用内目录）。
   Future<void> _iosChangeContractsDir() async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(
-      const SnackBar(
-        content: Text('╳ iOS 系统沙盒限制：契约仅保存在应用内目录，无法更改位置'),
-      ),
+      SnackBar(content: Text(AppLocalizations.of(context).settingsIosSandboxNotice)),
     );
   }
 
   /// Android：切换「内部沙盒 ↔ 应用外部存储」。
   Future<void> _toggleMobileStorage() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
     final enabled = await setMobileExternalStorage(!_useExternalStorage);
     if (!enabled) {
-      messenger.showSnackBar(const SnackBar(content: Text('╳ 切换存储位置失败')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsStorageSwitchFail)));
       return;
     }
     await _loadContractsDir();
@@ -153,8 +162,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       SnackBar(
         content: Text(
           _useExternalStorage
-              ? '✦ 契约占用地：应用外部存储（卸载应用时清除）'
-              : '✦ 契约占用地：应用内部存储',
+              ? l10n.settingsStorageExternalSwitched
+              : l10n.settingsStorageInternalSwitched,
         ),
       ),
     );
@@ -163,10 +172,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 用系统文件管理器打开契约文件夹（仅桌面端可用）。
   Future<void> _openContractsDir() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
     final dir = await getContractsDirectory();
 
     if (!dir.existsSync()) {
-      messenger.showSnackBar(const SnackBar(content: Text('╳ 目录不存在')));
+      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsDirNotExist)));
       return;
     }
 
@@ -180,10 +190,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       } else if (Platform.isWindows) {
         await Process.run('explorer', [dir.path]);
       } else {
-        messenger.showSnackBar(const SnackBar(content: Text('当前平台暂不支持打开文件夹')));
+        messenger.showSnackBar(
+          SnackBar(content: Text(l10n.settingsPlatformNotSupported)),
+        );
       }
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('╳ 打开文件夹失败: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.settingsOpenFolderFail('$e'))),
+      );
     }
   }
 
@@ -191,9 +205,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final themeMode = ref.watch(themeModeProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('📜 设置'), centerTitle: false),
+      appBar: AppBar(title: Text('📜 ${l10n.homeSettings}'), centerTitle: false),
       // 滚动区域占满全屏宽（鼠标在屏幕任意位置滚动都生效，桌面端友好）；
       // 内容宽度约束下移到内部列，保持内容居中固定 600px。
       body: ListView(
@@ -208,7 +223,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               // ============================================================
               // 外观设置
               // ============================================================
-              const _SectionHeader(icon: '◉', title: '外观'),
+              _SectionHeader(icon: '◉', title: l10n.settingsAppearance),
               const SizedBox(height: 12),
 
               // ---- 主题模式选择（ListTile 需要 Material 祖先以绘制水波纹）----
@@ -218,7 +233,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   children: [
                     RadioSelectionTile(
                       icon: Icons.brightness_auto_outlined,
-                      label: '跟随系统',
+                      label: l10n.settingsThemeSystem,
                       selected: themeMode == ThemeMode.system,
                       onTap: () => ref
                           .read(themeModeProvider.notifier)
@@ -227,7 +242,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const Divider(height: 1),
                     RadioSelectionTile(
                       icon: Icons.light_mode_outlined,
-                      label: '亮色',
+                      label: l10n.settingsThemeLight,
                       selected: themeMode == ThemeMode.light,
                       onTap: () => ref
                           .read(themeModeProvider.notifier)
@@ -236,7 +251,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     const Divider(height: 1),
                     RadioSelectionTile(
                       icon: Icons.dark_mode_outlined,
-                      label: '暗色',
+                      label: l10n.settingsThemeDark,
                       selected: themeMode == ThemeMode.dark,
                       onTap: () => ref
                           .read(themeModeProvider.notifier)
@@ -248,12 +263,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               const SizedBox(height: 28),
 
               // ============================================================
+              // 界面语言
+              // ============================================================
+              _SectionHeader(icon: '🌐', title: l10n.languageLabel),
+              const SizedBox(height: 12),
+
+              SectionCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    RadioSelectionTile(
+                      icon: Icons.translate,
+                      label: l10n.languageChinese,
+                      selected: ref.watch(languageProvider) == 'zh',
+                      onTap: () =>
+                          ref.read(languageProvider.notifier).setLanguage('zh'),
+                    ),
+                    const Divider(height: 1),
+                    RadioSelectionTile(
+                      icon: Icons.language,
+                      label: l10n.languageEnglish,
+                      selected: ref.watch(languageProvider) == 'en',
+                      onTap: () =>
+                          ref.read(languageProvider.notifier).setLanguage('en'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+
+              // ============================================================
               // 叙事内容宽度（桌面端阅读偏好）
               // ============================================================
-              const _SectionHeader(icon: '📐', title: '叙事内容宽度'),
+              _SectionHeader(icon: '📐', title: l10n.settingsNarrativeWidth),
               const SizedBox(height: 8),
               Text(
-                '叙事界面信息流的最大宽度。移动端自动占满屏幕，此选项主要影响桌面端。',
+                l10n.settingsWidthDescription,
                 style: theme.textTheme.labelLarge,
               ),
               const SizedBox(height: 12),
@@ -268,11 +313,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               // ============================================================
               // 叙事规则（输出约束，可自定义编辑）
               // ============================================================
-              const _SectionHeader(icon: '📜', title: '叙事规则'),
+              _SectionHeader(icon: '📜', title: l10n.settingsNarrativeRules),
               const SizedBox(height: 8),
               Text(
-                '自定义叙事风格，整体替换默认约束。'
-                '风格描述越精确，输出越贴合预期（明确写出"以什么风格/诗体/对白方式"）。',
+                l10n.settingsRulesDescription,
                 style: theme.textTheme.labelLarge,
               ),
               const SizedBox(height: 12),
@@ -290,8 +334,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         expands: true,
                         textAlignVertical: TextAlignVertical.top,
                         style: const TextStyle(fontSize: 13, height: 1.5),
-                        decoration: const InputDecoration(
-                          hintText: '输入叙事规则...',
+                        decoration: InputDecoration(
+                          hintText: l10n.settingsRulesHint,
                         ),
                       ),
                     ),
@@ -303,13 +347,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         OutlinedButton.icon(
                           icon: const Icon(Icons.restart_alt),
-                          label: const Text('恢复默认'),
+                          label: Text(l10n.settingsResetRules),
                           onPressed: _resetNarrativeRules,
                         ),
                         const SizedBox(width: 12),
                         FilledButton.icon(
                           icon: const Icon(Icons.save_outlined),
-                          label: const Text('保存规则'),
+                          label: Text(l10n.settingsSaveRules),
                           onPressed: _saveNarrativeRules,
                         ),
                       ],
@@ -322,22 +366,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               // ============================================================
               // 契约目录设置（平台自适应）
               // ============================================================
-              const _SectionHeader(icon: '⚜', title: '契约目录'),
+              _SectionHeader(icon: '⚜', title: l10n.settingsContractsDir),
               const SizedBox(height: 8),
               Text(
                 switch (defaultTargetPlatform) {
-                  TargetPlatform.android =>
-                    '契约保存在应用的私有空间，不受 Android 存储权限限制。'
-                        '“内部存储”使用应用专用分区；“外部存储”使用设备大容量分区'
-                        '——两者都在应用私有目录内，卸载应用时都会被清除。'
-                        'Android 系统限制应用直接读写用户公共目录（如下载、文档、SD 卡），'
-                        '因此无法像桌面端那样自由指定契约文件夹。'
-                        '如需从手机其他位置使用契约，请用首页的“导入”功能。',
-                  TargetPlatform.iOS =>
-                    '契约保存在应用内目录（iOS 系统沙盒限制）。'
-                        '导入和默认加载都使用此目录。',
-                  _ =>
-                    '存放 .meph 契约文件的文件夹。导入和默认加载都使用此目录。',
+                  TargetPlatform.android => l10n.settingsAndroidDirDescription,
+                  TargetPlatform.iOS => l10n.settingsIosDirDescription,
+                  _ => l10n.settingsDesktopDirDescription,
                 },
                 style: theme.textTheme.labelLarge,
               ),
@@ -353,7 +388,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _contractsDirPath ?? '加载中...',
+                          _contractsDirPath ?? l10n.settingsDirLoading,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontFamily: 'monospace',
                             fontSize: 13,
@@ -364,8 +399,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           const SizedBox(height: 4),
                           Text(
                             _useExternalStorage
-                                ? '位置说明：应用外部存储（Android/data 应用私有目录）'
-                                : '位置说明：应用内部存储（应用私有目录）',
+                                ? l10n.settingsAndroidExternalLocation
+                                : l10n.settingsAndroidInternalLocation,
                             style: theme.textTheme.labelSmall
                                 ?.copyWith(color: theme.hintColor),
                           ),
@@ -373,7 +408,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         if (defaultTargetPlatform == TargetPlatform.iOS) ...[
                           const SizedBox(height: 4),
                           Text(
-                            '位置说明：应用内目录（iOS 沙盒）',
+                            l10n.settingsIosLocation,
                             style: theme.textTheme.labelSmall
                                 ?.copyWith(color: theme.hintColor),
                           ),
@@ -388,8 +423,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           Expanded(
                             child: Text(
                               _useExternalStorage
-                                  ? '存储位置：应用外部空间'
-                                  : '存储位置：应用内部空间',
+                                  ? l10n.settingsAndroidExternalStorage
+                                  : l10n.settingsAndroidInternalStorage,
                               style: theme.textTheme.labelMedium,
                             ),
                           ),
@@ -400,7 +435,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   : Icons.sd_card_outlined,
                             ),
                             label: Text(
-                              _useExternalStorage ? '切换为内部存储' : '切换为外部存储',
+                              _useExternalStorage
+                                  ? l10n.settingsSwitchToInternal
+                                  : l10n.settingsSwitchToExternal,
                             ),
                             onPressed: _toggleMobileStorage,
                           ),
@@ -412,7 +449,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         children: [
                           FilledButton.icon(
                             icon: const Icon(Icons.folder_open),
-                            label: const Text('更改目录'),
+                            label: Text(l10n.settingsChangeDir),
                             onPressed: _iosChangeContractsDir,
                           ),
                         ],
@@ -423,13 +460,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         children: [
                           FilledButton.icon(
                             icon: const Icon(Icons.folder_open),
-                            label: const Text('更改目录'),
+                            label: Text(l10n.settingsChangeDir),
                             onPressed: _changeContractsDir,
                           ),
                           const SizedBox(width: 12),
                           OutlinedButton.icon(
                             icon: const Icon(Icons.open_in_new),
-                            label: const Text('打开文件夹'),
+                            label: Text(l10n.settingsOpenFolder),
                             onPressed: _openContractsDir,
                           ),
                         ],
@@ -443,10 +480,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               // ============================================================
               // LLM 配置
               // ============================================================
-              const _SectionHeader(icon: '⚚', title: 'LLM 配置'),
+              _SectionHeader(icon: '⚚', title: l10n.settingsLlmConfig),
               const SizedBox(height: 8),
               Text(
-                '叙事生成使用的 AI 服务参数。留空保存将使用默认配置。',
+                l10n.settingsLlmDescription,
                 style: theme.textTheme.labelLarge,
               ),
               const SizedBox(height: 12),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 /// 通用文本输入对话框
 ///
@@ -40,7 +41,7 @@ class TextInputDialog {
     Future<String?> Function(String value)? validateAsync,
     String? hintText,
     String? helperText,
-    String confirmText = '确定',
+    String? confirmText,
     String initialValue = '',
   }) {
     return showDialog<String>(
@@ -66,7 +67,7 @@ class _TextInputDialog extends StatefulWidget {
   final Future<String?> Function(String value)? validateAsync;
   final String? hintText;
   final String? helperText;
-  final String confirmText;
+  final String? confirmText;
   final String initialValue;
 
   const _TextInputDialog({
@@ -76,7 +77,7 @@ class _TextInputDialog extends StatefulWidget {
     this.validateAsync,
     this.hintText,
     this.helperText,
-    this.confirmText = '确定',
+    this.confirmText,
     this.initialValue = '',
   });
 
@@ -151,11 +152,14 @@ class _TextInputDialogState extends State<_TextInputDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(AppLocalizations.of(context).textInputDialogCancel),
         ),
         FilledButton(
           onPressed: _isValidating ? null : _submit,
-          child: Text(widget.confirmText),
+          child: Text(
+            widget.confirmText ??
+                AppLocalizations.of(context).textInputDialogConfirm,
+          ),
         ),
       ],
     );

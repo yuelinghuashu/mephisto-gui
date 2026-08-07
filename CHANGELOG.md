@@ -5,6 +5,43 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.0] - 规则热重载 · 国际化 · 文档
+
+### 新特性
+- **规则热重载**：叙事页 ✏️ 编辑器或外部编辑器（VSCode）保存 `.meph` 后，
+  仅规则区块即时生效，角色人格本体锁定，对话/状态/记忆/历史全保留
+  （文件监听 + 500ms 防抖 + mtime 防死循环）
+- **界面国际化**：引入 `flutter_localizations` + ARB，支持「简体中文 / English」
+  切换（设置页可选，偏好持久化）；全量替换 4 页面 / 11 组件 / 3 对话框的约 150 处硬编码中文
+- **英文文档**：新增 `README.en.md` 与 docs 全部 6 篇英文文档，中文索引页提供英文链接
+
+### 修复
+- LLM 配置缓存：`llmConfigProvider` 改 `autoDispose` + 发送时强制重读，且只读加载不重复触发重建，改 API Key 后无需重启
+- 开局场景卡片移除合成斜体，恢复正常字形
+- 首页品牌标题「叙事引擎」补充国际化，英文界面不再滞留中文
+- 打开子版存档后直接定位到最新消息，不再停留在历史开头
+- 叙事页滚动图标由左右箭头改为垂直双箭头，与消息流滚动方向一致
+
+### 性能与健壮性
+- 条件编译缓存增加 LRU 容量上限，防长期运行内存无界增长
+- LLM 错误响应体限制 8KB 截断，防异常服务撑爆内存
+- 文件系统监听不可用时显示用户提示，热重载降级不再静默
+- 契约列表并行读取文件信息（`Future.wait`），文件多时首页加载更快
+
+### 架构优化
+- `historyToMessages` 抽为共享纯函数，消除 provider / reducer 重复实现
+- 流式节流简化为一次性 Timer（最后一片 chunk 后 50ms 提交）
+- 新增共享测试助手，为全部 widget 测试注入本地化委托
+- 移除 Riverpod legacy API（`StateProvider` → `NotifierProvider`），统一日志输出为 `debugPrint`
+
+### 构建与工程化
+- Windows 移除 zip 整包，仅保留 Inno Setup 安装器
+- 新增 `tool/validate_build_config.py`（11 项断言）+ actionlint 工作流检查
+- 测试数提升至 202 个（新增消息列表滚动定位测试，全链路含构建配置断言）
+
+### 文档
+- README 补充中英文赞助支持区块，并修复收款码图片路径（含多余的 `images/` 双斜杠）
+
 ## [1.0.0] - 首个正式发布
 
 ### 核心叙事

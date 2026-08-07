@@ -19,9 +19,11 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
   @override
   LlmConfig? get defaultValue => null;
 
-  /// 读取持久化的 LLM 配置；返回恢复的配置（无持久化数据时返回 null）
-  @override
-  Future<LlmConfig?> load() async {
+  /// 从持久化存储读取 LLM 配置（不写回 state）。
+  ///
+  /// 与 [load] 不同，本方法只读取不触发状态更新，避免 `llmConfigProvider`
+  /// 每次请求都因 `state = config` 产生多余的 Provider 重建通知。
+  Future<LlmConfig?> readConfig() async {
     final prefs = await SharedPreferences.getInstance();
     final apiKey = prefs.getString(_apiKeyKey);
     final baseUrl = prefs.getString(_baseUrlKey);
@@ -42,14 +44,22 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
         LlmBackend.values.asNameMap()[backendName] ??
         LlmBackend.openaiCompatible;
 
-    final config = LlmConfig(
+    return LlmConfig(
       backend: backend,
       apiKey: apiKey ?? '',
       baseUrl: baseUrl ?? '',
       model: model ?? '',
       maxTokens: maxTokens ?? 4096,
     );
-    state = config;
+  }
+
+  /// 读取持久化的 LLM 配置；返回恢复的配置（无持久化数据时返回 null）
+  @override
+  Future<LlmConfig?> load() async {
+    final config = await readConfig();
+    if (config != null) {
+      state = config;
+    }
     return config;
   }
 
@@ -81,14 +91,16 @@ final llmSettingsProvider = NotifierProvider<LlmSettingsController, LlmConfig?>(
   LlmSettingsController.new,
 );
 
-/// LLM 配置 Provider（最终生效配置）
+/// LLM 配置 Provider（最终生效配置，autoDispose）
 ///
-/// 配置来源优先级：
-///   1. 用户在设置页配置的参数（持久化到 SharedPreferences）
-///   2. [LlmConfig] 构造函数中的默认值（兜底）
-final llmConfigProvider = FutureProvider<LlmConfig>((ref) async {
-  // 用户配置优先（await 异步持久化加载完成，避免首次请求拿到空 apiKey → 401）
-  final userConfig = await ref.read(llmSettingsProvider.notifier).load();
+/// - `autoDispose`：无监听时自动清缓存，彻底摆脱「改 key 须重启」的问题
+/// - `watch(llmSettingsProvider)`：配置保存（state 更新）时主动失效重建
+/// - 使用方（如叙事发送消息）建议用 `ref.refresh` 强制刷新，确保每次读最新 key
+final llmConfigProvider = FutureProvider.autoDispose<LlmConfig>((ref) async {
+  ref.watch(llmSettingsProvider);
+  // 用户配置优先（readConfig 只读不写 state，避免重复触发重建；
+  // await 异步持久化加载完成，避免首次请求拿到空 apiKey → 401）
+  final userConfig = await ref.read(llmSettingsProvider.notifier).readConfig();
   if (userConfig != null) return userConfig;
   // 默认值兜底
   return const LlmConfig();

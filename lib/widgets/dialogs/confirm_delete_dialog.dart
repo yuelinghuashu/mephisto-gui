@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 
@@ -27,14 +28,14 @@ class ConfirmDeleteDialog {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(AppLocalizations.of(context).confirmDeleteCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppTheme.error,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
+            child: Text(AppLocalizations.of(context).confirmDeleteDelete),
           ),
         ],
       ),

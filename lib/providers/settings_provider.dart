@@ -31,3 +31,33 @@ class SettingsController extends PrefsNotifier<ThemeMode> {
 final themeModeProvider = NotifierProvider<SettingsController, ThemeMode>(
   SettingsController.new,
 );
+
+/// 语言偏好控制器
+///
+/// 管理用户选择的界面语言，持久化到 SharedPreferences。
+/// 当前支持：`zh`（简体中文，默认）/ `en`（English）。
+class AppLanguageController extends PrefsNotifier<String> {
+  /// SharedPreferences 存储键
+  @override
+  String get key => _languageKey;
+
+  static const String _languageKey = 'mephisto_language';
+
+  @override
+  String get defaultValue => 'zh';
+
+  @override
+  String? fromStorage(String raw) =>
+      (raw == 'zh' || raw == 'en') ? raw : null;
+
+  @override
+  String toStorage(String value) => value;
+
+  /// 设置界面语言（`zh` / `en`）
+  Future<void> setLanguage(String language) => save(language);
+}
+
+/// 界面语言 Provider（`zh` = 简体中文，`en` = English）
+final languageProvider = NotifierProvider<AppLanguageController, String>(
+  AppLanguageController.new,
+);

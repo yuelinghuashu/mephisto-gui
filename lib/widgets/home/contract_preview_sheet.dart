@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 import '../../domain/models.dart';
@@ -30,7 +31,11 @@ class ContractPreviewSheet {
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('╳ 解析失败: $e')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).contractEditorParseFail('$e'),
+          ),
+        ),
       );
       return;
     }
@@ -73,7 +78,7 @@ class ContractPreviewSheet {
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
-                      tooltip: '关闭',
+                      tooltip: AppLocalizations.of(context).previewSheetClose,
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],

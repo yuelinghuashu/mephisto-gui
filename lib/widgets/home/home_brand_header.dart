@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 
@@ -17,7 +18,7 @@ class HomeBrandHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Mephisto 叙事引擎',
+          AppLocalizations.of(context).homeBrandTitle,
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
             color: AppTheme.gold,
@@ -25,7 +26,10 @@ class HomeBrandHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Text('选择一份命运契约，故事由此展开', style: theme.textTheme.labelLarge),
+        Text(
+          AppLocalizations.of(context).homeBrandSubtitle,
+          style: theme.textTheme.labelLarge,
+        ),
         const SizedBox(height: 24),
       ],
     );

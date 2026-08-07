@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 
@@ -24,6 +25,8 @@ class StatusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final l10n = AppLocalizations.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
@@ -35,11 +38,11 @@ class StatusBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _StatusChip('⚡', ruleCount, '规则'),
+          _StatusChip('⚡', ruleCount, l10n.statusBarRuleChip),
           const SizedBox(width: 16),
-          _StatusChip('🧠', memoryCount, '记忆'),
+          _StatusChip('🧠', memoryCount, l10n.statusBarMemoryChip),
           const SizedBox(width: 16),
-          _StatusChip('📜', historyCount, '历史'),
+          _StatusChip('📜', historyCount, l10n.statusBarHistoryChip),
         ],
       ),
     );

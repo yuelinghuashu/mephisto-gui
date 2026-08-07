@@ -27,11 +27,18 @@ import 'values_util.dart';
 /// 设计取舍：
 ///   - 同一个 .meph 契约的规则在每轮对话中都会被同一组 Rule 复用，
 ///     缓存可显著减少重复字符串拆分（split || / &&）的 CPU 开销
-///   - 缓存**无容量上限**：条件字符串来自契约文件，数量级远低于内存阈值，
-///     长期运行（多契约切换）累积的旧条目自然不再命中但不构成问题
-///   - 若未来支持运行时动态生成大量条件（如用户脚本），可在契约切换时
-///     调用 [_conditionCache.clear()] 释放旧条目
+///   - 采用 LRU 淘汰策略：记录每条目最近访问时间，超过 [maxConditionCacheEntries]
+///     时淘汰最久未用的条目，避免长期运行/多契约切换下积累无用内存
 final Map<String, CondNode?> _conditionCache = {};
+
+/// 条件编译缓存最大条目数。
+///
+/// 契约规则数量级远低于此阈值；LRU 淘汰仅作为内存安全兜底，
+/// 防止未来动态生成大量条件（如用户脚本）时的无界增长。
+const int maxConditionCacheEntries = 200;
+
+/// 每条目最近访问时间（LRU 辅助数据）。
+final Map<String, int> _conditionCacheAccess = {};
 
 // ============================================================
 // AST 节点定义
@@ -166,11 +173,44 @@ CondNode? _compileAtom(String c) {
 }
 
 /// 编译条件表达式（递归处理逻辑运算符与括号分组；结果写入模块级缓存）。
+///
+/// 带 LRU 淘汰：访问时更新最近时间戳，缓存超限时淘汰最久未用条目，
+/// 防止长期运行下无界增长。
 CondNode? compileCondition(String cond) {
-  return _conditionCache.putIfAbsent(
-    cond,
-    () => _compileConditionUncached(cond),
-  );
+  final now = _clock();
+  final cached = _conditionCache[cond];
+
+  if (cached != null) {
+    // 命中：更新最近访问时间
+    _conditionCacheAccess[cond] = now;
+    return cached;
+  }
+
+  // 未命中：编译并插入，随后按容量上限淘汰最久未用的条目
+  final compiled = _compileConditionUncached(cond);
+  _conditionCache[cond] = compiled;
+  _conditionCacheAccess[cond] = now;
+  _evictIfNeeded();
+  return compiled;
+}
+
+/// LRU 时钟：单调递增计数器（避免依赖系统时间导致的时间回拨/同毫秒冲突）。
+int _clock() => _clockCounter++;
+
+int _clockCounter = 0;
+
+/// 缓存超限时淘汰最久未使用的条目。
+void _evictIfNeeded() {
+  if (_conditionCache.length <= maxConditionCacheEntries) return;
+
+  // 按最近访问时间升序排序，取最久未用的条目逐个淘汰
+  final entries = _conditionCacheAccess.entries.toList()
+    ..sort((a, b) => a.value.compareTo(b.value));
+  final evictCount = _conditionCache.length - maxConditionCacheEntries;
+  for (final entry in entries.take(evictCount)) {
+    _conditionCache.remove(entry.key);
+    _conditionCacheAccess.remove(entry.key);
+  }
 }
 
 /// 编译（无缓存版本，供 [compileCondition] 调用）。

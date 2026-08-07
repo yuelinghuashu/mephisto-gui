@@ -1,6 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 import '../../providers/providers.dart';
@@ -62,6 +63,7 @@ class _InputBarState extends ConsumerState<InputBar> {
   Future<void> _attachFiles() async {
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(narrativeProvider.notifier);
+    final l10n = AppLocalizations.of(context);
 
     const typeGroup = XTypeGroup(label: '文本文件', extensions: _allowedExtensions);
     final files = await openFiles(acceptedTypeGroups: [typeGroup]);
@@ -80,7 +82,9 @@ class _InputBarState extends ConsumerState<InputBar> {
       } catch (e) {
         // 单个文件非文本则跳过，不影响其他
         messenger.showSnackBar(
-          SnackBar(content: Text('╳ ${file.name} 不是有效文本，已跳过')),
+          SnackBar(
+            content: Text(l10n.inputBarInvalidAttachment(file.name)),
+          ),
         );
       }
     }
@@ -96,6 +100,7 @@ class _InputBarState extends ConsumerState<InputBar> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isGenerating = widget.isGenerating;
+    final l10n = AppLocalizations.of(context);
     // 监听当前附件列表（用于显示附加提示，支持多选）
     final attachedNames = ref.watch(
       narrativeProvider.select((s) => s.attachedFileNames),
@@ -142,7 +147,7 @@ class _InputBarState extends ConsumerState<InputBar> {
               IconButton(
                 icon: const Icon(Icons.attach_file, color: AppTheme.gold),
                 onPressed: isGenerating ? null : _attachFiles,
-                tooltip: '附加上下文（文本，可多选）',
+                tooltip: l10n.inputBarAttachTooltip,
                 // 不设置 autofocus，点击后焦点回归 _focusNode
               ),
               const SizedBox(width: 4),
@@ -155,8 +160,8 @@ class _InputBarState extends ConsumerState<InputBar> {
                   enabled: !isGenerating,
                   decoration: InputDecoration(
                     hintText: isGenerating
-                        ? '梅菲斯特正在编织故事...'
-                        : '写下命运的指引，契约将推动叙事...',
+                        ? l10n.inputBarHintGenerating
+                        : l10n.inputBarHintIdle,
                     hintStyle: TextStyle(
                       color: isGenerating
                           ? AppTheme.textSecondary(
@@ -184,7 +189,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                       )
                     : const Icon(Icons.send, color: AppTheme.gold),
                 onPressed: isGenerating ? null : _sendMessage,
-                tooltip: '发送',
+                tooltip: l10n.inputBarSendTooltip,
               ),
             ],
           ),

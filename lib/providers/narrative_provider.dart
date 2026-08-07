@@ -9,6 +9,7 @@ import '../domain/narrative_reducer.dart';
 import '../domain/narrative_state.dart';
 import '../services/memory/memory_manager.dart';
 import '../services/narrative_turn_service.dart';
+import '../services/parser/meph_parser.dart';
 import '../services/session/child_save_store.dart';
 import '../services/session/session_saver.dart';
 import '../services/storage/contract_repo.dart';
@@ -43,9 +44,9 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交，减少 Riverpod 通知。
   void _appendStreamChunk(String chunk) {
     _streamBuffer.write(chunk);
-    _streamTimer ??= Timer.periodic(const Duration(milliseconds: 50), (_) {
-      _flushStreamBuffer();
-    });
+    // 每次有新 chunk 到达时，重置 50ms 一次性定时器；
+    // 定时器触发即提交缓冲 —— 语义是「最后一片 chunk 后 50ms 提交」。
+    _streamTimer ??= Timer(const Duration(milliseconds: 50), _flushStreamBuffer);
   }
 
   /// 提交缓冲中的流式内容到状态。
@@ -110,8 +111,9 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   Future<void> _generateCore(String userInput) async {
     final sharedClient = ref.read(httpClientProvider);
     final service = NarrativeTurnService(client: sharedClient);
-    // await 异步持久化加载完成，避免首次请求拿到空 apiKey → 401
-    final config = await ref.read(llmConfigProvider.future);
+    // 每次发消息都强制 refresh（重新读 SharedPreferences），
+    // 确保改 key 后不重启也能立即用新配置；llmConfigProvider 是 autoDispose
+    final config = await ref.refresh(llmConfigProvider.future);
     final narrativeRules = ref.read(narrativeRuleProvider);
 
     final result = await service.generate(
@@ -309,16 +311,39 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     _dispatch(const SessionReset());
   }
 
-  /// 将历史条目列表转换为 UI 消息列表（统一两种重建路径的样板）。
-  static List<Message> historyToMessages(List<HistoryEntry> history) {
-    return [
-      for (final h in history)
-        switch (h.role) {
-          MessageRole.fate => Message.fate(h.content),
-          MessageRole.assistant => Message.assistant(h.content),
-          MessageRole.system => Message.system(h.content),
-        },
-    ];
+  /// 热重载规则：解析新内容并**仅应用规则区块**，保留契约其余全部字段。
+  ///
+  /// 用于「叙事页内编辑当前契约」的运行时热更新：
+  ///   - 规则只在下一轮输入时由规则引擎重新求值，改规则不影响当前对话/
+  ///     状态/记忆，是最安全且有价值的实时调整对象
+  ///   - 角色名/锚点/世界观/背景/开局场景/初始状态等「角色人格本体」区块
+  ///     一律保留原运行版本——运行中改动它们会导致叙事前后矛盾（如历史
+  ///     回复仍是旧角色口吻），因此即使编辑器里改动了也不生效
+  ///   - [NarrativeState.currentState] / [NarrativeState.memories] /
+  ///     [NarrativeState.history] / [NarrativeState.messages] 全部保留，
+  ///     不丢失任何运行进度
+  ///   - 解析失败时不生效，仅记录错误（编辑器已有实时校验双保险）
+  void hotReloadContract(String content) {
+    try {
+      final newContract = parseMeph(content);
+      final old = state.contract;
+      state = state.copyWith(
+        contract: Contract(
+          roleName: old.roleName,
+          anchor: old.anchor,
+          worldview: old.worldview,
+          background: old.background,
+          opening: old.opening,
+          state: old.state,
+          rules: newContract.rules, // 仅应用规则区块
+          memories: old.memories,
+          history: old.history,
+        ),
+      );
+    } catch (e) {
+      debugPrint('契约热重载失败: $e');
+      state = state.copyWith(lastError: '契约热重载失败，已保留原设定');
+    }
   }
 }
 

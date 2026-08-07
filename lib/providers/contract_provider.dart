@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
@@ -14,13 +13,24 @@ const String contractPrefKey = 'mephisto_current_contract';
 /// 默认契约名（用户目录中不存在任何契约时使用）
 const String defaultContractName = 'faust.meph';
 
-/// 契约兜底提示 Provider。
+/// 契约兜底提示控制器。
 ///
 /// 当 [contractProvider] 因用户契约文件缺失/损坏而回退到 assets 内置模板时，
 /// 置为提示消息（UI 顶部提示条展示，避免用户误以为契约内容正确）；
 /// 正常加载时为 null（不显示）。
+class ContractFallbackNoticeController extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  /// 更新兜底提示（null 表示无提示）。
+  void setNotice(String? message) => state = message;
+}
+
+/// 契约兜底提示 Provider。
 final contractFallbackNoticeProvider =
-    StateProvider<String?>((ref) => null);
+    NotifierProvider<ContractFallbackNoticeController, String?>(
+  ContractFallbackNoticeController.new,
+);
 
 /// 当前使用的契约文件名 Provider（如 `faust.meph`）
 ///
@@ -55,7 +65,7 @@ final contractProvider = FutureProvider<Contract>((ref) async {
     try {
       final contract = parseMeph(source);
       // 正常加载：清除兜底提示
-      ref.read(contractFallbackNoticeProvider.notifier).state = null;
+      ref.read(contractFallbackNoticeProvider.notifier).setNotice(null);
       return contract;
     } catch (_) {
       // 用户文件存在但解析失败（语法错误）→ 落到内置模板兜底
@@ -66,8 +76,8 @@ final contractProvider = FutureProvider<Contract>((ref) async {
   final fallback = await _builtinFallback(name);
   if (fallback != null) {
     // 已回退内置模板：置提示，UI 顶部展示，避免用户误以为契约内容正确
-    ref.read(contractFallbackNoticeProvider.notifier).state =
-        '当前契约文件缺失或损坏，已加载内置模板';
+    ref.read(contractFallbackNoticeProvider.notifier)
+        .setNotice('当前契约文件缺失或损坏，已加载内置模板');
     return fallback;
   }
   throw Exception('契约文件不存在: $name');
@@ -153,20 +163,19 @@ final contractGroupListProvider =
 
   final files = await listContracts();
 
-  // 先解析所有文件信息
-  final infos = <ContractInfo>[];
-  for (final name in files) {
-    final content = await readContract(name);
-    final roleName = content == null ? null : extractRoleName(content);
-    infos.add(
-      ContractInfo(
+  // 先解析所有文件信息（并行读取，文件多时避免串行 IO 拖慢首页加载）
+  final infos = await Future.wait(
+    files.map((name) async {
+      final content = await readContract(name);
+      final roleName = content == null ? null : extractRoleName(content);
+      return ContractInfo(
         fileName: name,
         roleName: roleName ?? name.replaceAll('.meph', ''),
         isChild: isChildFileName(name),
         branchName: extractBranchName(name),
-      ),
-    );
-  }
+      );
+    }),
+  );
 
   // 按母版前缀分组：母版按文件名；子版挂到对应母版下
   final groupMap = <String, ContractGroup>{};

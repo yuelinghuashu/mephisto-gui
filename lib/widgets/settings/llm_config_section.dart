@@ -102,6 +102,8 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     }
 
     await ref.read(llmSettingsProvider.notifier).save(config);
+    // 强制失效缓存：确保运行时下次请求立即用新 key（双保险，见 llmConfigProvider 的 watch）
+    ref.invalidate(llmConfigProvider);
     messenger.showSnackBar(const SnackBar(content: Text('✦ LLM 配置已保存')));
   }
 
@@ -165,6 +167,8 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
   Future<void> _resetLlmConfig() async {
     final messenger = ScaffoldMessenger.of(context);
     await ref.read(llmSettingsProvider.notifier).clear();
+    // 强制失效缓存：清除配置后下次请求立即回退默认值
+    ref.invalidate(llmConfigProvider);
     const defaults = LlmConfig();
     _backend = defaults.backend;
     _apiKeyController.clear();

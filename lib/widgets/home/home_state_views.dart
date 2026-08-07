@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 /// 首页空状态：没有找到任何契约
 class HomeEmptyState extends StatelessWidget {
@@ -17,6 +18,7 @@ class HomeEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Center(
       child: Padding(
@@ -27,14 +29,14 @@ class HomeEmptyState extends StatelessWidget {
             const Text('⚜', style: TextStyle(fontSize: 48)),
             const SizedBox(height: 16),
             Text(
-              '契约虚空',
+              l10n.emptyStateNoContract,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              '尚未找到任何契约\n点击右上角导入 .meph 文件，\n或在设置页中配置契约目录',
+              l10n.emptyStateDescription,
               style: theme.textTheme.labelLarge,
               textAlign: TextAlign.center,
             ),
@@ -51,7 +53,9 @@ class HomeEmptyState extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.restore),
-                label: Text(isRestoring ? '正在恢复...' : '恢复内置角色'),
+                label: Text(
+                  isRestoring ? l10n.emptyStateRestoring : l10n.emptyStateRestoreBuiltin,
+                ),
                 style: FilledButton.styleFrom(
                   foregroundColor: Colors.black,
                   backgroundColor: theme.colorScheme.primary,
@@ -70,7 +74,7 @@ class HomeEmptyState extends StatelessWidget {
             // 前往设置按钮（引导用户配置契约目录）
             OutlinedButton.icon(
               icon: const Icon(Icons.settings_outlined),
-              label: const Text('前往设置'),
+              label: Text(l10n.emptyStateGoSettings),
               style: OutlinedButton.styleFrom(
                 foregroundColor: theme.colorScheme.primary,
                 side: BorderSide(color: theme.colorScheme.primary),
@@ -111,7 +115,7 @@ class HomeErrorState extends StatelessWidget {
             const Text('⚚', style: TextStyle(fontSize: 48)),
             const SizedBox(height: 16),
             Text(
-              '加载契约失败',
+              AppLocalizations.of(context).emptyStateLoadFail,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.bold,
               ),

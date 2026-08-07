@@ -10,6 +10,7 @@ import 'package:mephisto/providers/providers.dart';
 import 'package:mephisto/screens/narrative_screen.dart';
 import 'package:mephisto/screens/settings_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'test_helpers.dart';
 
 /// 叙事页 Widget 测试
 ///
@@ -18,6 +19,22 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// 通过 override contractProvider 直接注入内存中的契约，
 /// 避免测试环境中真实文件 IO 的 Future 无法在 FakeAsync 中完成的问题。
+///
+/// 测试专用：预填兜底提示的 Notifier（override 用）。
+///
+/// [ContractFallbackNoticeController.build] 返回 null，无法在构建后
+/// 再 setNotice（build 会在首次读取 state 时覆盖已设值），因此子类
+/// 直接在 build() 中返回预设消息。
+class _PrefilledFallbackNoticeController
+    extends ContractFallbackNoticeController {
+  final String message;
+
+  _PrefilledFallbackNoticeController(this.message);
+
+  @override
+  String? build() => message;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -61,7 +78,7 @@ void main() {
         contractProvider.overrideWith((ref) async => testContract),
         currentContractNameProvider.overrideWith((ref) async => 'faust.meph'),
       ],
-      child: MaterialApp(
+      child: localizedAppWithRoutes(
         routes: {
           '/settings': (_) => const SettingsScreen(),
         },
@@ -97,10 +114,12 @@ void main() {
           contractProvider.overrideWith((ref) async => testContract),
           currentContractNameProvider.overrideWith((ref) async => 'faust.meph'),
           contractFallbackNoticeProvider.overrideWith(
-            (ref) => '当前契约文件缺失或损坏，已加载内置模板',
+            () => _PrefilledFallbackNoticeController(
+              '当前契约文件缺失或损坏，已加载内置模板',
+            ),
           ),
         ],
-        child: MaterialApp(
+        child: localizedAppWithRoutes(
           routes: {
             '/settings': (_) => const SettingsScreen(),
           },

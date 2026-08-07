@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mephisto/widgets/dialogs/text_input_dialog.dart';
+import 'test_helpers.dart';
 
 /// TextInputDialog 通用文本输入对话框测试
 ///
@@ -18,7 +19,7 @@ void main() {
   Future<void> openDialog(WidgetTester tester) async {
     completer = Completer<String?>();
     await tester.pumpWidget(
-      MaterialApp(
+      localizedApp(
         home: Builder(
           builder: (context) => Center(
             child: FilledButton(
@@ -92,7 +93,7 @@ void main() {
   testWidgets('初始值显示在输入框中', (tester) async {
     completer = Completer<String?>();
     await tester.pumpWidget(
-      MaterialApp(
+      localizedApp(
         home: Builder(
           builder: (context) => Center(
             child: FilledButton(

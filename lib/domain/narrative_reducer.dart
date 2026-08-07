@@ -11,6 +11,33 @@ import 'models.dart';
 import 'narrative_event.dart';
 import 'narrative_state.dart';
 
+/// 将历史条目列表转换为 UI 消息列表（共享纯函数，供 Reducer 与状态管理器复用）。
+///
+/// 历史条目只含命运 / 角色两类（系统消息不参与存档）；
+/// 转换后生成对应的 [Message.fate] / [Message.assistant] / [Message.system]。
+List<Message> historyToMessages(List<HistoryEntry> history) {
+  return [
+    for (final h in history)
+      switch (h.role) {
+        MessageRole.fate => Message.fate(h.content),
+        MessageRole.assistant => Message.assistant(h.content),
+        MessageRole.system => Message.system(h.content),
+      },
+  ];
+}
+
+/// 在历史末尾追加一条条目（共享辅助，消除多处同步复制列表的样板）。
+List<HistoryEntry> _appendHistoryEntry(
+  NarrativeState state,
+  MessageRole role,
+  String content,
+) {
+  return [
+    ...state.history,
+    HistoryEntry(role: role, content: content),
+  ];
+}
+
 /// 应用事件到当前状态，返回新状态（纯函数，不修改原状态）。
 NarrativeState narrativeReducer(NarrativeState state, NarrativeEvent event) {
   return switch (event) {
@@ -49,10 +76,7 @@ NarrativeState _onMessageSent(NarrativeState state, String content) {
   final trimmed = content.trim();
   return state.copyWith(
     messages: [...state.messages, Message.fate(trimmed)],
-    history: [
-      ...state.history,
-      HistoryEntry(role: MessageRole.fate, content: trimmed),
-    ],
+    history: _appendHistoryEntry(state, MessageRole.fate, trimmed),
     isGenerating: true,
     streamingContent: '',
   );
@@ -89,10 +113,7 @@ NarrativeState _onReplySucceeded(
   // 写回回复 + 清空生成状态
   return next.copyWith(
     messages: [...next.messages, Message.assistant(reply)],
-    history: [
-      ...next.history,
-      HistoryEntry(role: MessageRole.assistant, content: reply),
-    ],
+    history: _appendHistoryEntry(next, MessageRole.assistant, reply),
     isGenerating: false,
     streamingContent: '',
     // 错误信息提示（放在最后，避免被覆盖）
@@ -118,14 +139,7 @@ NarrativeState _onSessionRestored(
   return state.copyWith(
     contract: restored,
     sourceFileName: fileName,
-    messages: [
-      for (final h in restored.history)
-        switch (h.role) {
-          MessageRole.fate => Message.fate(h.content),
-          MessageRole.assistant => Message.assistant(h.content),
-          MessageRole.system => Message.system(h.content),
-        },
-    ],
+    messages: historyToMessages(restored.history),
     currentState: restored.stateMap,
     memories: restored.memories,
     history: restored.history,

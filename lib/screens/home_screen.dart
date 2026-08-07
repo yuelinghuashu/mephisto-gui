@@ -1,6 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../providers/contract_provider.dart';
 import '../providers/providers.dart';
@@ -131,11 +132,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final count = _selected.length;
 
+    final l10n = AppLocalizations.of(context);
+
     // 确认对话框
     final confirmed = await ConfirmDeleteDialog.show(
       context,
-      title: '删除契约',
-      message: '确定要删除选中的 $count 个契约文件吗？此操作不可恢复。',
+      title: l10n.homeDeleteContractTitle,
+      message: l10n.homeDeleteSelectedConfirm(count),
     );
 
     if (!confirmed) return;
@@ -153,7 +156,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 成功时列表已直观反映（文件消失），无需提示；仅当存在删除失败时告知
     if (failCount > 0) {
       messenger.showSnackBar(
-        SnackBar(content: Text('╳ $failCount 个契约删除失败')),
+        SnackBar(content: Text(l10n.homeDeleteSelectedFail(count))),
       );
     }
   }
@@ -163,6 +166,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 支持多选：文件选择器允许同时选择多个 .meph 文件，逐个导入。
   Future<void> _importContract() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
 
     // 打开系统文件选择器（过滤 .meph 文件，支持多选）
     const typeGroup = XTypeGroup(
@@ -194,15 +198,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 汇总提示
     if (failCount == 0) {
       messenger.showSnackBar(
-        SnackBar(content: Text('✦ 已导入 $successCount 个契约')),
+        SnackBar(content: Text(l10n.homeImportSuccess(successCount))),
       );
     } else if (successCount == 0) {
       messenger.showSnackBar(
-        SnackBar(content: Text('╳ 导入失败: $lastError')),
+        SnackBar(content: Text(l10n.homeImportFailAll(lastError))),
       );
     } else {
       messenger.showSnackBar(
-        SnackBar(content: Text('⚚ 成功 $successCount 个，失败 $failCount 个')),
+        SnackBar(
+          content: Text(l10n.homeImportPartial(successCount, failCount)),
+        ),
       );
     }
   }
@@ -268,6 +274,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final allFiles = [
       for (final g in groups) ...[g.master, ...g.children],
     ];
+    final l10n = AppLocalizations.of(context);
 
     // ---- 多选模式顶栏 ----
     if (_isSelectMode) {
@@ -275,10 +282,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: _exitSelectMode,
-          tooltip: '取消',
+          tooltip: l10n.homeCancel,
         ),
         title: Text(
-          '已选 ${_selected.length} 项',
+          l10n.homeSelectedCount(_selected.length),
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.bold,
           ),
@@ -288,7 +295,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: _selected.isEmpty ? null : _deleteSelected,
-            tooltip: '删除所选',
+            tooltip: l10n.homeDeleteSelected,
           ),
           // ---- 全选 ----
           TextButton(
@@ -303,7 +310,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     }
                   },
             child: Text(
-              _selected.length == allFiles.length ? '取消全选' : '全选',
+              _selected.length == allFiles.length
+                  ? l10n.homeDeselectAll
+                  : l10n.homeSelectAll,
             ),
           ),
         ],
@@ -319,19 +328,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         IconButton(
           icon: const Icon(Icons.add_circle_outline),
           onPressed: _newContract,
-          tooltip: '新建契约',
+          tooltip: l10n.homeNewContract,
         ),
         // ---- 导入契约按钮 ----
         IconButton(
           icon: const Icon(Icons.file_upload_outlined),
           onPressed: _importContract,
-          tooltip: '导入契约',
+          tooltip: l10n.homeImportContract,
         ),
         // ---- 设置入口 ----
         IconButton(
           icon: const Icon(Icons.settings),
           onPressed: () => Navigator.pushNamed(context, '/settings'),
-          tooltip: '设置',
+          tooltip: l10n.homeSettings,
         ),
       ],
     );
@@ -430,6 +439,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 打开契约编辑器（编辑母版 .meph 源文本）。
   Future<void> _editContract(ContractInfo info) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
 
     final content = await readContract(info.fileName);
     if (content == null) return;
@@ -448,7 +458,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (saved != null) {
       _refreshLists();
       messenger.showSnackBar(
-        const SnackBar(content: Text('✦ 契约已保存')),
+        SnackBar(content: Text(l10n.homeContractSaved)),
       );
     }
   }
@@ -497,6 +507,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 弹出重命名对话框并执行重命名（母版级联同步子版前缀）。
   Future<void> _renameDialog(ContractInfo info) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
 
     final newName = await RenameContractDialog.show(
       context,
@@ -525,22 +536,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // （对话框已拦截「目标名已存在」，此处是文件系统层面失败的兜底提示）
     if (!ok) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('╳ 重命名失败：目标文件名已存在或旧文件不存在')),
+        SnackBar(content: Text(l10n.homeRenameFail)),
       );
     }
   }
 
   /// 确认并级联删除母版及其下所有子版。
   Future<void> _confirmCascadeDelete(ContractInfo master) => _confirmAndDelete(
-    title: '删除契约',
-    message: '确定要删除母版 ${master.fileName} 及其下所有子版吗？此操作不可恢复。',
+    title: AppLocalizations.of(context).homeDeleteContractTitle,
+    message: AppLocalizations.of(context).homeDeleteMasterConfirm(
+      master.fileName,
+    ),
     delete: () async => await deleteContractCascade(master.fileName) > 0,
   );
 
   /// 确认并删除单个子版。
   Future<void> _confirmDeleteChild(ContractInfo child) => _confirmAndDelete(
-    title: '删除子版',
-    message: '确定要删除子版文件 ${child.fileName} 吗？此操作不可恢复。',
+    title: AppLocalizations.of(context).homeDeleteChildTitle,
+    message: AppLocalizations.of(context).homeDeleteChildConfirm(
+      child.fileName,
+    ),
     delete: () => deleteContract(child.fileName),
   );
 
@@ -554,6 +569,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     required Future<bool> Function() delete,
   }) async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
 
     final confirmed = await ConfirmDeleteDialog.show(
       context,
@@ -570,7 +586,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // 成功时列表已直观反映（文件消失），无需提示；仅当删除失败时告知
     if (!ok) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('╳ 删除失败')),
+        SnackBar(content: Text(l10n.homeDeleteFail)),
       );
     }
   }

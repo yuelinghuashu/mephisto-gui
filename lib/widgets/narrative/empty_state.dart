@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 
@@ -29,7 +30,10 @@ class EmptyState extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Text('写下命运的指引，叙事将在契约中生长...', style: theme.textTheme.labelLarge),
+            Text(
+              AppLocalizations.of(context).narrativeEmptyHint,
+              style: theme.textTheme.labelLarge,
+            ),
             if (opening.isNotEmpty) ...[
               const SizedBox(height: 20),
               Container(
@@ -56,9 +60,7 @@ class EmptyState extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       opening,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontStyle: FontStyle.italic,
-                      ),
+                      style: theme.textTheme.bodyMedium,
                     ),
                   ],
                 ),

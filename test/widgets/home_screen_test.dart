@@ -7,6 +7,7 @@ import 'package:mephisto/providers/contract_provider.dart';
 import 'package:mephisto/providers/providers.dart';
 import 'package:mephisto/screens/home_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'test_helpers.dart';
 
 /// 首页 Widget 测试
 ///
@@ -60,7 +61,7 @@ void main() {
         ),
         currentContractNameProvider.overrideWith((ref) async => 'faust.meph'),
       ],
-      child: const MaterialApp(home: HomeScreen()),
+      child: localizedApp(home: const HomeScreen()),
     );
   }
 

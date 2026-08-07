@@ -8,6 +8,7 @@ library;
 
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -224,8 +225,7 @@ Future<void> ensureContracts({bool force = false}) async {
       await file.writeAsString(content);
     } catch (e) {
       // 内置模板加载失败不影响主流程
-      // ignore: avoid_print
-      print('复制内置契约失败: $name ($e)');
+      debugPrint('复制内置契约失败: $name ($e)');
     }
   }
 

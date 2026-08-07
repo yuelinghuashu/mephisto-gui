@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../providers/settings_provider.dart';
 import '../screens/home_screen.dart';
@@ -31,9 +32,16 @@ class _MyAppState extends ConsumerState<MyApp> {
   Widget build(BuildContext context) {
     // 从持久化设置读取主题模式（默认跟随系统）
     final themeMode = ref.watch(themeModeProvider);
+    // 从持久化设置读取界面语言（默认简体中文）
+    final language = ref.watch(languageProvider);
 
     return MaterialApp(
       title: 'Mephisto',
+      // 应用界面语言（由用户偏好决定，而非跟随系统）
+      locale: Locale(language),
+      // 本地化委托：AppLocalizations + Flutter 内置组件本地化
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
 
       /// 亮色主题（当系统为亮色时使用）
       theme: AppTheme.light(),

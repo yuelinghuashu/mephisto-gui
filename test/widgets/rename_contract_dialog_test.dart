@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mephisto/widgets/dialogs/rename_contract_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'test_helpers.dart';
 
 /// RenameContractDialog 重命名契约对话框测试
 ///
@@ -46,7 +47,7 @@ void main() {
   Future<void> openDialog(WidgetTester tester) async {
     completer = Completer<String?>();
     await tester.pumpWidget(
-      MaterialApp(
+      localizedApp(
         home: Builder(
           builder: (context) => Center(
             child: FilledButton(

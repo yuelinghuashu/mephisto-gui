@@ -18,6 +18,21 @@ on:
       - 'docs/**'
       - 'LICENSE'
 jobs:
+  validate-build-config:
+    name: Validate Build Config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint GitHub Actions workflows (actionlint)
+        uses: reviewdog/action-actionlint@v1
+        with:
+          fail_on_error: true
+
+      - name: Validate Android / iOS / packaging configs
+        run: python3 tool/validate_build_config.py
+
   analyze-and-test:
     name: Flutter Analyze & Test
     strategy:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../domain/models.dart';
 import 'message_bubble.dart';
@@ -59,6 +60,13 @@ class MessageListState extends State<MessageList> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
+    // 首次挂载后定位到最新消息：打开子版（已含完整历史）或切换契约时
+    // 应直接看到结尾而非开头。jumpTo 瞬时完成，历史长时也无需滚动动画；
+    // 母版无历史时 maxScrollExtent 为 0，jumpTo(0) 无副作用。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
   }
 
   @override
@@ -138,7 +146,7 @@ class MessageListState extends State<MessageList> {
           // ---- 如果正在生成，最后一条显示流式内容 ----
           if (widget.isGenerating && index == widget.messages.length) {
             final content = widget.streamingContent.isEmpty
-                ? '梅菲斯特正在执笔...'
+                ? AppLocalizations.of(context).messageBubbleThinking
                 : widget.streamingContent;
             return _wrapBubble(
               MessageBubble(

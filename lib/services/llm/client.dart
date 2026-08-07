@@ -3,6 +3,11 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+/// LLM 错误响应体最大读取字节数。
+///
+/// 防止异常 API 返回超长错误体导致客户端内存膨胀。
+const int maxErrorBodyBytes = 8192;
+
 /// LLM 消息（API 格式）
 class LlmMessage {
   /// 角色（user、assistant、system）
@@ -80,8 +85,15 @@ class LlmClient {
       final response = await httpClient.send(request).timeout(timeout);
 
       if (response.statusCode != 200) {
-        final errorBody = await response.stream.bytesToString();
-        throw Exception('API 错误: ${response.statusCode}\n$errorBody');
+        // 限制错误响应体的读取长度，防止恶意/异常服务返回超长错误体导致内存膨胀
+        final errorBody = await response.stream
+            .transform(utf8.decoder)
+            .take(maxErrorBodyBytes + 1)
+            .join();
+        final truncated = errorBody.length > maxErrorBodyBytes
+            ? '${errorBody.substring(0, maxErrorBodyBytes)}\n…（响应体已截断）'
+            : errorBody;
+        throw Exception('API 错误: ${response.statusCode}\n$truncated');
       }
 
       final fullContent = StringBuffer();

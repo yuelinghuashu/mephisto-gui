@@ -1,9 +1,17 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../app/theme.dart';
 import '../providers/providers.dart';
+import '../screens/contract_editor_screen.dart';
+import '../services/parser/meph_serializer.dart';
+import '../services/storage/contract_dir.dart';
+import '../services/storage/contract_repo.dart';
 import '../widgets/contract_menu_item.dart';
 import '../widgets/contract_panel.dart';
 import '../widgets/dialogs/text_input_dialog.dart';
@@ -25,6 +33,11 @@ import '../widgets/narrative/width_constrained_center.dart';
 /// 存档机制（母版/子版）：
 ///   - 进入页面时自动恢复最近存档；每轮对话自动覆盖保存子版文件（`faust.child.meph`）
 ///   - AppBar 存档菜单支持：保存、另存为分支、删除
+///
+/// 规则热重载：
+///   - 通过 [FileSystemEntity.watch] 监听当前打开的 .meph 文件，
+///     外部编辑器（VSCode）保存后自动热更新规则（对齐 CLI 版 fsnotify 体验）
+///   - 编辑按钮打开应用内编辑器，保存同样由文件监听统一触发热重载
 class NarrativeScreen extends ConsumerStatefulWidget {
   const NarrativeScreen({super.key});
 
@@ -36,6 +49,18 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
   /// 消息列表控制 Key（用于 AppBar 按钮 / 快捷键控制滚动）
   final GlobalKey<MessageListState> _messageListKey =
       GlobalKey<MessageListState>();
+
+  /// 当前监听的文件变更订阅（.meph 规则热重载）
+  StreamSubscription<FileSystemEvent>? _fileWatchSub;
+
+  /// 当前监听的文件路径（用于 sourceFileName 变化时重新绑定）
+  String _watchedFileName = '';
+
+  /// 文件变更防抖：短时间内多次写入只触发一次（与 CLI 版 fsnotify 对齐）
+  Timer? _watchDebounce;
+
+  /// 上次处理完的文件 mtime（抑制 saveChild 自我触发监听造成死循环）
+  DateTime? _lastProcessedMtime;
 
   @override
   void initState() {
@@ -49,6 +74,130 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
   }
 
   @override
+  void dispose() {
+    _cancelFileWatch();
+    _watchDebounce?.cancel();
+    super.dispose();
+  }
+
+  /// 取消当前文件监听。
+  void _cancelFileWatch() {
+    _watchDebounce?.cancel();
+    _watchDebounce = null;
+    _fileWatchSub?.cancel();
+    _fileWatchSub = null;
+    _watchedFileName = '';
+  }
+
+  /// 启动对指定 .meph 文件的监听（仅在文件名变化时重新绑定）。
+  ///
+  /// 外部编辑器保存 → 防抖 500ms → 读取文件 → 仅规则热重载（保留运行态）。
+  ///
+  /// 注意：完整路径 = 契约目录（[getContractsDirectory]）+ 文件名，
+  /// 与 [readContract] / [saveContract] 的路径解析保持一致。
+  Future<void> _startFileWatch(String fileName) async {
+    // 文件名未变化时不重复绑定
+    if (fileName.isEmpty || fileName == _watchedFileName) return;
+
+    _cancelFileWatch();
+    _watchedFileName = fileName;
+
+    try {
+      final dir = await getContractsDirectory();
+      if (!dir.existsSync()) return;
+
+      // 在契约目录上监听整个事件流（write/create/rename/modify 均覆盖）。
+      // 现代编辑器原子保存 = 临时文件 rename 覆盖，event.path 不固定，
+      // 因此不做路径精确匹配；契约目录文件极少，统一防抖重读当前文件即可。
+      final sub = dir.watch().listen(
+        (event) {
+          // 防抖：短时间内多次写入只触发一次（500ms）
+          _watchDebounce?.cancel();
+          _watchDebounce = Timer(const Duration(milliseconds: 500), () async {
+            // mtime 抑制：saveChild 自己写文件也会触发事件，
+            // 但 mtime 与上次处理后记录的一致 → 忽略，避免死循环
+            final file = File(
+              '${dir.path}${Platform.pathSeparator}$_watchedFileName',
+            );
+            if (!file.existsSync()) return;
+            final mtime = file.lastModifiedSync();
+            if (mtime == _lastProcessedMtime) return;
+            _handleFileChanged(_watchedFileName);
+          });
+        },
+        onError: (Object e) {
+          debugPrint('文件监听错误: $e');
+          _showFileWatchUnavailable();
+        },
+      );
+      _fileWatchSub = sub;
+    } catch (e) {
+      // 文件系统不支持监听/路径异常时静默降级（不影响叙事主流程）
+      debugPrint('启动文件监听失败: $e');
+      _showFileWatchUnavailable();
+    }
+  }
+
+  /// 文件监听不可用提示（一次性 SnackBar，避免重复打扰）。
+  ///
+  /// 文件系统不支持监听（如某些网络文件系统）或监听流报错时，
+  /// 规则热重载将失效——但叙事主流程不受影响，通过提示让用户知晓。
+  void _showFileWatchUnavailable() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).narrativeFileWatchUnavailable),
+        ),
+      );
+  }
+
+  /// 文件变更后的热重载处理：读取最新内容 → 仅规则热更新 → 补存子版。
+  ///
+  /// 注意：处理期间（补存子版写盘）暂停监听，避免「写 → 监听 → 再写」死循环；
+  /// 完成后恢复监听。
+  void _handleFileChanged(String fileName) {
+    if (!mounted) return;
+    final notifier = ref.read(narrativeProvider.notifier);
+
+    Future(() async {
+      _fileWatchSub?.pause();
+      try {
+        // 记录处理前 mtime；若之前已有记录且未变化（saveChild 自我触发）则忽略
+        final dir = await getContractsDirectory();
+        final file = File('${dir.path}${Platform.pathSeparator}$fileName');
+        final mtime = file.existsSync() ? file.lastModifiedSync() : null;
+        if (mtime != null &&
+            _lastProcessedMtime != null &&
+            mtime == _lastProcessedMtime) {
+          return;
+        }
+
+        final content = await readContract(fileName);
+        if (content == null || !mounted) return;
+
+        notifier.hotReloadContract(content);
+        await notifier.saveChild();
+
+        // 记录处理完的 mtime，抑制 saveChild 写文件触发的下一次监听
+        _lastProcessedMtime = file.existsSync() ? file.lastModifiedSync() : null;
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(AppLocalizations.of(context).narrativeHotReloadNotice),
+            ),
+          );
+      } finally {
+        _fileWatchSub?.resume();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     // ---- 读取状态 ----
     final state = ref.watch(narrativeProvider);
@@ -56,13 +205,32 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final fallbackNotice = ref.watch(contractFallbackNoticeProvider);
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final l10n = AppLocalizations.of(context);
 
     // ---- 监听 LLM 错误：非空时提示用户，避免静默回退 ----
     ref.listen(narrativeProvider.select((s) => s.lastError), (prev, next) {
       if (next.isNotEmpty) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text('╳ $next，梅菲斯特以凡俗之力回应')));
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context).narrativeErrorPrefix(next),
+              ),
+            ),
+          );
+      }
+    });
+
+    // ---- 文件监听：sourceFileName 变化（重开子版/切换契约）时重绑 ----
+    ref.listen(
+      narrativeProvider.select((s) => s.sourceFileName),
+      (prev, next) => _startFileWatch(next),
+    );
+    // 首次监听（页面打开后立即绑定当前文件）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _startFileWatch(ref.read(narrativeProvider).sourceFileName);
       }
     });
 
@@ -135,32 +303,38 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
             // 存档菜单（保存/另存为/删除）
             PopupMenuButton<String>(
               icon: const Icon(Icons.save_outlined),
-              tooltip: '存档',
+              tooltip: AppLocalizations.of(context).narrativeSaveMenu,
               onSelected: _onSaveMenu,
               // 缩短动画时长，菜单弹出更快更流畅（共享样式见 AppTheme.popupAnimationStyle）
               popUpAnimationStyle: AppTheme.popupAnimationStyle,
               itemBuilder: (context) => [
-                ContractMenuItem('save', Icons.save_outlined, '保存当前进度'),
+                ContractMenuItem('save', Icons.save_outlined, l10n.narrativeSaveCurrent),
                 ContractMenuItem(
                   'save_branch',
                   Icons.account_tree_outlined,
-                  '另存为分支...',
+                  l10n.narrativeSaveBranch,
                 ),
                 const PopupMenuDivider(),
-                ContractMenuItem('delete', Icons.delete_outline, '删除存档'),
+                ContractMenuItem('delete', Icons.delete_outline, l10n.narrativeDeleteSave),
               ],
             ),
-            // 跳至第一条历史
+            // 跳至第一条历史（消息流垂直滚动 → 用垂直双箭头表达「跳到顶」）
             IconButton(
-              icon: const Icon(Icons.first_page),
-              tooltip: '跳至第一条历史（Ctrl+Home）',
+              icon: const Icon(Icons.keyboard_double_arrow_up),
+              tooltip: l10n.narrativeScrollTop,
               onPressed: () => _messageListKey.currentState?.scrollToTop(),
             ),
-            // 跳至最后一条历史
+            // 跳至最后一条历史（消息流垂直滚动 → 用垂直双箭头表达「跳到底」）
             IconButton(
-              icon: const Icon(Icons.last_page),
-              tooltip: '跳至最后一条历史（Ctrl+End）',
+              icon: const Icon(Icons.keyboard_double_arrow_down),
+              tooltip: l10n.narrativeScrollBottom,
               onPressed: () => _messageListKey.currentState?.scrollToBottom(),
+            ),
+            // 编辑当前契约（打开应用内编辑器；保存由文件监听自动热更新）
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: l10n.narrativeEditContract,
+              onPressed: _openContractEditor,
             ),
             // 仪表盘按钮（查看当前契约数据）
             Builder(
@@ -173,14 +347,14 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                     Scaffold.of(context).openEndDrawer();
                   }
                 },
-                tooltip: '仪表盘',
+                tooltip: l10n.narrativeDashboard,
               ),
             ),
             // 设置按钮
             IconButton(
               icon: const Icon(Icons.settings),
               onPressed: () => Navigator.pushNamed(context, '/settings'),
-              tooltip: '设置',
+              tooltip: l10n.narrativeSettings,
             ),
           ],
         ),
@@ -305,7 +479,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '仪表盘',
+                        AppLocalizations.of(context).narrativeDashboard,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -313,7 +487,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
-                      tooltip: '关闭',
+                      tooltip: AppLocalizations.of(context).narrativeClose,
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -340,40 +514,81 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
   Future<void> _onSaveMenu(String value) async {
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(narrativeProvider.notifier);
+    final l10n = AppLocalizations.of(context);
 
     switch (value) {
       case 'save':
         final fileName = await notifier.saveChild();
         if (!mounted) return;
         if (fileName != null) {
-          messenger.showSnackBar(SnackBar(content: Text('✦ 契约已镌刻: $fileName')));
+          messenger.showSnackBar(
+            SnackBar(content: Text(l10n.narrativeSaveSuccess(fileName))),
+          );
         } else {
           messenger.showSnackBar(
-            const SnackBar(content: Text('╳ 存档失败：请检查契约目录权限或磁盘空间')),
+            SnackBar(content: Text(l10n.narrativeSaveFail)),
           );
         }
+        break;
       case 'save_branch':
         await _showSaveBranchDialog();
+        break;
       case 'delete':
         final ok = await notifier.deleteSave();
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text(ok ? '⚰ 存档已删除' : '╳ 没有可删除的存档')),
+          SnackBar(
+            content: Text(
+              ok ? l10n.narrativeDeleteSaveSuccess : l10n.narrativeDeleteSaveNone,
+            ),
+          ),
         );
+        break;
     }
+  }
+
+  /// 打开契约编辑器编辑当前正在游玩的 .meph 文件。
+  ///
+  /// 职责瘦身：本方法只负责「打开编辑器」——保存动作产生的文件写入，
+  /// 由 [_startFileWatch] 的文件监听统一感知并触发热重载（避免双重触发）。
+  ///
+  /// 编辑器内容预填当前契约的完整快照（静态区块 + 运行时状态/记忆/历史）。
+  Future<void> _openContractEditor() async {
+    final state = ref.read(narrativeProvider);
+
+    // 预填完整快照：静态区块 + 运行时状态/记忆/历史
+    final fullContent = serializeMeph(
+      state.contract,
+      runtimeState: state.currentState,
+      memories: state.memories,
+      history: state.history,
+    );
+
+    await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ContractEditorScreen(
+          fileName: state.sourceFileName,
+          initialContent: fullContent,
+        ),
+      ),
+    );
+    // 编辑器保存后不在此手动热重载：
+    // 文件监听已检测到写入并触发 [NarrativeNotifier.hotReloadContract]
   }
 
   /// 弹出「另存为分支」对话框，输入分支名生成 `faust.branch.meph`。
   Future<void> _showSaveBranchDialog() async {
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(narrativeProvider.notifier);
+    final l10n = AppLocalizations.of(context);
 
     final branchName = await TextInputDialog.show(
       context,
-      title: '✏️ 另存为分支',
-      labelText: '分支名',
-      hintText: '如 dark、light、审判线',
-      confirmText: '保存',
+      title: l10n.narrativeBranchDialogTitle,
+      labelText: l10n.narrativeBranchLabel,
+      hintText: l10n.narrativeBranchHint,
+      confirmText: l10n.narrativeConfirm,
       validate: (value) => value.isNotEmpty,
     );
 
@@ -381,10 +596,12 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final fileName = await notifier.saveChild(branchName: branchName);
     if (!mounted) return;
     if (fileName != null) {
-      messenger.showSnackBar(SnackBar(content: Text('✦ 分支契约已镌刻: $fileName')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.narrativeBranchSaved(fileName))),
+      );
     } else {
       messenger.showSnackBar(
-        const SnackBar(content: Text('╳ 分支存档失败：请检查契约目录权限或磁盘空间')),
+        SnackBar(content: Text(l10n.narrativeBranchFail)),
       );
     }
   }

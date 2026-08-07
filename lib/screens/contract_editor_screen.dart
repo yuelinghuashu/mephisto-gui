@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../app/theme.dart';
 import '../services/parser/meph_formatter.dart';
@@ -149,7 +150,9 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
     } on MephParseError catch (e) {
       error = e;
     } catch (_) {
-      error = MephParseError(message: '无法解析的契约内容');
+      error = MephParseError(
+        message: AppLocalizations.of(context).contractEditorUnparseable,
+      );
     }
 
     if (!mounted) return;
@@ -159,13 +162,14 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
   /// 保存契约：校验文件名 + 校验 .meph 格式 + 写入文件。
   Future<void> _save() async {
     final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
 
     // 1. 校验文件名
     var fileName = _nameController.text.trim();
     if (_isNew) {
       if (fileName.isEmpty) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('╳ 请填写文件名')),
+          SnackBar(content: Text(l10n.contractEditorNameEmpty)),
         );
         return;
       }
@@ -175,7 +179,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
       // 新建时检查重名
       if (!await isContractNameAvailable(fileName)) {
         messenger.showSnackBar(
-          SnackBar(content: Text('╳ 文件名已存在: $fileName')),
+          SnackBar(content: Text(l10n.contractEditorNameExists(fileName))),
         );
         return;
       }
@@ -192,15 +196,18 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            '╳ 格式错误: ${e.message}'
-            '（${e.blockName ?? ''}第 ${e.line ?? '?'} 行）',
+            l10n.contractEditorFormatError(
+              e.message,
+              e.blockName ?? '',
+              e.line ?? 0,
+            ),
           ),
         ),
       );
       return;
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('╳ 解析失败: $e')),
+        SnackBar(content: Text(l10n.contractEditorParseFail('$e'))),
       );
       return;
     }
@@ -210,7 +217,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
       await saveContract(fileName, content);
     } catch (e) {
       messenger.showSnackBar(
-        SnackBar(content: Text('╳ 保存失败: $e')),
+        SnackBar(content: Text(l10n.contractEditorSaveFail('$e'))),
       );
       return;
     }
@@ -222,16 +229,19 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isNew ? '✏️ 新建契约' : '✏️ 编辑契约'),
+        title: Text(
+          _isNew ? l10n.contractEditorNewTitle : l10n.contractEditorEditTitle,
+        ),
         centerTitle: false,
         actions: [
           // 一键格式化：文本级规范（缩进/空行/列表/规则运算符自动修复）
           IconButton(
             icon: const Icon(Icons.format_align_left, color: AppTheme.gold),
-            tooltip: '格式化文本（调整缩进、空行并修复运算符空格）',
+            tooltip: l10n.contractEditorFormatTooltip,
             onPressed: () {
               _contentController.text = formatMephText(_contentController.text);
               // 光标移到最后，直观看到格式化结果
@@ -243,7 +253,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
           FilledButton.icon(
             onPressed: _save,
             icon: const Icon(Icons.save_outlined, size: 18),
-            label: const Text('保存'),
+            label: Text(l10n.contractEditorSave),
             style: FilledButton.styleFrom(
               backgroundColor: AppTheme.gold,
               foregroundColor: Colors.black,
@@ -252,7 +262,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
           const SizedBox(width: 8),
           IconButton(
             icon: const Icon(Icons.close),
-            tooltip: '取消',
+            tooltip: l10n.contractEditorCancel,
             onPressed: () => Navigator.pop(context),
           ),
         ],
@@ -269,10 +279,10 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
                 if (_isNew) ...[
                   TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: '文件名（自动补 .meph 后缀）',
-                      hintText: '如 my_story',
-                      prefixIcon: Icon(Icons.description_outlined),
+                    decoration: InputDecoration(
+                      labelText: l10n.contractEditorFileName,
+                      hintText: l10n.contractEditorFileNameHint,
+                      prefixIcon: const Icon(Icons.description_outlined),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -301,8 +311,8 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
                       ),
                       decoration: InputDecoration(
                         hintText: _isNewLoading
-                            ? '正在加载 faust.meph 模板...'
-                            : '输入 .meph 契约内容...',
+                            ? l10n.contractEditorLoadingTemplate
+                            : l10n.contractEditorContentHint,
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.all(16),
                       ),
@@ -334,9 +344,15 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '第 ${_liveError!.line ?? '?'} 行'
-                            '${_liveError!.blockName != null ? '，区块「${_liveError!.blockName}」' : ''}'
-                            ': ${_liveError!.message}',
+                            l10n.contractEditorErrorLine(
+                              _liveError!.line ?? 0,
+                              _liveError!.blockName != null
+                                  ? l10n.contractEditorErrorBlock(
+                                      _liveError!.blockName!,
+                                    )
+                                  : '',
+                              _liveError!.message,
+                            ),
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.5,
@@ -355,37 +371,46 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
                       color: AppTheme.gold.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
                     ),
-                    child: const Row(
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline,
+                        const Icon(Icons.info_outline,
                             size: 16, color: AppTheme.gold),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '• 契约以【区块名】组织：角色名 / 锚点 / 世界观 / '
-                                '角色背景 / 开局场景 / 状态 / 规则 / 记忆 / 历史',
-                                style: TextStyle(fontSize: 12, height: 1.5),
+                                l10n.contractEditorInfoLine1,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
-                                '• 规则格式：[规则名] if 条件 -> 动作；'
-                                '任意【自定义区块】可作为草稿/备忘，不会报错',
-                                style: TextStyle(fontSize: 12, height: 1.5),
+                                l10n.contractEditorInfoLine2,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
-                                '• 保存时自动校验格式并定位错误',
-                                style: TextStyle(fontSize: 12, height: 1.5),
+                                l10n.contractEditorInfoLine3,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
                               ),
-                              SizedBox(height: 4),
+                              const SizedBox(height: 4),
                               Text(
-                                '• 需要更专业的编辑体验（行号、语法高亮、自动补全）等等'
-                                '可在 VSCode 安装 Mephisto 插件编辑 .meph 文件',
-                                style: TextStyle(fontSize: 12, height: 1.5),
+                                l10n.contractEditorInfoLine4,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  height: 1.5,
+                                ),
                               ),
                             ],
                           ),

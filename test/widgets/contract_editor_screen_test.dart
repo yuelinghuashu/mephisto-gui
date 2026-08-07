@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mephisto/screens/contract_editor_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'test_helpers.dart';
 
 /// 契约编辑器 Widget 测试
 ///
@@ -32,8 +33,8 @@ void main() {
 ''';
 
   Widget buildEditor() {
-    return const MaterialApp(
-      home: ContractEditorScreen(
+    return localizedApp(
+      home: const ContractEditorScreen(
         // 编辑模式（非新建）：不触发 assets 模板加载
         fileName: 'faust.meph',
         initialContent: validOpening,

@@ -6,6 +6,7 @@ import 'package:mephisto/providers/providers.dart';
 import 'package:mephisto/screens/settings_screen.dart';
 import 'package:mephisto/services/prompt/system_prompt.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'test_helpers.dart';
 
 /// 设置页 Widget 测试
 ///
@@ -29,7 +30,9 @@ void main() {
   });
 
   Widget buildSettings() {
-    return const ProviderScope(child: MaterialApp(home: SettingsScreen()));
+    return ProviderScope(
+      child: localizedApp(home: const SettingsScreen()),
+    );
   }
 
   testWidgets('渲染全部配置区块', (tester) async {
@@ -57,7 +60,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: SettingsScreen()),
+        child: localizedApp(home: const SettingsScreen()),
       ),
     );
     await tester.pumpAndSettle();
@@ -83,7 +86,7 @@ void main() {
     await tester.pumpWidget(
       UncontrolledProviderScope(
         container: container,
-        child: const MaterialApp(home: SettingsScreen()),
+        child: localizedApp(home: const SettingsScreen()),
       ),
     );
     await tester.pumpAndSettle();

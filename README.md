@@ -5,6 +5,11 @@
 # 📜 Mephisto 叙事引擎
 
 <p align="center">
+  <img src="https://img.shields.io/badge/lang-简体中文-blue?style=flat-square" alt="简体中文" />
+  <a href="README.en.md"><img src="https://img.shields.io/badge/lang-English-blue?style=flat-square" alt="English" /></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/github/v/release/yuelinghuashu/mephisto-gui" alt="GitHub Release" />
@@ -28,8 +33,7 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 | 浮士德最终说出"你真美呀，请停留一下" | 玩家最终感到"心满意足"   |
 | 契约完成，浮士德的灵魂归于梅菲斯特   | 契约完成，故事抵达终点   |
 
-> **梅菲斯特不是恶魔，不是守护者。**
-> **他是那个让叙事无法停下的机制。**
+> **原典为根，命途为枝。每一句「请停留一下」，都是一条尚未被书写的命运。**
 
 ## 🚀 核心特性
 
@@ -39,6 +43,7 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 - **骰子系统**：`roll(1d2)` 二元判定 / `roll(1d100)` 高精度命运判定，带「命运结算」卡片渲染
 - **记忆系统**：自动提取关键事件摘要，超限自动压缩，塑造长期叙事一致性
 - **子版存档**：母版只读，运行时对话生成子版快照，支持分支与恢复
+- **规则热重载**：叙事页 ✏️ 或 VSCode 保存 `.meph` → **仅规则即时生效**，对话/状态/记忆/历史全保留
 - **自定义风格**：可自由设置叙事规则，精准控制输出文学风格（诗句对白/冷峻白描等）
 - **跨平台**：Windows / macOS / Linux / Android / iOS
   - 桌面端：Windows / macOS / Linux，契约存储于用户主目录 `~/Mephisto/contracts`，可自定义目录
@@ -99,6 +104,21 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 | [存档系统](docs/save-system.md) | 母版只读、子版快照、分支 |
 | [平台存储策略](docs/platform-storage.md) | 各平台契约目录与沙盒限制 |
 
+## 🔥 规则热重载
+
+你可以在叙事进行中实时调整规则，而**不会破坏当前进度**：
+
+- **仅规则区块生效**：保存 `.meph` 后，新的规则（触发条件 / 动作 / 骰子阈值）立即用于**下一轮叙事**
+- **角色人格锁定**：角色名 / 锚点 / 世界观 / 背景 / 开局场景等「人格本体」区块一律保留原运行版本，
+  避免运行时改动导致叙事前后矛盾（如历史回复仍是旧角色口吻）
+- **运行态全保留**：对话消息 / 状态值 / 记忆 / 历史丝毫无损，不存在「改规则 = 清进度」
+- **两种触发方式**：
+  - 叙事页右上角 ✏️ 打开应用内编辑器，保存后自动生效
+  - 直接在使用 VSCode 等外部编辑器修改契约文件，应用自动检测并热更新
+
+> 该机制与「子版存档」天然互补：热重载针对**运行中的当前会话**，存档针对**持久化快照**；
+> 详细机制见 [docs/save-system.md](docs/save-system.md)。
+
 ## 🧩 VSCode 插件联动
 
 编写 `.meph` 契约推荐使用 **Mephisto VSCode 插件**，获得更专业的编辑体验：
@@ -145,12 +165,17 @@ flutter analyze
 flutter test
 ```
 
-测试覆盖规则引擎、Meph 解析、LLM、记忆、存档、Provider 与 UI 全链路。
+测试覆盖规则引擎、Meph 解析、LLM、记忆、存档、Provider 与 UI 全链路，
+另有 `tool/validate_build_config.py` 对 Android/iOS/打包脚本做 11 项静态断言。
 
 ## 🚀 CI / CD
 
 项目内置 GitHub Actions 工作流（[`.github/workflows/ci.yml`](.github/workflows/ci.yml)），
-在 Linux / Windows / macOS 三平台自动运行 `flutter analyze` + `flutter test` + 桌面构建。
+在 Linux / Windows / macOS 三平台自动运行：
+
+- `validate-build-config`：actionlint 工作流语法检查 + `tool/validate_build_config.py` 构建配置断言
+- `analyze-and-test`：`flutter analyze` + `flutter test`
+- 桌面平台构建（Release），发布工作流见 [`.github/workflows/release.yml`](.github/workflows/release.yml)
 
 ## 🛠️ 平台支持与测试声明
 
@@ -204,10 +229,18 @@ flutter test
 
 ## ⚖️ 版本
 
-当前版本 **v1.0.0**：功能骨架完整，核心叙事/存档/分支流程已调通，测试完备度 191 个（含 UI 层关键路径测试）。
-
 完整版本历史见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 📜 许可证
 
 本项目采用 [MIT License](LICENSE) 开源，详见 [LICENSE](LICENSE) 文件。
+
+## ☕ 赞助支持
+
+<details>
+<summary>☕ 若这叙事曾打动你，不妨请梅菲斯特喝一杯</summary>
+
+<img src="./assets/images/ali-pay.jpg" width="200" height="280" alt="支付宝收款码" />
+<img src="./assets/images/wechat-pay.jpg" width="200" height="280" alt="微信收款码" />
+
+</details>
