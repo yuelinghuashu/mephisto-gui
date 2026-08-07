@@ -308,50 +308,66 @@ class _ChildTile extends StatelessWidget {
                 const SizedBox(width: 6),
               ],
               // 分支标签：命运一句话为主 + 分支名为副（并存显示）
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      child.branchTitle ?? child.branchName ?? 'child',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: AppTheme.gold,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    // 命运一句话与分支名不同（如「命运：xxx」带分支名后缀）时，
-                    // 以小字展示分支名，保留文件本身的命名信息
-                    if (child.branchTitle != null &&
-                        child.branchName != null &&
-                        child.branchName!.isNotEmpty)
+              // 与文件名共享「有限弹性宽度」（3 : 2），
+              // 两者各自 maxLines/ellipsis 真正生效、互不挤爆——
+              // 命运描述过长在 3/5 宽度内省略号截断，文件名过长在 2/5 宽度内截断
+              Expanded(
+                flex: 3,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        child.branchName!,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: AppTheme.textSecondary(theme.brightness),
-                          fontSize: 10,
+                        child.branchTitle ?? child.branchName ?? 'child',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: AppTheme.gold,
+                          fontWeight: FontWeight.bold,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              // 存档文件名
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text(
-                  child.fileName,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: AppTheme.textSecondary(theme.brightness),
-                    fontSize: 11,
+                      // 命运一句话与分支名不同（如「命运：xxx」带分支名后缀）时，
+                      // 以小字展示分支名，保留文件本身的命名信息
+                      if (child.branchTitle != null &&
+                          child.branchName != null &&
+                          child.branchName!.isNotEmpty)
+                        Text(
+                          child.branchName!,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: AppTheme.textSecondary(theme.brightness),
+                            fontSize: 10,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 4),
+              // 文件名：同样包在 Expanded 内（flex: 2），
+              // 过长时在有限宽度内省略号截断，不再撑满整行或溢出卡片右缘
+              Expanded(
+                flex: 2,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 12, right: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        child.fileName,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppTheme.textSecondary(theme.brightness),
+                          fontSize: 11,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               // ⋮ 操作菜单（进入/重命名/删除）—— 多选模式下也保留
               _buildChildMenu(context),
             ],

@@ -31,13 +31,14 @@ void main() {
     }
   });
 
-  ContractInfo info(String name, {String? branch}) {
+  ContractInfo info(String name, {String? branch, String? branchTitle}) {
     final base = name.replaceAll('.meph', '').split('.').first;
     return ContractInfo(
       fileName: name,
       roleName: base,
       isChild: branch != null,
       branchName: branch,
+      branchTitle: branchTitle,
     );
   }
 
@@ -64,6 +65,50 @@ void main() {
       child: localizedApp(home: const HomeScreen()),
     );
   }
+
+  testWidgets('超长命运描述与超长文件名不溢出卡片边界（省略号截断）', (tester) async {
+    // 超长 @命运 描述 + 超长分支名 + 远超卡片可用宽度的超长文件名
+    final groups = [
+      ContractGroup(
+        master: info('faust.meph'),
+        children: [
+          info(
+            'faust.verylongbranchnamechild.this-file-name-is-far-longer-than-'
+            'any-card-can-fit-in-a-single-row-meph.meph',
+            branch: 'very-long-branch-name',
+            branchTitle: '命运：理想国支线里浮士德在边际海岸望向乌托邦的那一天，'
+                '天上的云像极了他年轻时追求的知识之海',
+          ),
+        ],
+      ),
+    ];
+    await tester.pumpWidget(buildHome(groups: groups));
+    await tester.pumpAndSettle();
+
+    // 展开子版区
+    await tester.tap(find.byTooltip('展开子版'));
+    await tester.pumpAndSettle();
+
+    // 无溢出异常（Flutter 测试默认 FlutterError.onError 会捕获 RenderFlex overflow）
+    expect(tester.takeException(), isNull);
+
+    // 命运描述截断展示（未完整铺满）
+    final titleText = tester.widget<Text>(
+      find.textContaining('命运：理想国支线里浮士德在边际海岸望向乌托邦的那一天'),
+    );
+    expect(titleText.maxLines, 1);
+    expect(titleText.overflow, TextOverflow.ellipsis);
+
+    // 文件名同样被省略号截断（不再撑满整行 / 溢出右缘）
+    final fileNameText = tester.widget<Text>(
+      find.byWidgetPredicate((w) =>
+          w is Text &&
+          w.data != null &&
+          w.data!.startsWith('faust.verylongbranchnamechild.this-file-name')),
+    );
+    expect(fileNameText.maxLines, 1);
+    expect(fileNameText.overflow, TextOverflow.ellipsis);
+  });
 
   testWidgets('渲染母版分组列表', (tester) async {
     await tester.pumpWidget(buildHome());
