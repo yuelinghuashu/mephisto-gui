@@ -92,6 +92,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   /// 构建叙事内容宽度选择器
   Widget _buildWidthSelector(ThemeData theme) {
     final currentWidth = ref.watch(narrativeWidthProvider);
+    final l10n = AppLocalizations.of(context);
 
     return Column(
       children: [
@@ -103,7 +104,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               NarrativeWidth.wide => Icons.menu_book,
               NarrativeWidth.full => Icons.photo_size_select_large,
             },
-            label: width.label,
+            // 档位文案走 ARB 国际化（Narrow / Medium / Wide / Full Screen）
+            label: switch (width) {
+              NarrativeWidth.narrow => l10n.settingsWidthNarrow,
+              NarrativeWidth.medium => l10n.settingsWidthMedium,
+              NarrativeWidth.wide => l10n.settingsWidthWide,
+              NarrativeWidth.full => l10n.settingsWidthFull,
+            },
             selected: currentWidth == width,
             onTap: () =>
                 ref.read(narrativeWidthProvider.notifier).setWidth(width),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mephisto/domain/narrative_error.dart';
 import 'package:mephisto/providers/contract_provider.dart';
 import 'package:mephisto/services/parser/meph_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -66,10 +67,10 @@ void main() {
       expect(contract.roleName, '浮士德');
       expect(contract.opening, isNotEmpty);
       expect(contract.rules, isNotEmpty);
-      // 兜底提示已置位
+      // 兜底提示已置位（Provider 层暴露错误码，由 UI 层翻译）
       expect(
         container.read(contractFallbackNoticeProvider),
-        contains('已加载内置模板'),
+        narrativeErrorContractFallback,
       );
     });
 
@@ -85,7 +86,7 @@ void main() {
       expect(contract.opening, isNotEmpty);
       expect(
         container.read(contractFallbackNoticeProvider),
-        contains('已加载内置模板'),
+        narrativeErrorContractFallback,
       );
     });
 

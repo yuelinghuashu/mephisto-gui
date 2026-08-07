@@ -248,12 +248,15 @@ Future<void> ensureContracts({bool force = false}) async {
 /// 统一了 [contract_repo.dart]（listContracts / deleteContractCascade）与
 /// [child_save_store.dart]（listChildFiles）中重复的「扫目录 → 过滤 .meph →
 /// 取文件名 → 排序」样板，消除各处 `listSync + whereType<File> + split` 重复。
-List<String> listMephFileNames(Directory dir) {
-  return dir
-      .listSync()
-      .whereType<File>()
-      .map((f) => f.path.split(Platform.pathSeparator).last)
-      .where((name) => name.endsWith('.meph'))
-      .toList()
-    ..sort();
+///
+/// 异步实现（`dir.list()`）避免 UI 线程上同步 IO 阻塞。
+Future<List<String>> listMephFileNames(Directory dir) async {
+  final names = <String>[];
+  await for (final entity in dir.list()) {
+    if (entity is! File) continue;
+    final name = entity.path.split(Platform.pathSeparator).last;
+    if (name.endsWith('.meph')) names.add(name);
+  }
+  names.sort();
+  return names;
 }

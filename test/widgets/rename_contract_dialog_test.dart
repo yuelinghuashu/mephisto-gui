@@ -16,17 +16,29 @@ import 'test_helpers.dart';
 ///   - 取消返回 null
 ///   - 目标文件名已存在（非自身）→ 阻止提交并展示错误提示
 ///   - 重命名为自身名 → 放行
+///   - 子版重命名时显示命运说明输入框并返回修改后的值
+///   - 母版重命名时不显示命运说明输入框
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
-  late Completer<String?> completer;
+  late Completer<(String, String?)?> completer;
 
   /// 当前被重命名的文件（默认 faust.meph 已存在于契约目录）
   String currentName = 'faust.meph';
 
+  /// 是否为子版（决定是否显示命运说明输入框）
+  bool showFateField = false;
+
+  /// 当前命运说明初始值（预填用）
+  String? initialFateTitle;
+
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('mephisto_rename_test_');
+    // 重置流程状态变量（避免测试间状态泄漏）
+    currentName = 'faust.meph';
+    showFateField = false;
+    initialFateTitle = null;
     // mock 契约目录：faust.meph 已存在（当前文件），dantes.meph 已存在（重名目标）
     SharedPreferences.setMockInitialValues({
       'mephisto_contracts_directory': tempDir.path,
@@ -44,8 +56,14 @@ void main() {
     }
   });
 
+  void resetFlowState({String name = 'faust.meph', bool showFate = false, String? fateTitle}) {
+    currentName = name;
+    showFateField = showFate;
+    initialFateTitle = fateTitle;
+  }
+
   Future<void> openDialog(WidgetTester tester) async {
-    completer = Completer<String?>();
+    completer = Completer<(String, String?)?>();
     await tester.pumpWidget(
       localizedApp(
         home: Builder(
@@ -56,6 +74,8 @@ void main() {
                   RenameContractDialog.show(
                     context,
                     currentName: currentName,
+                    initialBranchTitle: initialFateTitle,
+                    showBranchTitleField: showFateField,
                   ),
                 );
               },
@@ -84,7 +104,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
 
-    expect(await completer.future, '歌德.meph');
+    expect(await completer.future, ('歌德.meph', null));
     expect(find.byType(TextField), findsNothing);
   });
 
@@ -101,7 +121,7 @@ void main() {
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
 
-    expect(await completer.future, '歌德.meph');
+    expect(await completer.future, ('歌德.meph', null));
   });
 
   testWidgets('取消返回 null', (tester) async {
@@ -124,17 +144,12 @@ void main() {
     // 对话框未关闭 + 错误提示出现（重名提交已被异步校验拦截）
     expect(find.byType(TextField), findsOneWidget);
     expect(find.text('该文件名已存在，请更换'), findsOneWidget);
-    // 注：不用 completer.isCompleted 断言「对话框未关闭」——
-    //   openDialog 用 completer.complete(Future) 包装，Dart 的 Completer 在
-    //   complete() 被调用时即置为 completed（其值待 Future resolve），
-    //   因此 isCompleted 从打开对话框起恒为 true，无法反映对话框真实状态。
-    //   对话框是否关闭由上面的 find.byType(TextField) 断言保证。
 
     // 改为合法新名后仍可提交
     await tester.enterText(find.byType(TextField), '歌德.meph');
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
-    expect(await completer.future, '歌德.meph');
+    expect(await completer.future, ('歌德.meph', null));
   });
 
   testWidgets('重命名为自身名 → 放行', (tester) async {
@@ -145,7 +160,32 @@ void main() {
     await tester.tap(find.text('重命名'));
     await tester.pumpAndSettle();
 
-    expect(await completer.future, 'faust.meph');
+    expect(await completer.future, ('faust.meph', null));
     expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('子版显示命运说明输入框并返回修改后的值', (tester) async {
+    resetFlowState(name: 'faust.dark.meph', showFate: true, fateTitle: '旧的命运说明');
+    await openDialog(tester);
+
+    // 两个输入框：文件名 + 命运说明
+    expect(find.byType(TextField), findsNWidgets(2));
+    // 命运说明预填当前值
+    expect(find.text('旧的命运说明'), findsOneWidget);
+
+    // 修改命运说明后提交
+    await tester.enterText(find.byType(TextField).first, 'faust.dark.meph');
+    await tester.enterText(find.byType(TextField).last, '新的命运说明');
+    await tester.tap(find.text('重命名'));
+    await tester.pumpAndSettle();
+
+    expect(await completer.future, ('faust.dark.meph', '新的命运说明'));
+  });
+
+  testWidgets('母版不显示命运说明输入框', (tester) async {
+    // 保持默认：母版（faust.meph）不显示命运说明
+    await openDialog(tester);
+
+    expect(find.byType(TextField), findsOneWidget);
   });
 }

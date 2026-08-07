@@ -105,6 +105,15 @@ class ContractCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                   ],
+                  // 非多选模式：树根图标（命中「命运树」隐喻）
+                  if (!isSelectMode) ...[
+                    const Icon(
+                      Icons.graphic_eq,
+                      size: 16,
+                      color: AppTheme.gold,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -126,26 +135,28 @@ class ContractCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // 非多选模式：子版展开箭头 + ⋮ 操作菜单
-                  if (!isSelectMode) ...[
-                    // 子版展开/收起按钮（仅在存在子版时显示）
-                    if (children.isNotEmpty)
-                      IconButton(
-                        icon: Icon(
-                          childrenExpanded
-                              ? Icons.expand_less
-                              : Icons.expand_more,
-                          color: AppTheme.gold,
-                          size: 20,
-                        ),
-                        onPressed: onToggleChildren,
-                        tooltip: childrenExpanded
-                            ? AppLocalizations.of(context).contractCardCollapseChildren
-                            : AppLocalizations.of(context).contractCardExpandChildren,
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(8),
+                  // 子版展开/收起按钮（仅在存在子版时显示）
+                  // 普通模式和多选模式都保留，方便多选时查看其他列表的子版
+                  if (children.isNotEmpty)
+                    IconButton(
+                      icon: Icon(
+                        childrenExpanded
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        color: isSelectMode && !isMasterSelected
+                            ? AppTheme.textSecondary(theme.brightness)
+                            : AppTheme.gold,
+                        size: 20,
                       ),
-                    // ⋮ 操作菜单（进入/预览/重命名/删除）
+                      onPressed: onToggleChildren,
+                      tooltip: childrenExpanded
+                          ? AppLocalizations.of(context).contractCardCollapseChildren
+                          : AppLocalizations.of(context).contractCardExpandChildren,
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  // ⋮ 操作菜单（仅普通模式显示）
+                  if (!isSelectMode) ...[
                     _buildMasterMenu(context),
                   ],
                 ],
@@ -153,24 +164,68 @@ class ContractCard extends StatelessWidget {
             ),
           ),
 
-          // ---- 子版区（可展开，缩进 + 低对比背景突出层级）----
+          // ---- 子版区（可展开，树状「枝桠」视觉 + 平滑生长动画）----
           if (childrenExpanded && children.isNotEmpty)
-            Container(
-              padding: const EdgeInsets.fromLTRB(28, 0, 16, 14),
-              child: Column(
-                children: [
-                  for (final child in children) ...[
-                    _ChildTile(
-                      child: child,
-                      isSelectMode: isSelectMode,
-                      isSelected: childSelection[child.fileName] ?? false,
-                      onTap: () => onChildTap(child),
-                      onLongPress: () => onChildLongPress(child),
-                      onMenuSelected: (action) => onChildMenu(child, action),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                ],
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // ---- 树状主干（贯穿子版区的金色竖直细线）----
+                      // 竖线画在容器右缘，紧随其后的横枝从左缘起笔，
+                      // 二者无缝衔接成「主干 → 横枝 → 叶」的连续折线
+                      SizedBox(
+                        width: 12,
+                        child: CustomPaint(
+                          painter: _TreeTrunkPainter(),
+                          size: const Size(12, double.infinity),
+                        ),
+                      ),
+                      // ---- 子版列表（每行前端是「横枝 + 圆点」） ----
+                      Expanded(
+                        child: Column(
+                          children: [
+                            for (final child in children) ...[
+                              Row(
+                                children: [
+                                  // 横枝 + 圆点（连接主干与子版卡片）
+                                  SizedBox(
+                                    width: 14,
+                                    height: 40,
+                                    child: CustomPaint(
+                                      painter: _TreeBranchPainter(),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Expanded(
+                                    child: _ChildTile(
+                                      child: child,
+                                      isSelectMode: isSelectMode,
+                                      isSelected:
+                                          childSelection[child.fileName] ??
+                                          false,
+                                      onTap: () => onChildTap(child),
+                                      onLongPress: () =>
+                                          onChildLongPress(child),
+                                      onMenuSelected: (action) =>
+                                          onChildMenu(child, action),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],
@@ -252,15 +307,36 @@ class _ChildTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
               ],
-              // 分支标签（金色加粗）
+              // 分支标签：命运一句话为主 + 分支名为副（并存显示）
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Text(
-                  child.branchName ?? 'child',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: AppTheme.gold,
-                    fontWeight: FontWeight.bold,
-                  ),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      child.branchTitle ?? child.branchName ?? 'child',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: AppTheme.gold,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // 命运一句话与分支名不同（如「命运：xxx」带分支名后缀）时，
+                    // 以小字展示分支名，保留文件本身的命名信息
+                    if (child.branchTitle != null &&
+                        child.branchName != null &&
+                        child.branchName!.isNotEmpty)
+                      Text(
+                        child.branchName!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: AppTheme.textSecondary(theme.brightness),
+                          fontSize: 10,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
               const Spacer(),
@@ -325,4 +401,77 @@ PopupMenuButton<String> _buildContractMenu({
       ContractMenuItem('delete', Icons.delete_outline, l10n.contractCardDelete),
     ],
   );
+}
+
+/// 树状主干画笔：绘制子版区贯穿到底的金色竖直细线。
+///
+/// 与每个子版行前的 [_TreeBranchPainter] 横枝相连，
+/// 形成「命运树」的枝干视觉——母版为根，子版为枝。
+class _TreeTrunkPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppTheme.gold.withValues(alpha: 0.35)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // 顶部留 6px 空隙，底部贯穿至卡片下边距（视觉上「向下生长」）
+    const startY = 6.0;
+    final endY = size.height - 6;
+    if (endY <= startY) return;
+
+    // 竖直主干：贴近右缘绘制，使横枝（紧随其后的 x=0 起笔）与之无缝相接
+    final trunkX = size.width - 2;
+    canvas.drawLine(
+      Offset(trunkX, startY),
+      Offset(trunkX, endY),
+      paint,
+    );
+
+    // 主干底部收束小圆点（枝干生长端）
+    canvas.drawCircle(
+      Offset(trunkX, endY),
+      2.5,
+      paint..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TreeTrunkPainter oldDelegate) => false;
+}
+
+/// 树状横枝画笔：绘制子版卡片前方的一截横枝 + 连接圆点。
+///
+/// 横枝从左侧主干处向右延伸到子版卡片，末端以一个金色小圆点
+/// 作为「枝桠生长点」——每个子版就是命运之树上的一根枝。
+class _TreeBranchPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppTheme.gold.withValues(alpha: 0.35)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // 水平横枝：从左缘向右延伸（到卡片边缘附近）
+    final midY = size.height / 2;
+    const startX = 0.0;
+    final endX = size.width - 2;
+    canvas.drawLine(
+      Offset(startX, midY),
+      Offset(endX, midY),
+      paint,
+    );
+
+    // 枝桠生长点（卡片侧的圆点）
+    canvas.drawCircle(
+      Offset(endX, midY),
+      2.5,
+      paint..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TreeBranchPainter oldDelegate) => false;
 }

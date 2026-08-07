@@ -74,6 +74,7 @@ class NarrativeTurnService {
   ///   - narrativeRules: 用户自定义叙事约束（设置页）
   ///   - config: LLM 配置
   ///   - onChunk: 流式输出回调（逐 token）
+  ///   - cancelSignal: 协作式取消信号；该 Future 完成后停止 LLM 流式读取
   Future<NarrativeTurnResult> generate({
     required String userInput,
     required Contract contract,
@@ -84,6 +85,7 @@ class NarrativeTurnService {
     required String narrativeRules,
     required LlmConfig config,
     required void Function(String chunk) onChunk,
+    Future<void>? cancelSignal,
   }) async {
     // 1. 规则引擎（主动/被动规则、骰子判定、状态变更、记忆注入）
     final ruleResult = RuleEngine(
@@ -124,6 +126,7 @@ class NarrativeTurnService {
       final streamed = await llmClient.generateStream(
         messages: messages,
         onChunk: onChunk,
+        cancelSignal: cancelSignal,
       );
       reply = streamed.trim().isEmpty
           ? localReply(userInput, roleName: contract.roleName)

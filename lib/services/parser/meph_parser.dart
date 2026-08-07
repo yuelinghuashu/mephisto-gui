@@ -40,6 +40,7 @@ Contract _parseBlocks(List<Block> blocks) {
   var opening = '';
   final state = <StateItem>[];
   final rules = <Rule>[];
+  var branchTitle = '';
   final memories = <Memory>[];
   final history = <HistoryEntry>[];
   final seen = <String>{};
@@ -84,6 +85,9 @@ Contract _parseBlocks(List<Block> blocks) {
       case '历史':
         history.addAll(_parseHistory(block));
         break;
+      case '@命运':
+        branchTitle = _parsePlainText(block);
+        break;
       default:
         // 自定义区块：静默忽略
         break;
@@ -98,9 +102,20 @@ Contract _parseBlocks(List<Block> blocks) {
     opening: opening,
     state: state,
     rules: rules,
+    branchTitle: branchTitle,
     memories: memories,
     history: history,
   );
+}
+
+/// 解析纯文本系统区块（如 `@命运`）：取首行非空内容作为值；无内容返回空字符串。
+String _parsePlainText(Block block) {
+  for (final line in block.content) {
+    final trimmed = line.text.trim();
+    if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+    return trimmed;
+  }
+  return '';
 }
 
 /// 解析【角色名】：取第一个非空行。

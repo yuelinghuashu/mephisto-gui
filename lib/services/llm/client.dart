@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -53,11 +54,14 @@ class LlmClient {
   ///   - 网络超时：默认 60 秒，可通过 [timeout] 覆盖
   ///   - API 错误：状态码非 200 时抛出 [Exception]（含响应体）
   ///   - 解析错误：单行解析失败仅打印日志，不影响后续内容
+  ///   - 协作式取消：传入 [cancelSignal] 后，该 Future 完成（如用户点击
+  ///     「停止生成」）时提前终止 SSE 读取，返回已累积的内容（不抛异常）
   ///   - 返回：完整拼接后的回复内容
   Future<String> generateStream({
     required List<LlmMessage> messages,
     required void Function(String chunk) onChunk,
     Duration timeout = const Duration(seconds: 60),
+    Future<void>? cancelSignal,
   }) async {
     // 去掉 baseUrl 末尾多余斜杠，避免出现 `//chat/completions`
     final base = baseUrl.endsWith('/')
@@ -97,9 +101,18 @@ class LlmClient {
       }
 
       final fullContent = StringBuffer();
+      // 取消信号：完成时置位标记，SSE 循环内检查后提前 break
+      final cancelCompleter = Completer<void>();
+      if (cancelSignal != null) {
+        cancelSignal.whenComplete(cancelCompleter.complete);
+      }
+      // 取消信号是否已触发（用于 SSE 循环内提前 break）
+      bool isCancelled() => cancelCompleter.isCompleted;
+
       await for (final line in response.stream
           .transform(utf8.decoder)
           .transform(const LineSplitter())) {
+        if (isCancelled()) break;
         if (!line.startsWith('data:')) continue;
 
         final data = line.substring(5).trim();

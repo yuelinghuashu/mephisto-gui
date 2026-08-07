@@ -9,16 +9,10 @@ library;
 
 import '../../domain/models.dart';
 
-/// 将契约及其运行时快照序列化为 .meph 文本。
-///
-/// 参数：
-///   - contract: 母版契约（提供角色名/锚点/世界观/背景/开局/规则等静态区块）
-///   - runtimeState: 运行时状态（覆盖合同初始状态；null 时使用合同状态）
-///   - memories: 运行时记忆列表
-///   - history: 运行时历史列表
-///
-/// 区块输出顺序（与 parseMeph 白名单一致）：
-///   角色名 → 锚点 → 世界观 → 角色背景 → 开局场景 → 状态 → 规则 → 记忆 → 历史
+/// 序列化区块输出顺序说明：
+///   - `@命运`（系统门面区块，如存在）位于文件**最顶部**——作为子版的
+///     「命运门面」，打开文件第一眼即见
+///   - 其后为用户叙事区块
 String serializeMeph(
   Contract contract, {
   Map<String, StateValue>? runtimeState,
@@ -26,6 +20,13 @@ String serializeMeph(
   List<HistoryEntry>? history,
 }) {
   final buffer = StringBuffer();
+
+  // ---- @命运 系统门面区块（若有，置于文件最顶部）----
+  if (contract.branchTitle.isNotEmpty) {
+    buffer.writeln('@命运');
+    buffer.writeln(contract.branchTitle);
+    buffer.writeln();
+  }
 
   // ---- 角色名 ----
   buffer.writeln('【角色名】');

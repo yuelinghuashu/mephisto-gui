@@ -19,6 +19,7 @@ class SessionSaver {
   /// - [memories]：运行时记忆
   /// - [history]：运行时历史
   /// - [branchName]：可选自定义分支名（如 'dark'）；null 时使用默认 `.child`
+  /// - [branchTitle]：可选「命运一句话」；以 `@命运:` 标记注入子版【角色背景】
   /// - [overwriteFileName]：直接覆盖的文件名（已存在子版时传入）
   ///
   /// 返回值：保存的子版文件名；保存失败时抛异常（由调用方决定错误处理）。
@@ -29,6 +30,7 @@ class SessionSaver {
     required List<Memory> memories,
     required List<HistoryEntry> history,
     String? branchName,
+    String? branchTitle,
     String? overwriteFileName,
   }) {
     return ChildSaveStore.save(
@@ -38,6 +40,7 @@ class SessionSaver {
       memories: memories,
       history: history,
       branchName: branchName,
+      branchTitle: branchTitle,
       overwriteFileName: overwriteFileName,
     );
   }
@@ -79,12 +82,14 @@ class SessionSaver {
   /// 参数：
   ///   - [sourceFileName]：当前打开的会话源文件（仅用于提取母版前缀）
   ///   - [branchName]：自定义分支名（如 'dark'、'light'）
+  ///   - [branchTitle]：可选「命运一句话」；以 `@命运:` 标记注入子版【角色背景】
   ///   - 其余为会话快照参数（与 [save] 一致）
   ///
   /// 返回值：保存的分支文件名（如 `faust.dark.meph`）。
   static Future<String> saveAsBranch({
     required String sourceFileName,
     required String branchName,
+    String? branchTitle,
     required Contract contract,
     required Map<String, StateValue> currentState,
     required List<Memory> memories,
@@ -97,6 +102,7 @@ class SessionSaver {
       memories: memories,
       history: history,
       branchName: branchName,
+      branchTitle: branchTitle,
     );
   }
 }

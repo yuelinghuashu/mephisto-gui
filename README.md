@@ -18,7 +18,9 @@
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-blue" alt="Platforms" />
 </p>
 
-> **你写下角色的灵魂，梅菲斯特让它活过来，然后看它会走向何方。**
+<p align="center" >
+<b><i>你写下角色的灵魂，梅菲斯特让它活过来，然后看它会走向何方。</i></b>
+</p>
 
 Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎。它不替创作者写故事——它设定一个框架（契约），让叙事在框架内持续运动，直到玩家心满意足。
 
@@ -96,13 +98,13 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 
 深入了解 Mephisto 的机制，请阅读 [docs](docs/README.md) 文档中心：
 
-| 文档 | 内容 |
-| ---- | ---- |
-| [契约语法参考](docs/contract-syntax.md) | `.meph` 格式、区块、值类型、错误处理 |
-| [规则引擎详解](docs/rule-engine.md) | 条件、动作、骰子（1d2 / 1d100）、互斥组 |
-| [记忆系统](docs/memory-system.md) | 记忆提取、去重、压缩 |
-| [存档系统](docs/save-system.md) | 母版只读、子版快照、分支 |
-| [平台存储策略](docs/platform-storage.md) | 各平台契约目录与沙盒限制 |
+| 文档                                     | 内容                                    |
+| ---------------------------------------- | --------------------------------------- |
+| [契约语法参考](docs/contract-syntax.md)  | `.meph` 格式、区块、值类型、错误处理    |
+| [规则引擎详解](docs/rule-engine.md)      | 条件、动作、骰子（1d2 / 1d100）、互斥组 |
+| [记忆系统](docs/memory-system.md)        | 记忆提取、去重、压缩                    |
+| [存档系统](docs/save-system.md)          | 母版只读、子版快照、分支                |
+| [平台存储策略](docs/platform-storage.md) | 各平台契约目录与沙盒限制                |
 
 ## 🔥 规则热重载
 

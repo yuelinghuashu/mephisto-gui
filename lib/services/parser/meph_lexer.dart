@@ -30,6 +30,7 @@ class MephParseError implements Exception {
 /// 已知区块白名单
 ///
 /// 与 CLI 一致：显式列出合法区块名，避免拼写错误导致的隐式 bug。
+/// 含用户书写区块（【名称】）与系统保留区块（`@名称`，如 `@命运`）。
 const Set<String> knownBlocks = {
   '角色名',
   '锚点',
@@ -40,6 +41,8 @@ const Set<String> knownBlocks = {
   '规则',
   '记忆',
   '历史',
+  // ---- 系统保留区块（`@` 前缀 = 系统生成元数据，用户不应书写）----
+  '@命运',
 };
 
 /// 带行号的内容行
@@ -156,11 +159,22 @@ List<Block> lexMeph(String text) {
   return blocks;
 }
 
-/// 检查一行是否为区块标题（`【标题】` 格式）。
+/// 检查一行是否为区块标题。
 ///
-/// 规则：以【开头、以】结尾，提取的标题非空即可 —— 不要求在白名单中，
-/// 未知区块作为草稿宽容接受（标记 [Block.isKnown] 为 false 供解析层判断）。
+/// 支持两种形式：
+///   - 用户区块：`【标题】`（如 `【角色名】`）
+///   - 系统保留区块：`@标题`（如 `@命运`），独立成行
+///
+/// `@` 前缀是「系统生成元数据」命名空间，与用户 `【】` 区块天然区分。
+/// 未知名称同样接受作为草稿宽容处理（标记 [Block.isKnown] 为 false 供解析层判断）。
 String? blockTitle(String trimmed) {
+  // 系统保留区块：@xxx 独立成行
+  if (trimmed.startsWith('@')) {
+    final title = trimmed.substring(1).trim();
+    if (title.isEmpty) return null;
+    return '@$title';
+  }
+  // 用户区块：【标题】
   if (!trimmed.startsWith('【') || !trimmed.endsWith('】')) return null;
   final title = trimmed.substring(1, trimmed.length - 1).trim();
   if (title.isEmpty) return null;

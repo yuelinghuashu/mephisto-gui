@@ -127,7 +127,7 @@ void main() {
     File('${dir.path}/c.txt').writeAsStringSync('');
     File('${dir.path}/a.child.meph').writeAsStringSync('');
 
-    final names = listMephFileNames(dir);
+    final names = await listMephFileNames(dir);
     expect(names, ['a.child.meph', 'a.meph', 'b.meph']); // 字典序
     expect(names, isNot(contains('c.txt')));
   });

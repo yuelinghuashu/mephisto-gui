@@ -219,6 +219,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get narrativeBranchHint => 'e.g. dark, light, judgment';
 
   @override
+  String get narrativeBranchTitleLabel => 'Fate description';
+
+  @override
+  String get narrativeBranchTitleHint =>
+      'Describe where this branch will lead (optional). Shown as the branch name on the home page';
+
+  @override
+  String get narrativeStopGenerating => 'Stop Generating';
+
+  @override
   String get narrativeConfirm => 'Save';
 
   @override
@@ -294,6 +304,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsWidthDescription =>
       'The maximum width of the narrative message flow. Mobile fills the screen automatically; this mainly affects desktop.';
+
+  @override
+  String get settingsWidthNarrow => 'Narrow';
+
+  @override
+  String get settingsWidthMedium => 'Medium';
+
+  @override
+  String get settingsWidthWide => 'Wide';
+
+  @override
+  String get settingsWidthFull => 'Full Screen';
 
   @override
   String get settingsNarrativeRules => 'Narrative Rules';
@@ -408,7 +430,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'AI service parameters used for narrative generation. Saving with empty fields uses default configuration.';
 
   @override
+  String get settingsBackendOpenai => 'OpenAI Compatible';
+
+  @override
   String get settingsBackendOllama => 'Local Ollama';
+
+  @override
+  String get settingsApiKeyLabel => 'API Key';
+
+  @override
+  String get settingsApiKeyHint => 'sk-... (can be empty for Ollama)';
+
+  @override
+  String get settingsBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsBaseUrlHint => 'https://api.deepseek.com/v1';
+
+  @override
+  String get settingsModelLabel => 'Model';
+
+  @override
+  String get settingsModelHint => 'deepseek-v4-flash / qwen2.5:7b';
+
+  @override
+  String get settingsMaxTokensLabel => 'Max Tokens';
+
+  @override
+  String get settingsMaxTokensHint => '4096';
 
   @override
   String get settingsTestConnection => 'Test Connection';
@@ -421,6 +470,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsResetConfig => 'Reset to Default';
+
+  @override
+  String get settingsConfigSaved => '✦ LLM configuration saved';
+
+  @override
+  String get settingsConfigSaveFail => '╳ Base URL and Model cannot be empty';
+
+  @override
+  String get settingsConfigReset => '⇄ Restored default configuration';
+
+  @override
+  String get settingsTestNeedBaseUrlModel =>
+      '╳ Please fill in Base URL and Model first';
+
+  @override
+  String get settingsTestSuccess =>
+      '✦ Connection successful, model is available';
+
+  @override
+  String settingsTestFail(Object error) {
+    return '╳ Connection failed: $error';
+  }
 
   @override
   String get contractEditorNewTitle => '✏️ New Contract';
@@ -531,6 +602,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get renameDialogNameExists =>
       'This file name already exists, please choose another';
+
+  @override
+  String get renameDialogBranchTitleLabel => 'Fate description';
+
+  @override
+  String get renameDialogBranchTitleHint =>
+      'Describe where this branch leads (optional)';
 
   @override
   String get confirmDeleteCancel => 'Cancel';

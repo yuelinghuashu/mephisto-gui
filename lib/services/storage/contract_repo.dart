@@ -135,7 +135,8 @@ Future<int> deleteContractCascade(String masterFileName) async {
   if (await deleteContract(masterFileName)) deleted++;
 
   // 再删除该母版下的所有子版（`母版前缀.*.meph` 且非母版自身）
-  final children = listMephFileNames(dir)
+  final allNames = await listMephFileNames(dir);
+  final children = allNames
       .where((name) => name != masterFileName)
       .where((name) => name.startsWith('$masterPrefix.'))
       .toList();
@@ -216,4 +217,151 @@ String? extractRoleName(String content) {
   }
 
   return null;
+}
+
+/// 命运说明系统保留区块名（`@命运`）
+///
+/// 「另存为分支」时可填写一句「命运说明」描述这条支流走向，保存子版时
+/// 由 serializer 输出为独立系统区块 `@命运`，首页据此显示「命运一句话」。
+/// 无该区块（如母版或未填写）时返回 null，首页回落为显示分支名。
+const String fateBlockTitle = '@命运';
+
+/// 从 .meph 内容中提取「命运说明」（分支的一句话描述）。
+///
+/// 读取 `@命运` 系统保留区块的首行非空内容；未找到区块/内容为空返回 null。
+///
+/// 仅子版文件可能含该区块；母版/旧分支无标记时返回 null。
+String? extractBranchTitle(String content) {
+  final lines = content.split('\n');
+  var inFateBlock = false;
+
+  for (final line in lines) {
+    final trimmed = line.trim();
+
+    // 检测区块标题（@命运 或 用户 【区块】）
+    if (trimmed.startsWith('@') || (trimmed.startsWith('【') && trimmed.endsWith('】'))) {
+      final isFate = trimmed == fateBlockTitle;
+      // 进入 @命运 区块：开始收集内容
+      inFateBlock = isFate;
+      continue;
+    }
+
+    // 在 @命运 区块内：取首个非空、非注释内容行
+    if (inFateBlock) {
+      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+      return trimmed;
+    }
+  }
+
+  return null;
+}
+
+/// 更新 .meph 内容中的 `@命运` 系统区块（命运说明）。
+///
+/// 纯文本级操作：不经过 parseMeph/serializeMeph 重建，避免丢失子版文件
+/// 中的运行时状态/记忆/历史等动态内容。
+///
+/// 参数：
+///   - content: 原 .meph 文件完整内容
+///   - newTitle: 新的命运说明；空字符串时移除整个 `@命运` 区块（若存在）
+///
+/// 返回值：更新后的 .meph 文件内容。
+String updateFateBlock(String content, String newTitle) {
+  final trimmedTitle = newTitle.trim();
+
+  // 逐行扫描，在 @命运 区块边界内记录其区间；其余内容原样保留
+  final lines = content.split('\n');
+  var fateStart = -1; // @命运 区块标题行下标
+  var fateEnd = lines.length; // 区块结束行下标（不含）
+
+  for (var i = 0; i < lines.length; i++) {
+    final trimmed = lines[i].trim();
+
+    // 记录 @命运 区块标题行
+    if (trimmed == fateBlockTitle) {
+      fateStart = i;
+      // 查找区块结束（下一个 @ 或 【 标题行）
+      for (var j = i + 1; j < lines.length; j++) {
+        final inner = lines[j].trim();
+        if (inner.startsWith('@') ||
+            (inner.startsWith('【') && inner.endsWith('】'))) {
+          fateEnd = j;
+          break;
+        }
+      }
+      break;
+    }
+  }
+
+  // ---- 原内容无 @命运 区块 ----
+  if (fateStart == -1) {
+    if (trimmedTitle.isEmpty) return content; // 无区块且无新说明 → 原样返回
+    // 新说明 → 插入到文件最顶部（与 serializer 输出位置一致）
+    final buffer = StringBuffer();
+    buffer.writeln('@命运');
+    buffer.writeln(trimmedTitle);
+    buffer.writeln();
+    // 原内容去除开头的空行，保持整洁
+    var start = 0;
+    while (start < lines.length && lines[start].trim().isEmpty) {
+      start++;
+    }
+    if (start < lines.length) {
+      buffer.write(lines.sublist(start).join('\n'));
+    }
+    return buffer.toString();
+  }
+
+  // ---- 原内容存在 @命运 区块 ----
+  final header = lines.sublist(0, fateStart); // 区块标题前的行
+  final tail = lines.sublist(fateEnd); // 区块后的行
+
+  final buffer = StringBuffer();
+  if (header.isNotEmpty) {
+    buffer.write(header.join('\n'));
+    buffer.write('\n');
+  }
+
+  if (trimmedTitle.isNotEmpty) {
+    buffer.writeln('@命运');
+    buffer.writeln(trimmedTitle);
+    buffer.writeln();
+  }
+
+  if (tail.isNotEmpty) {
+    final tailText = tail.join('\n');
+    // 去除尾部前导空行（原区块末尾的空行由新区块输出的空行替代）
+    var trimmedTail = tailText;
+    while (trimmedTail.startsWith('\n')) {
+      trimmedTail = trimmedTail.substring(1);
+    }
+    buffer.write(trimmedTail);
+  }
+
+  return buffer.toString();
+}
+
+/// 更新契约文件中的命运说明（`@命运` 区块）并写回磁盘。
+///
+/// 参数：
+///   - fileName: 契约文件名（如 `faust.dark.meph`）
+///   - newTitle: 新的命运说明；空字符串时移除整个 `@命运` 区块
+///
+/// 返回值：是否更新成功（false 表示文件不存在或写入失败）。
+Future<bool> updateContractBranchTitle(
+  String fileName,
+  String newTitle,
+) async {
+  final dir = await getContractsDirectory();
+  final file = File('${dir.path}/$fileName');
+  if (!file.existsSync()) return false;
+  try {
+    final content = await file.readAsString();
+    final updated = updateFateBlock(content, newTitle);
+    if (updated == content) return true; // 无变化，视为成功
+    await file.writeAsString(updated);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }

@@ -119,6 +119,70 @@ void main() {
     expect(find.text('已选 3 项'), findsNothing);
   });
 
+  testWidgets('长按母版自动展开子版区，被级联选中的子版立即可见', (tester) async {
+    await tester.pumpWidget(buildHome());
+    await tester.pumpAndSettle();
+
+    // 不手动展开子版区，直接长按母版
+    // （修复前：子版被级联选中但不可见，也无法在窗口中展开查看）
+    await tester.longPress(find.text('faust'));
+    await tester.pumpAndSettle();
+
+    // 母版 + 2 子版全部被选中
+    expect(find.text('已选 3 项'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle), findsNWidgets(3));
+
+    // 子版区自动展开：子版文件名应立即可见（而非需要手动点箭头展开）
+    expect(find.text('faust.child.meph'), findsOneWidget);
+    expect(find.text('faust.dark.meph'), findsOneWidget);
+
+    // 子版区已展开，展开箭头在多选模式下仍保留（可收起）
+    expect(find.byTooltip('收起子版'), findsOneWidget);
+
+    // 直接点击子版可单独取消选中（验证子版对用户可操作）
+    await tester.tap(find.text('faust.child.meph'));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
+  });
+
+  testWidgets('多选模式下其他列表仍可展开/收起子版', (tester) async {
+    // faust（级联目标）+ goethe（有其他子版，未展开）
+    final groups = [
+      ContractGroup(
+        master: info('faust.meph'),
+        children: [info('faust.child.meph', branch: 'child')],
+      ),
+      ContractGroup(
+        master: info('goethe.meph'),
+        children: [info('goethe.utopia.meph', branch: 'utopia')],
+      ),
+    ];
+    await tester.pumpWidget(buildHome(groups: groups));
+    await tester.pumpAndSettle();
+
+    // 长按 faust 进入多选（faust 子版自动展开，goethe 保持收起）
+    await tester.longPress(find.text('faust'));
+    await tester.pumpAndSettle();
+
+    // 多选模式下：faust 显示「收起子版」，goethe 仍显示「展开子版」箭头
+    expect(find.text('已选 2 项'), findsOneWidget);
+    expect(find.byTooltip('收起子版'), findsOneWidget);
+    expect(find.byTooltip('展开子版'), findsOneWidget);
+
+    // 点击 goethe 的展开箭头 → 其子版立即可见
+    // （faust 已级联展开，此时 goethe 展开后有两个「收起子版」箭头）
+    await tester.tap(find.byTooltip('展开子版'));
+    await tester.pumpAndSettle();
+    expect(find.text('goethe.utopia.meph'), findsOneWidget);
+    expect(find.byTooltip('收起子版'), findsNWidgets(2));
+
+    // 点击 goethe 的收起箭头（列表顺序中 goethe 在 faust 之后）→ 子版收起
+    await tester.tap(find.byTooltip('收起子版').last);
+    await tester.pumpAndSettle();
+    expect(find.text('goethe.utopia.meph'), findsNothing);
+  });
+
   testWidgets('批量删除：确认对话框 → 点击删除 → 退出多选', (tester) async {
     // 注意：此处不验证真实文件删除——widget 测试运行在 FakeAsync zone，
     // 真实文件系统 IO 的异步回调与 FakeAsync 冲突会挂起测试。

@@ -133,19 +133,21 @@ String setState(String action, Map<String, StateValue> state) {
   final valNum = parseStateValue(valStr).asDouble;
   if (valNum == null) return '📊 $key：赋值类型不支持算术运算';
 
-  var result = 0.0;
-  switch (compoundOp) {
-    case '+=':
-      result = currentNum + valNum;
-    case '-=':
-      result = currentNum - valNum;
-    case '*=':
-      result = currentNum * valNum;
-    case '/=':
-      if (valNum == 0) return '📊 除数不能为0';
-      result = currentNum / valNum;
+  // 除数为 0 时返回提示（保持原语义：返回提示文本而非抛异常）
+  if (compoundOp == '/=' && valNum == 0) {
+    return '📊 除数不能为0';
   }
+
   // 保持类型：int 状态保持 int（向零截断）
+  // 使用 Dart 3 switch 表达式统一风格；`_` 分支理论上不可达
+  // （[compoundOp] 已在上方 `compoundOps` 列表中验证），仅作穷尽性兜底。
+  final double result = switch (compoundOp) {
+    '+=' => currentNum + valNum,
+    '-=' => currentNum - valNum,
+    '*=' => currentNum * valNum,
+    '/=' => currentNum / valNum,
+    _ => throw ArgumentError('未知的复合运算符: $compoundOp'),
+  };
   state[key] = current is IntValue
       ? IntValue(result.toInt())
       : DoubleValue(result);

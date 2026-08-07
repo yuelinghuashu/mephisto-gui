@@ -23,6 +23,31 @@ Three runtime data blocks are injected during serialization:
 2. **【记忆】(Memory)**: long-term memories extracted by MemoryManager
 3. **【历史】(History)**: the complete dialogue history of this session (fate / assistant)
 
+## 2.1 Fate Description (One-Line Branch Title)
+
+When choosing **Save as Branch**, you may write a **fate description** summarizing where this branch leads.
+It is written into the child file as an **independent system section `@命运`**, placed at the **very top**
+of the file (as a facade section, visible immediately upon opening):
+
+```meph
+@命运
+理想国支线：浮士德在边际海岸望向乌托邦
+
+【角色名】
+浮士德
+```
+
+The `@` prefix marks **system-generated metadata**, naturally distinct from user-written `【】` narrative
+sections—the 【角色背景】(Background) section stays clean with no markers. When expanding the master
+on the home page, each child shows:
+
+- **Primary label**: the fate description (e.g., "Utopia branch: Faust looks toward the ideal land on the edge of the sea")
+- **Secondary label**: the branch name (e.g., `utopia`, preserving the original naming)
+- Bottom-right: the save file name
+
+Branches without a fate description fall back to showing the branch name (same behavior as before).
+Masters do not show a fate description (only the character name).
+
 ## 3. Naming Rules
 
 | Scenario | File Name |
@@ -47,7 +72,7 @@ Three runtime data blocks are injected during serialization:
 
 ## 5. Children in the Home Screen UI
 
-- A master card can expand to show all its children
+- A master card can expand to show all its children, using a "Tree of Fate" visual: the master is the root, and children grow as branches along a golden trunk
 - Children support: enter narrative (restore), preview, rename, delete
 - Master deletion supports "cascade delete": deletes all its children in one go
 

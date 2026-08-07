@@ -23,13 +23,6 @@ extension NarrativeWidthExtension on NarrativeWidth {
     NarrativeWidth.full => null,
   };
 
-  /// 档位显示名称
-  String get label => switch (this) {
-    NarrativeWidth.narrow => '窄',
-    NarrativeWidth.medium => '中',
-    NarrativeWidth.wide => '宽',
-    NarrativeWidth.full => '满屏',
-  };
 }
 
 /// 叙事宽度偏好控制器

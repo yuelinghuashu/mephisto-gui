@@ -458,6 +458,24 @@ abstract class AppLocalizations {
   /// **'如 dark、light、审判线'**
   String get narrativeBranchHint;
 
+  /// No description provided for @narrativeBranchTitleLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'命运说明'**
+  String get narrativeBranchTitleLabel;
+
+  /// No description provided for @narrativeBranchTitleHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'描述这条支流将走向何方（可留空），首页将以此命名枝桠'**
+  String get narrativeBranchTitleHint;
+
+  /// No description provided for @narrativeStopGenerating.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止生成'**
+  String get narrativeStopGenerating;
+
   /// No description provided for @narrativeConfirm.
   ///
   /// In zh, this message translates to:
@@ -589,6 +607,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'叙事界面信息流的最大宽度。移动端自动占满屏幕，此选项主要影响桌面端。'**
   String get settingsWidthDescription;
+
+  /// No description provided for @settingsWidthNarrow.
+  ///
+  /// In zh, this message translates to:
+  /// **'窄'**
+  String get settingsWidthNarrow;
+
+  /// No description provided for @settingsWidthMedium.
+  ///
+  /// In zh, this message translates to:
+  /// **'中'**
+  String get settingsWidthMedium;
+
+  /// No description provided for @settingsWidthWide.
+  ///
+  /// In zh, this message translates to:
+  /// **'宽'**
+  String get settingsWidthWide;
+
+  /// No description provided for @settingsWidthFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'满屏'**
+  String get settingsWidthFull;
 
   /// No description provided for @settingsNarrativeRules.
   ///
@@ -782,11 +824,65 @@ abstract class AppLocalizations {
   /// **'叙事生成使用的 AI 服务参数。留空保存将使用默认配置。'**
   String get settingsLlmDescription;
 
+  /// No description provided for @settingsBackendOpenai.
+  ///
+  /// In zh, this message translates to:
+  /// **'OpenAI 兼容'**
+  String get settingsBackendOpenai;
+
   /// No description provided for @settingsBackendOllama.
   ///
   /// In zh, this message translates to:
   /// **'本地 Ollama'**
   String get settingsBackendOllama;
+
+  /// No description provided for @settingsApiKeyLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'API Key'**
+  String get settingsApiKeyLabel;
+
+  /// No description provided for @settingsApiKeyHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'sk-...（Ollama 可留空）'**
+  String get settingsApiKeyHint;
+
+  /// No description provided for @settingsBaseUrlLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'Base URL'**
+  String get settingsBaseUrlLabel;
+
+  /// No description provided for @settingsBaseUrlHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'https://api.deepseek.com/v1'**
+  String get settingsBaseUrlHint;
+
+  /// No description provided for @settingsModelLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'Model'**
+  String get settingsModelLabel;
+
+  /// No description provided for @settingsModelHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'deepseek-v4-flash / qwen2.5:7b'**
+  String get settingsModelHint;
+
+  /// No description provided for @settingsMaxTokensLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'Max Tokens'**
+  String get settingsMaxTokensLabel;
+
+  /// No description provided for @settingsMaxTokensHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'4096'**
+  String get settingsMaxTokensHint;
 
   /// No description provided for @settingsTestConnection.
   ///
@@ -811,6 +907,42 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'恢复默认'**
   String get settingsResetConfig;
+
+  /// No description provided for @settingsConfigSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'✦ LLM 配置已保存'**
+  String get settingsConfigSaved;
+
+  /// No description provided for @settingsConfigSaveFail.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ Base URL 和 Model 不能为空'**
+  String get settingsConfigSaveFail;
+
+  /// No description provided for @settingsConfigReset.
+  ///
+  /// In zh, this message translates to:
+  /// **'⇄ 已恢复默认配置'**
+  String get settingsConfigReset;
+
+  /// No description provided for @settingsTestNeedBaseUrlModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ 请先填写 Base URL 和 Model'**
+  String get settingsTestNeedBaseUrlModel;
+
+  /// No description provided for @settingsTestSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'✦ 连接成功，模型可用'**
+  String get settingsTestSuccess;
+
+  /// No description provided for @settingsTestFail.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ 连接失败: {error}'**
+  String settingsTestFail(Object error);
 
   /// No description provided for @contractEditorNewTitle.
   ///
@@ -983,6 +1115,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'该文件名已存在，请更换'**
   String get renameDialogNameExists;
+
+  /// No description provided for @renameDialogBranchTitleLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'命运说明'**
+  String get renameDialogBranchTitleLabel;
+
+  /// No description provided for @renameDialogBranchTitleHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'描述这条支流将走向何方（可留空），首页将以此命名枝桠'**
+  String get renameDialogBranchTitleHint;
 
   /// No description provided for @confirmDeleteCancel.
   ///

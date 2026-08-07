@@ -117,6 +117,42 @@ void main() {
     expect(container.read(narrativeRuleProvider), defaultNarrativeRules);
   });
 
+  testWidgets('LLM 后端切换：保留用户输入（自定义 Base URL / API Key 不被覆盖）', (tester) async {
+    await tester.pumpWidget(buildSettings());
+    await tester.pumpAndSettle();
+
+    // 初始 OpenAI 兼容：找到 Base URL 输入框并输入自定义地址
+    final baseUrlField = find.widgetWithText(TextField, 'Base URL');
+    expect(baseUrlField, findsOneWidget);
+    await tester.enterText(baseUrlField, 'https://my-proxy.example.com/v1');
+    // 输入自定义 API Key
+    final apiKeyField = find.widgetWithText(TextField, 'API Key');
+    await tester.enterText(apiKeyField, 'sk-custom-key-123');
+
+    // 切到「本地 Ollama」：API Key 隐藏但值保留
+    await tester.ensureVisible(find.text('本地 Ollama'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('本地 Ollama'));
+    await tester.pumpAndSettle();
+    expect(find.text('API Key'), findsNothing);
+
+    // 切回「OpenAI 兼容」：Base URL 保持用户自定义（不被覆盖为 deepseek 默认）
+    await tester.ensureVisible(find.text('OpenAI 兼容'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('OpenAI 兼容'));
+    await tester.pumpAndSettle();
+
+    final restoredBaseUrl = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'https://my-proxy.example.com/v1').first,
+    );
+    expect(restoredBaseUrl.controller?.text, 'https://my-proxy.example.com/v1');
+    // API Key 自动回显（从未被清空）
+    final restoredApiKey = tester.widget<TextField>(
+      find.widgetWithText(TextField, 'sk-custom-key-123').first,
+    );
+    expect(restoredApiKey.controller?.text, 'sk-custom-key-123');
+  });
+
   testWidgets('LLM 后端切换：Ollama 隐藏 API Key 并填充本地 URL', (tester) async {
     await tester.pumpWidget(buildSettings());
     await tester.pumpAndSettle();

@@ -212,6 +212,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get narrativeBranchHint => '如 dark、light、审判线';
 
   @override
+  String get narrativeBranchTitleLabel => '命运说明';
+
+  @override
+  String get narrativeBranchTitleHint => '描述这条支流将走向何方（可留空），首页将以此命名枝桠';
+
+  @override
+  String get narrativeStopGenerating => '停止生成';
+
+  @override
   String get narrativeConfirm => '保存';
 
   @override
@@ -284,6 +293,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsWidthDescription => '叙事界面信息流的最大宽度。移动端自动占满屏幕，此选项主要影响桌面端。';
+
+  @override
+  String get settingsWidthNarrow => '窄';
+
+  @override
+  String get settingsWidthMedium => '中';
+
+  @override
+  String get settingsWidthWide => '宽';
+
+  @override
+  String get settingsWidthFull => '满屏';
 
   @override
   String get settingsNarrativeRules => '叙事规则';
@@ -391,7 +412,34 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsLlmDescription => '叙事生成使用的 AI 服务参数。留空保存将使用默认配置。';
 
   @override
+  String get settingsBackendOpenai => 'OpenAI 兼容';
+
+  @override
   String get settingsBackendOllama => '本地 Ollama';
+
+  @override
+  String get settingsApiKeyLabel => 'API Key';
+
+  @override
+  String get settingsApiKeyHint => 'sk-...（Ollama 可留空）';
+
+  @override
+  String get settingsBaseUrlLabel => 'Base URL';
+
+  @override
+  String get settingsBaseUrlHint => 'https://api.deepseek.com/v1';
+
+  @override
+  String get settingsModelLabel => 'Model';
+
+  @override
+  String get settingsModelHint => 'deepseek-v4-flash / qwen2.5:7b';
+
+  @override
+  String get settingsMaxTokensLabel => 'Max Tokens';
+
+  @override
+  String get settingsMaxTokensHint => '4096';
 
   @override
   String get settingsTestConnection => '测试连接';
@@ -404,6 +452,26 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsResetConfig => '恢复默认';
+
+  @override
+  String get settingsConfigSaved => '✦ LLM 配置已保存';
+
+  @override
+  String get settingsConfigSaveFail => '╳ Base URL 和 Model 不能为空';
+
+  @override
+  String get settingsConfigReset => '⇄ 已恢复默认配置';
+
+  @override
+  String get settingsTestNeedBaseUrlModel => '╳ 请先填写 Base URL 和 Model';
+
+  @override
+  String get settingsTestSuccess => '✦ 连接成功，模型可用';
+
+  @override
+  String settingsTestFail(Object error) {
+    return '╳ 连接失败: $error';
+  }
 
   @override
   String get contractEditorNewTitle => '✏️ 新建契约';
@@ -511,6 +579,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get renameDialogNameExists => '该文件名已存在，请更换';
+
+  @override
+  String get renameDialogBranchTitleLabel => '命运说明';
+
+  @override
+  String get renameDialogBranchTitleHint => '描述这条支流将走向何方（可留空），首页将以此命名枝桠';
 
   @override
   String get confirmDeleteCancel => '取消';

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
+import '../domain/narrative_error.dart';
 import '../services/parser/meph_parser.dart';
 import '../services/storage/contract_dir.dart';
 import '../services/storage/contract_repo.dart';
@@ -75,9 +76,10 @@ final contractProvider = FutureProvider<Contract>((ref) async {
   // 4. 回退到 assets 内置模板；仍不可用时抛异常
   final fallback = await _builtinFallback(name);
   if (fallback != null) {
-    // 已回退内置模板：置提示，UI 顶部展示，避免用户误以为契约内容正确
+    // 已回退内置模板：置错误码提示，UI 顶部展示并翻译，
+    // 避免用户误以为契约内容正确
     ref.read(contractFallbackNoticeProvider.notifier)
-        .setNotice('当前契约文件缺失或损坏，已加载内置模板');
+        .setNotice(narrativeErrorContractFallback);
     return fallback;
   }
   throw Exception('契约文件不存在: $name');
@@ -122,11 +124,17 @@ class ContractInfo {
   /// 子版的分支名（仅子版有；如 `child`、`dark`、`light`）
   final String? branchName;
 
+  /// 子版「命运一句话」（用户另存为分支时填写，取自子版【角色背景】的 `@命运:` 标记）
+  ///
+  /// 用于首页展示更可读的支流描述；未填写时为 null，首页回落为显示 [branchName]。
+  final String? branchTitle;
+
   const ContractInfo({
     required this.fileName,
     required this.roleName,
     this.isChild = false,
     this.branchName,
+    this.branchTitle,
   });
 }
 
@@ -173,6 +181,9 @@ final contractGroupListProvider =
         roleName: roleName ?? name.replaceAll('.meph', ''),
         isChild: isChildFileName(name),
         branchName: extractBranchName(name),
+        // 命运一句话（仅子版可能含 @命运: 标记；母版/旧分支为 null）
+        branchTitle:
+            content == null ? null : extractBranchTitle(content),
       );
     }),
   );

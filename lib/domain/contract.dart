@@ -62,6 +62,12 @@ class Contract extends Equatable {
   // 系统区块（由程序自动生成）
   // ==========================================================
 
+  /// 命运说明（分支的一句话描述，来自系统保留区块 `@命运`）
+  ///
+  /// 仅子版可能有；用户在「另存为分支」时填写。
+  /// 非空时 serializer 输出 `@命运` 区块，首页据此展示「命运一句话」。
+  final String branchTitle;
+
   /// 记忆列表
   final List<Memory> memories;
 
@@ -77,6 +83,7 @@ class Contract extends Equatable {
     this.opening = '',
     this.state = const [],
     this.rules = const [],
+    this.branchTitle = '',
     this.memories = const [],
     this.history = const [],
   });
@@ -98,6 +105,7 @@ class Contract extends Equatable {
     opening,
     state,
     rules,
+    branchTitle,
     memories,
     history,
   ];

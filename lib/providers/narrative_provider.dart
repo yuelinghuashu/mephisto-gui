@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/models.dart';
+import '../domain/narrative_error.dart';
 import '../domain/narrative_event.dart';
 import '../domain/narrative_reducer.dart';
 import '../domain/narrative_state.dart';
@@ -41,6 +42,12 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   /// 流式输出节流定时器
   Timer? _streamTimer;
 
+  /// 当前生成任务的取消信号（用户点击「停止生成」后完成）
+  ///
+  /// 每次发送新消息时重新创建；[stopGenerating] 触发完成，
+  /// [NarrativeTurnService] 和 [LlmClient] 收到后提前终止 SSE 读取。
+  Completer<void>? _generationCancel;
+
   /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交，减少 Riverpod 通知。
   void _appendStreamChunk(String chunk) {
     _streamBuffer.write(chunk);
@@ -71,6 +78,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       _streamTimer?.cancel();
       _streamTimer = null;
       _streamBuffer.clear();
+      _generationCancel = null;
     });
 
     // 读取当前母版文件名（用于子版命名）
@@ -99,9 +107,22 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     if (state.isGenerating) return;
 
     final trimmed = content.trim();
+    // 每次发送创建新的取消信号（覆盖上次生成可能遗留的已取消信号）
+    _generationCancel = Completer<void>();
     _dispatch(MessageSent(trimmed));
 
     _generateReply(trimmed);
+  }
+
+  /// 停止当前生成：触发取消信号，让 LLM 流式读取提前终止。
+  ///
+  /// 协作式取消：不会中断底层 http 连接，而是让 [LlmClient] 在下一个
+  /// SSE 数据行处停止读取并返回已累积内容，随后生成流程正常走
+  /// [ReplySucceeded] 收尾（含自动存档），状态不会卡在「生成中」。
+  void stopGenerating() {
+    // 立即 flush 已到达的流式内容，避免遗留在缓冲中
+    _flushStreamBuffer();
+    _generationCancel?.complete();
   }
 
   /// 生成 AI 回复（委托 [NarrativeTurnService]，结果写回状态）。
@@ -127,6 +148,8 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       narrativeRules: narrativeRules,
       config: config,
       onChunk: _appendStreamChunk,
+      // 当前生成任务的取消信号（停止生成时触发）
+      cancelSignal: _generationCancel?.future,
     );
 
     // 流式输出结束：先 flush 缓冲中的剩余 chunk，再聚合提交
@@ -155,8 +178,9 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     } catch (e, st) {
       debugPrint('生成回复异常: $e\n$st');
       // 重置生成状态 + 抛出错误信息，避免 UI 永久停留在"生成中"（走 reducer）
+      // 错误以错误码形式暴露（provider.generation_failed），由 UI 层本地化翻译
       _flushStreamBuffer();
-      _dispatch(const GenerationFailed('生成回复时发生异常，请重试'));
+      _dispatch(const GenerationFailed(narrativeErrorGenFailed));
     }
   }
 
@@ -211,7 +235,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   /// 保存成功后更新 [NarrativeState.sourceFileName] 为实际保存的文件名，
   /// 使后续自动保存识别当前已打开的是子版，直接覆盖原文件而非生成递增新文件。
   Future<String?> _autoSaveChild() {
-    return _saveDefault(errorMessage: '自动存档失败，进度未写入磁盘');
+    return _saveDefault(errorMessage: narrativeErrorAutoSaveFail);
   }
 
   /// 保存当前会话为子版文件。返回保存的文件名；失败返回 null 并经
@@ -219,18 +243,21 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   ///
   /// 参数：
   ///   - branchName: 可选自定义分支名（如 'dark'）；null 时使用默认 `.child`
+  ///   - branchTitle: 可选「命运一句话」（另存为分支时填写），
+  ///     以 `@命运:` 标记注入子版【角色背景】；null/空则沿用既有说明
   ///
   /// 保存成功后更新 [NarrativeState.sourceFileName] 为实际保存的文件名，
   /// 使后续保存操作识别当前已打开的是子版，直接覆盖原文件而非重复新建。
-  Future<String?> saveChild({String? branchName}) async {
+  Future<String?> saveChild({String? branchName, String? branchTitle}) async {
     // 用户显式指定分支名 → 「另存为分支」：以母版名为基础生成新分支文件
     // （如 faust.dark.meph），而不是基于当前文件名（否则从子版另存会得到 child.dark）
     if (branchName != null && branchName.isNotEmpty) {
       return _performSave(
-        errorMessage: '存档失败，请检查契约目录权限或磁盘空间',
+        errorMessage: narrativeErrorSaveFail,
         saver: () => SessionSaver.saveAsBranch(
           sourceFileName: state.sourceFileName,
           branchName: branchName,
+          branchTitle: branchTitle,
           contract: state.contract,
           currentState: state.currentState,
           memories: state.memories,
@@ -241,7 +268,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
 
     // 默认保存：复用「子版覆盖 / 母版 .child 递增」的共享路径
     return _saveDefault(
-      errorMessage: '存档失败，请检查契约目录权限或磁盘空间',
+      errorMessage: narrativeErrorSaveFail,
     );
   }
 
@@ -342,7 +369,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       );
     } catch (e) {
       debugPrint('契约热重载失败: $e');
-      state = state.copyWith(lastError: '契约热重载失败，已保留原设定');
+      state = state.copyWith(lastError: narrativeErrorHotReloadFail);
     }
   }
 }

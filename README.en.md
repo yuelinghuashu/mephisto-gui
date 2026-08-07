@@ -5,6 +5,11 @@
 # 📜 Mephisto Narrative Engine
 
 <p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/lang-简体中文-blue?style=flat-square" alt="简体中文" /></a>
+  <img src="https://img.shields.io/badge/lang-English-blue?style=flat-square" alt="English" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter" alt="Flutter" />
   <img src="https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart" alt="Dart" />
   <img src="https://img.shields.io/github/v/release/yuelinghuashu/mephisto-gui" alt="GitHub Release" />
@@ -13,22 +18,22 @@
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20Android%20%7C%20iOS-blue" alt="Platforms" />
 </p>
 
-> **You write the soul of the character; Mephisto brings it to life, then watches where it leads.**
+<p align="center" >
+  <b><i>You write the soul of the character; Mephisto brings it to life, then watches where it leads.</i></b>
+</p>
 
-> **中文版：[简体中文](README.md)**
-
-Mephisto is an AI narrative engine driven by "fate." It doesn't write stories for you—it sets a framework (the *Contract*) and keeps the narrative moving within that framework until the player is satisfied.
+Mephisto is an AI narrative engine driven by "fate." It doesn't write stories for you—it sets a framework (the _Contract_) and keeps the narrative moving within that framework until the player is satisfied.
 
 ## ✦ Design Philosophy
 
-In Goethe's *Faust*, Mephistopheles makes a pact with Faust: he grants Faust every wish, on the condition that—once Faust feels content and stops striving—his life comes to an end.
+In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust every wish, on the condition that—once Faust feels content and stops striving—his life comes to an end.
 
-| *Faust*                                        | Mephisto Engine             |
-| ---------------------------------------------- | --------------------------- |
-| Faust never stops striving, never satisfied    | Narrative grows within the Contract framework |
-| Mephistopheles sets the condition: satisfaction ends the story | The engine defines the boundary of the rules |
-| Faust finally says "Stay, thou art so fair!"   | The player finally feels "content"            |
-| The pact is fulfilled; Faust's soul belongs to Mephistopheles | The pact is fulfilled; the story reaches its end |
+| _Faust_                                                        | Mephisto Engine                                  |
+| -------------------------------------------------------------- | ------------------------------------------------ |
+| Faust never stops striving, never satisfied                    | Narrative grows within the Contract framework    |
+| Mephistopheles sets the condition: satisfaction ends the story | The engine defines the boundary of the rules     |
+| Faust finally says "Stay, thou art so fair!"                   | The player finally feels "content"               |
+| The pact is fulfilled; Faust's soul belongs to Mephistopheles  | The pact is fulfilled; the story reaches its end |
 
 > **The original work is the root; fate is the branch. Every "Stay, thou art so fair!" is a destiny yet unwritten.**
 
@@ -94,13 +99,13 @@ Faust
 
 For a deeper understanding of Mephisto's mechanics, read the [docs](docs/README.md) documentation center:
 
-| Document | Content |
-| ---- | ---- |
-| [Contract Syntax Reference](docs/contract-syntax.md) | `.meph` format, sections, value types, error handling |
-| [Rule Engine Deep Dive](docs/rule-engine.md) | Conditions, actions, dice (1d2 / 1d100), mutual exclusion groups |
-| [Memory System](docs/memory-system.md) | Memory extraction, deduplication, compression |
-| [Save System](docs/save-system.md) | Read-only master, child snapshots, branches |
-| [Platform Storage Strategy](docs/platform-storage.md) | Contract directories and sandbox restrictions per platform |
+| Document                                              | Content                                                          |
+| ----------------------------------------------------- | ---------------------------------------------------------------- |
+| [Contract Syntax Reference](docs/contract-syntax.md)  | `.meph` format, sections, value types, error handling            |
+| [Rule Engine Deep Dive](docs/rule-engine.md)          | Conditions, actions, dice (1d2 / 1d100), mutual exclusion groups |
+| [Memory System](docs/memory-system.md)                | Memory extraction, deduplication, compression                    |
+| [Save System](docs/save-system.md)                    | Read-only master, child snapshots, branches                      |
+| [Platform Storage Strategy](docs/platform-storage.md) | Contract directories and sandbox restrictions per platform       |
 
 ## 🔥 Rule Hot-Reload
 
@@ -180,25 +185,25 @@ that automatically runs on Linux / Windows / macOS:
 > the following platforms have **not been verified on real devices/builds** and may contain undiscovered bugs.
 > Please verify thoroughly before releasing on any platform.
 
-| Platform | Verification Status | Notes |
-| --------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Windows**                                   | ✅ Verified on real device      | Default window 1280×720 + centered on screen verified |
-| **Linux**                                     | ✅ Real device + local build passed | Includes `flutter build linux` native compilation (C++ runner changes) |
-| **Android**                                   | ✅ Verified on real device      | The **interaction experience** of external ↔ internal storage switching is pending actual testing |
-| **macOS**                                     | ⚠️ Code-adapted only, **never compiled or run** | Window centering Swift code, XIB size changes not verified on real macOS |
-| **iOS**                                       | ⚠️ Code-adapted only, **never compiled or run** | Sandbox directory, file picker interactions not verified on real devices |
-| **Legacy HarmonyOS** (HarmonyOS 2/3/4, Android-compatible) | ✅ Can run this project's Android APK | Essentially an Android compatibility layer; existing `path_provider` / `file_selector` sandbox adaptations can be used directly; **not actually tested** |
-| **Pure HarmonyOS** (HarmonyOS NEXT / 5.0+)    | ⛔ **Not supported**            | Flutter has no official target for this platform; requires an OpenHarmony Flutter fork and per-dependency migration (independent effort, not planned) |
+| Platform                                                   | Verification Status                             | Notes                                                                                                                                                    |
+| ---------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Windows**                                                | ✅ Verified on real device                      | Default window 1280×720 + centered on screen verified                                                                                                    |
+| **Linux**                                                  | ✅ Real device + local build passed             | Includes `flutter build linux` native compilation (C++ runner changes)                                                                                   |
+| **Android**                                                | ✅ Verified on real device                      | The **interaction experience** of external ↔ internal storage switching is pending actual testing                                                        |
+| **macOS**                                                  | ⚠️ Code-adapted only, **never compiled or run** | Window centering Swift code, XIB size changes not verified on real macOS                                                                                 |
+| **iOS**                                                    | ⚠️ Code-adapted only, **never compiled or run** | Sandbox directory, file picker interactions not verified on real devices                                                                                 |
+| **Legacy HarmonyOS** (HarmonyOS 2/3/4, Android-compatible) | ✅ Can run this project's Android APK           | Essentially an Android compatibility layer; existing `path_provider` / `file_selector` sandbox adaptations can be used directly; **not actually tested** |
+| **Pure HarmonyOS** (HarmonyOS NEXT / 5.0+)                 | ⛔ **Not supported**                            | Flutter has no official target for this platform; requires an OpenHarmony Flutter fork and per-dependency migration (independent effort, not planned)    |
 
 ### System Version Requirements
 
-| Platform | Minimum | Recommended |
-| ----------- | -------------------------------------------------------------------- | -------------------------------------- |
-| **Windows** | Windows 10 (Flutter desktop minimum) | Windows 11 |
-| **Linux**   | GTK 3 required (supported by mainstream distros) | Recent distributions (e.g., Ubuntu 22.04+) |
-| **Android** | Flutter toolchain default `minSdk` (follows `flutter.minSdkVersion`, currently ~API 21) | Android 10+ (API 29) |
-| **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`) | iOS 16+ |
-| **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`) | macOS 12 Monterey+ |
+| Platform    | Minimum                                                                                 | Recommended                                |
+| ----------- | --------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **Windows** | Windows 10 (Flutter desktop minimum)                                                    | Windows 11                                 |
+| **Linux**   | GTK 3 required (supported by mainstream distros)                                        | Recent distributions (e.g., Ubuntu 22.04+) |
+| **Android** | Flutter toolchain default `minSdk` (follows `flutter.minSdkVersion`, currently ~API 21) | Android 10+ (API 29)                       |
+| **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`)                              | iOS 16+                                    |
+| **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`)                    | macOS 12 Monterey+                         |
 
 > **Notes**:
 >

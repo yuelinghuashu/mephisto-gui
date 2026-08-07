@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../domain/config.dart';
 import '../../domain/enums.dart';
@@ -66,26 +67,49 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     if (mounted) setState(() => _llmLoaded = true);
   }
 
-  /// 切换后端类型：Ollama 自动填充本地地址、清空 API Key 和默认模型
+  /// 切换后端类型：仅在字段为空或仍为另一后端默认值时自动填充对应默认值，
+  /// 绝不覆盖用户已输入的自定义内容；API Key 在 Ollama 模式下仅隐藏 UI、保留值。
+  ///
+  /// 设计原则：
+  ///   - 用户首次进入表单时字段为空 → 切到某后端自动填其默认值（减少输入成本）
+  ///   - 用户已自定义 Base URL / Model → 切换后端时不覆盖，保留自定义内容
+  ///   - API Key 在 Ollama 下隐藏（`if (!isOllama)`），但 controller 值不清空，
+  ///     切回 OpenAI 兼容时自动回显，避免用户重复输入
   void _switchBackend(LlmBackend? backend) {
     if (backend == null || backend == _backend) return;
     setState(() => _backend = backend);
 
     if (backend == LlmBackend.ollama) {
-      _baseUrlController.text = LlmConfig.ollamaBaseUrl;
-      _apiKeyController.clear();
-      // Model 若仍是默认的 deepseek，则清空让用户填本地模型名
-      if (_modelController.text == LlmConfig.defaultModel) {
+      // Base URL：为空或仍是 OpenAI 默认 URL（未自定义）→ 填 Ollama 默认
+      final base = _baseUrlController.text.trim();
+      if (base.isEmpty || base == LlmConfig.defaultBaseUrl) {
+        _baseUrlController.text = LlmConfig.ollamaBaseUrl;
+      }
+      // API Key：不清空（隐藏 UI 但保留值，切回时自动回显）
+      // Model：为空或仍是默认 deepseek → 清空让用户填本地模型名
+      final model = _modelController.text.trim();
+      if (model.isEmpty || model == LlmConfig.defaultModel) {
         _modelController.clear();
       }
     } else {
-      _baseUrlController.text = LlmConfig.defaultBaseUrl;
+      // OpenAI 兼容：Base URL 为空或仍是 Ollama 默认 URL（未自定义）→ 填 OpenAI 默认
+      final base = _baseUrlController.text.trim();
+      if (base.isEmpty || base == LlmConfig.ollamaBaseUrl) {
+        _baseUrlController.text = LlmConfig.defaultBaseUrl;
+      }
+      // Model：为空（Ollama 下被清空过）→ 填回默认模型；非空则保留用户自定义
+      final model = _modelController.text.trim();
+      if (model.isEmpty) {
+        _modelController.text = LlmConfig.defaultModel;
+      }
     }
   }
 
   /// 保存 LLM 配置
   Future<void> _saveLlmConfig() async {
     final messenger = ScaffoldMessenger.of(context);
+    // async 间隙前先取引用，避免 use_build_context_synchronously
+    final l10n = AppLocalizations.of(context);
     final config = LlmConfig(
       backend: _backend,
       apiKey: _apiKeyController.text.trim(),
@@ -96,7 +120,7 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
 
     if (config.baseUrl.isEmpty || config.model.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('╳ Base URL 和 Model 不能为空')),
+        SnackBar(content: Text(l10n.settingsConfigSaveFail)),
       );
       return;
     }
@@ -104,7 +128,9 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     await ref.read(llmSettingsProvider.notifier).save(config);
     // 强制失效缓存：确保运行时下次请求立即用新 key（双保险，见 llmConfigProvider 的 watch）
     ref.invalidate(llmConfigProvider);
-    messenger.showSnackBar(const SnackBar(content: Text('✦ LLM 配置已保存')));
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.settingsConfigSaved)),
+    );
   }
 
   /// 测试 LLM 连接：使用表单当前字段（无需先保存）发一个最小流式请求验证连通性。
@@ -127,7 +153,11 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     if (config.baseUrl.isEmpty || config.model.isEmpty) {
       setState(() => _testing = false);
       messenger.showSnackBar(
-        const SnackBar(content: Text('╳ 请先填写 Base URL 和 Model')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context).settingsTestNeedBaseUrlModel,
+          ),
+        ),
       );
       return;
     }
@@ -154,10 +184,13 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
 
     if (!mounted) return;
     setState(() => _testing = false);
+    final l10n = AppLocalizations.of(context);
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          error == null ? '✦ 连接成功，模型可用' : '╳ 连接失败: $error',
+          error == null
+              ? l10n.settingsTestSuccess
+              : l10n.settingsTestFail(error),
         ),
       ),
     );
@@ -166,6 +199,8 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
   /// 重置 LLM 配置（回退到默认）
   Future<void> _resetLlmConfig() async {
     final messenger = ScaffoldMessenger.of(context);
+    // async 间隙前先取引用，避免 use_build_context_synchronously
+    final l10n = AppLocalizations.of(context);
     await ref.read(llmSettingsProvider.notifier).clear();
     // 强制失效缓存：清除配置后下次请求立即回退默认值
     ref.invalidate(llmConfigProvider);
@@ -175,11 +210,14 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     _baseUrlController.text = defaults.baseUrl;
     _modelController.text = defaults.model;
     _maxTokensController.text = defaults.maxTokens.toString();
-    messenger.showSnackBar(const SnackBar(content: Text('⇄ 已恢复默认配置')));
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.settingsConfigReset)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isOllama = _backend == LlmBackend.ollama;
 
     // ---- 羊皮纸卡片容器 ----
@@ -190,13 +228,13 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
             // 后端类型选择（复古单选，与设置页其他区块风格一致）
             RadioSelectionTile(
               icon: Icons.auto_stories_outlined,
-              label: 'OpenAI 兼容',
+              label: l10n.settingsBackendOpenai,
               selected: _backend == LlmBackend.openaiCompatible,
               onTap: () => _switchBackend(LlmBackend.openaiCompatible),
             ),
             RadioSelectionTile(
               icon: Icons.local_fire_department_outlined,
-              label: '本地 Ollama',
+              label: l10n.settingsBackendOllama,
               selected: _backend == LlmBackend.ollama,
               onTap: () => _switchBackend(LlmBackend.ollama),
             ),
@@ -208,9 +246,9 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
                 controller: _apiKeyController,
                 onTap: _ensureLlmLoaded,
                 obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'API Key',
-                  hintText: 'sk-...（Ollama 可留空）',
+                decoration: InputDecoration(
+                  labelText: l10n.settingsApiKeyLabel,
+                  hintText: l10n.settingsApiKeyHint,
                 ),
               ),
             if (!isOllama) const SizedBox(height: 12),
@@ -220,10 +258,8 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
               controller: _baseUrlController,
               onTap: _ensureLlmLoaded,
               decoration: InputDecoration(
-                labelText: 'Base URL',
-                hintText: isOllama
-                    ? 'http://localhost:11434/v1'
-                    : 'https://api.deepseek.com/v1',
+                labelText: l10n.settingsBaseUrlLabel,
+                hintText: isOllama ? LlmConfig.ollamaBaseUrl : l10n.settingsBaseUrlHint,
               ),
             ),
             const SizedBox(height: 12),
@@ -232,9 +268,9 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
             TextField(
               controller: _modelController,
               onTap: _ensureLlmLoaded,
-              decoration: const InputDecoration(
-                labelText: 'Model',
-                hintText: 'deepseek-v4-flash / qwen2.5:7b',
+              decoration: InputDecoration(
+                labelText: l10n.settingsModelLabel,
+                hintText: l10n.settingsModelHint,
               ),
             ),
             const SizedBox(height: 12),
@@ -244,9 +280,9 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
               controller: _maxTokensController,
               onTap: _ensureLlmLoaded,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Max Tokens',
-                hintText: '4096',
+              decoration: InputDecoration(
+                labelText: l10n.settingsMaxTokensLabel,
+                hintText: l10n.settingsMaxTokensHint,
               ),
             ),
             const SizedBox(height: 16),
@@ -265,17 +301,17 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.wifi_tethering_outlined, size: 18),
-                  label: Text(_testing ? '测试中...' : '测试连接'),
+                  label: Text(_testing ? l10n.settingsTesting : l10n.settingsTestConnection),
                   onPressed: _testing ? null : _testConnection,
                 ),
                 FilledButton.icon(
                   icon: const Icon(Icons.save_outlined),
-                  label: const Text('保存配置'),
+                  label: Text(l10n.settingsSaveConfig),
                   onPressed: _saveLlmConfig,
                 ),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.restart_alt),
-                  label: const Text('恢复默认'),
+                  label: Text(l10n.settingsResetConfig),
                   onPressed: _resetLlmConfig,
                 ),
               ],

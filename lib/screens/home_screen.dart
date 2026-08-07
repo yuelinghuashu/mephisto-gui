@@ -53,14 +53,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 参数：
   ///   - fileName: 长按的文件名
   ///   - cascadeChildren: 长按母版时，将其下所有子版一并选中
+  ///   - expandMaster: 进入多选时自动展开该母版的子版区
+  ///     （使级联选中的子版立即可见，避免用户看不到被选中的内容）
   void _enterSelectMode(
     String fileName, {
     List<String> cascadeChildren = const [],
+    String? expandMaster,
   }) {
     setState(() {
       _isSelectMode = true;
       _selected.add(fileName);
       _selected.addAll(cascadeChildren);
+      if (expandMaster != null) {
+        _expandedGroups.add(expandMaster);
+      }
     });
   }
 
@@ -385,10 +391,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onMasterLongPress: () {
               if (!_isSelectMode) {
                 // 长按母版 → 级联选中其下所有子版
+                // 同时自动展开子版区，使被级联选中的子版立即可见
                 _enterSelectMode(
                   group.master.fileName,
                   cascadeChildren:
                       group.children.map((c) => c.fileName).toList(),
+                  expandMaster: group.master.fileName,
                 );
               }
             },
@@ -505,16 +513,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   /// 弹出重命名对话框并执行重命名（母版级联同步子版前缀）。
+  ///
+  /// 子版重命名时还可同时编辑「命运说明」（`@命运` 区块）：
+  /// 先更新原文件内容（文本级操作，不动其他内容），再执行文件重命名。
   Future<void> _renameDialog(ContractInfo info) async {
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
 
-    final newName = await RenameContractDialog.show(
+    final result = await RenameContractDialog.show(
       context,
       currentName: info.fileName,
+      initialBranchTitle: info.branchTitle,
+      showBranchTitleField: info.isChild || info.branchTitle != null,
     );
 
-    if (newName == null || newName == info.fileName) return;
+    if (result == null) return;
+    final (newName, newBranchTitle) = result;
+    // 文件名与命运说明均未变化 → 无需操作
+    if (newName == info.fileName && newBranchTitle == info.branchTitle) {
+      return;
+    }
+
+    // 命运说明有变化 → 先更新原文件内容（旧文件名），再执行重命名
+    if (newBranchTitle != info.branchTitle) {
+      await updateContractBranchTitle(info.fileName, newBranchTitle ?? '');
+    }
+
+    // 文件名未变化（可能仅修改了命运说明）→ 刷新列表后返回
+    if (newName == info.fileName) {
+      _refreshLists();
+      return;
+    }
 
     final ok = await renameContract(info.fileName, newName);
     // 母版重命名时，同步其子版文件名前缀

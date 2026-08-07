@@ -59,6 +59,11 @@ class _InputBarState extends ConsumerState<InputBar> {
     ref.read(narrativeProvider.notifier).sendMessage(text);
   }
 
+  /// 停止当前生成（生成中时点击发送按钮变为「停止」按钮）。
+  void _stopGenerating() {
+    ref.read(narrativeProvider.notifier).stopGenerating();
+  }
+
   /// 选择并附加多个文本文件（限定文本格式，支持多选）
   Future<void> _attachFiles() async {
     final messenger = ScaffoldMessenger.of(context);
@@ -176,20 +181,16 @@ class _InputBarState extends ConsumerState<InputBar> {
                 ),
               ),
 
-              // ---- 发送按钮 ----
+              // ---- 发送 / 停止按钮 ----
+              // 生成中时按钮变为「停止生成」：点击即中断 LLM 流式读取
               IconButton(
                 icon: isGenerating
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppTheme.gold,
-                        ),
-                      )
+                    ? const Icon(Icons.stop_circle_outlined, color: AppTheme.crimson)
                     : const Icon(Icons.send, color: AppTheme.gold),
-                onPressed: isGenerating ? null : _sendMessage,
-                tooltip: l10n.inputBarSendTooltip,
+                onPressed: isGenerating ? _stopGenerating : _sendMessage,
+                tooltip: isGenerating
+                    ? l10n.narrativeStopGenerating
+                    : l10n.inputBarSendTooltip,
               ),
             ],
           ),

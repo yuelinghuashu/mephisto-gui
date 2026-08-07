@@ -33,6 +33,8 @@ class ChildSaveStore {
   ///   - memories: 运行时记忆
   ///   - history: 运行时历史
   ///   - branchName: 可选自定义分支名（如 'dark'）；null 时使用默认 `.child`
+  ///   - branchTitle: 可选「命运一句话」（用户另存为分支时填写），
+  ///     以 `@命运:` 标记注入【角色背景】区块；null 时不注入
   ///
   /// 返回值：保存的子版文件名（如 `faust.child.meph` 或 `faust.dark.meph`）
   static Future<String> save(
@@ -42,6 +44,7 @@ class ChildSaveStore {
     required List<Memory> memories,
     required List<HistoryEntry> history,
     String? branchName,
+    String? branchTitle,
     String? overwriteFileName,
   }) async {
     final dir = await getContractsDirectory();
@@ -53,9 +56,25 @@ class ChildSaveStore {
     final fileName = overwriteFileName ??
         _resolveFileName(dir, baseName, branchName);
 
+    // 构造带「命运说明」的契约副本（branchTitle 非空时 serializer 输出 @命运 区块）
+    final effectiveContract = (branchTitle != null && branchTitle.trim().isNotEmpty)
+        ? Contract(
+            roleName: contract.roleName,
+            anchor: contract.anchor,
+            worldview: contract.worldview,
+            background: contract.background,
+            opening: contract.opening,
+            state: contract.state,
+            rules: contract.rules,
+            branchTitle: branchTitle.trim(),
+            memories: contract.memories,
+            history: contract.history,
+          )
+        : contract;
+
     // 序列化子版
     final content = serializeMeph(
-      contract,
+      effectiveContract,
       runtimeState: currentState,
       memories: memories,
       history: history,
@@ -98,7 +117,8 @@ class ChildSaveStore {
     final baseName = masterFileName.replaceAll('.meph', '');
 
     // 匹配 `baseName.*.meph` 且排除母版本身（复用共享的目录扫描工具）
-    return listMephFileNames(dir)
+    final allNames = await listMephFileNames(dir);
+    return allNames
         .where((name) => name != masterFileName)
         .where((name) => name.startsWith('$baseName.'))
         .toList();

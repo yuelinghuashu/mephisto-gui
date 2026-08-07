@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,14 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../app/theme.dart';
+import '../domain/narrative_error.dart';
 import '../providers/providers.dart';
 import '../screens/contract_editor_screen.dart';
+import '../services/contract_file_watcher.dart';
 import '../services/parser/meph_serializer.dart';
-import '../services/storage/contract_dir.dart';
 import '../services/storage/contract_repo.dart';
 import '../widgets/contract_menu_item.dart';
 import '../widgets/contract_panel.dart';
-import '../widgets/dialogs/text_input_dialog.dart';
+import '../widgets/dialogs/save_branch_dialog.dart';
 import '../widgets/narrative/dashboard_drawer.dart';
 import '../widgets/narrative/empty_state.dart';
 import '../widgets/narrative/input_bar.dart';
@@ -50,17 +50,8 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
   final GlobalKey<MessageListState> _messageListKey =
       GlobalKey<MessageListState>();
 
-  /// 当前监听的文件变更订阅（.meph 规则热重载）
-  StreamSubscription<FileSystemEvent>? _fileWatchSub;
-
-  /// 当前监听的文件路径（用于 sourceFileName 变化时重新绑定）
-  String _watchedFileName = '';
-
-  /// 文件变更防抖：短时间内多次写入只触发一次（与 CLI 版 fsnotify 对齐）
-  Timer? _watchDebounce;
-
-  /// 上次处理完的文件 mtime（抑制 saveChild 自我触发监听造成死循环）
-  DateTime? _lastProcessedMtime;
+  /// 契约文件变更监听器（外部编辑器保存 → 规则热重载）
+  ContractFileWatcher? _fileWatcher;
 
   @override
   void initState() {
@@ -75,67 +66,28 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
 
   @override
   void dispose() {
-    _cancelFileWatch();
-    _watchDebounce?.cancel();
+    _fileWatcher?.dispose();
+    _fileWatcher = null;
     super.dispose();
-  }
-
-  /// 取消当前文件监听。
-  void _cancelFileWatch() {
-    _watchDebounce?.cancel();
-    _watchDebounce = null;
-    _fileWatchSub?.cancel();
-    _fileWatchSub = null;
-    _watchedFileName = '';
   }
 
   /// 启动对指定 .meph 文件的监听（仅在文件名变化时重新绑定）。
   ///
   /// 外部编辑器保存 → 防抖 500ms → 读取文件 → 仅规则热重载（保留运行态）。
-  ///
-  /// 注意：完整路径 = 契约目录（[getContractsDirectory]）+ 文件名，
-  /// 与 [readContract] / [saveContract] 的路径解析保持一致。
+  /// 具体监听/防抖/mtime 抑制逻辑已抽至 [ContractFileWatcher]。
   Future<void> _startFileWatch(String fileName) async {
     // 文件名未变化时不重复绑定
-    if (fileName.isEmpty || fileName == _watchedFileName) return;
-
-    _cancelFileWatch();
-    _watchedFileName = fileName;
-
-    try {
-      final dir = await getContractsDirectory();
-      if (!dir.existsSync()) return;
-
-      // 在契约目录上监听整个事件流（write/create/rename/modify 均覆盖）。
-      // 现代编辑器原子保存 = 临时文件 rename 覆盖，event.path 不固定，
-      // 因此不做路径精确匹配；契约目录文件极少，统一防抖重读当前文件即可。
-      final sub = dir.watch().listen(
-        (event) {
-          // 防抖：短时间内多次写入只触发一次（500ms）
-          _watchDebounce?.cancel();
-          _watchDebounce = Timer(const Duration(milliseconds: 500), () async {
-            // mtime 抑制：saveChild 自己写文件也会触发事件，
-            // 但 mtime 与上次处理后记录的一致 → 忽略，避免死循环
-            final file = File(
-              '${dir.path}${Platform.pathSeparator}$_watchedFileName',
-            );
-            if (!file.existsSync()) return;
-            final mtime = file.lastModifiedSync();
-            if (mtime == _lastProcessedMtime) return;
-            _handleFileChanged(_watchedFileName);
-          });
-        },
-        onError: (Object e) {
-          debugPrint('文件监听错误: $e');
-          _showFileWatchUnavailable();
-        },
-      );
-      _fileWatchSub = sub;
-    } catch (e) {
-      // 文件系统不支持监听/路径异常时静默降级（不影响叙事主流程）
-      debugPrint('启动文件监听失败: $e');
-      _showFileWatchUnavailable();
+    if (fileName.isEmpty ||
+        (_fileWatcher?.watchedFileName == fileName)) {
+      return;
     }
+
+    final watcher = (_fileWatcher ??= ContractFileWatcher(
+      // 文件变更 → 读取最新内容 → 仅规则热重载 → 补存子版
+      onFileChanged: _handleFileChanged,
+      onUnavailable: _showFileWatchUnavailable,
+    ));
+    await watcher.start(fileName);
   }
 
   /// 文件监听不可用提示（一次性 SnackBar，避免重复打扰）。
@@ -155,68 +107,58 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
 
   /// 文件变更后的热重载处理：读取最新内容 → 仅规则热更新 → 补存子版。
   ///
-  /// 注意：处理期间（补存子版写盘）暂停监听，避免「写 → 监听 → 再写」死循环；
-  /// 完成后恢复监听。
-  void _handleFileChanged(String fileName) {
+  /// 注意：此回调由 [ContractFileWatcher] 在防抖 + mtime 抑制后调用，
+  /// 且处理期间监听已由 watcher 暂停，完成后恢复（避免死循环）。
+  Future<void> _handleFileChanged(String fileName) async {
     if (!mounted) return;
     final notifier = ref.read(narrativeProvider.notifier);
 
-    Future(() async {
-      _fileWatchSub?.pause();
-      try {
-        // 记录处理前 mtime；若之前已有记录且未变化（saveChild 自我触发）则忽略
-        final dir = await getContractsDirectory();
-        final file = File('${dir.path}${Platform.pathSeparator}$fileName');
-        final mtime = file.existsSync() ? file.lastModifiedSync() : null;
-        if (mtime != null &&
-            _lastProcessedMtime != null &&
-            mtime == _lastProcessedMtime) {
-          return;
-        }
+    // 读取最新内容（若文件已被删除则跳过）
+    final content = await readContract(fileName);
+    if (content == null || !mounted) return;
 
-        final content = await readContract(fileName);
-        if (content == null || !mounted) return;
+    notifier.hotReloadContract(content);
+    await notifier.saveChild();
 
-        notifier.hotReloadContract(content);
-        await notifier.saveChild();
-
-        // 记录处理完的 mtime，抑制 saveChild 写文件触发的下一次监听
-        _lastProcessedMtime = file.existsSync() ? file.lastModifiedSync() : null;
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context).narrativeHotReloadNotice),
-            ),
-          );
-      } finally {
-        _fileWatchSub?.resume();
-      }
-    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context).narrativeHotReloadNotice),
+        ),
+      );
   }
 
   @override
   Widget build(BuildContext context) {
     // ---- 读取状态 ----
     final state = ref.watch(narrativeProvider);
-    // 契约兜底提示（用户文件缺失/损坏 → 已加载内置模板时非空）
-    final fallbackNotice = ref.watch(contractFallbackNoticeProvider);
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final l10n = AppLocalizations.of(context);
+    // 契约兜底提示（用户文件缺失/损坏 → 已加载内置模板时非空）
+    // 注意：契约兜底提示来自 Provider 层，可能为错误码，需要本地化翻译
+    final rawFallbackNotice = ref.watch(contractFallbackNoticeProvider);
+    final fallbackNotice = rawFallbackNotice == null
+        ? null
+        : isNarrativeErrorCode(rawFallbackNotice)
+            ? _localizeNarrativeError(l10n, rawFallbackNotice)
+            : rawFallbackNotice;
 
     // ---- 监听 LLM 错误：非空时提示用户，避免静默回退 ----
     ref.listen(narrativeProvider.select((s) => s.lastError), (prev, next) {
       if (next.isNotEmpty) {
+        final l10n = AppLocalizations.of(context);
+        // 错误码 → 本地化文本；自由格式错误文本（如 LLM 异常信息）直接展示
+        final displayError = isNarrativeErrorCode(next)
+            ? _localizeNarrativeError(l10n, next)
+            : next;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(
-              content: Text(
-                AppLocalizations.of(context).narrativeErrorPrefix(next),
-              ),
+              content: Text(l10n.narrativeErrorPrefix(displayError)),
             ),
           );
       }
@@ -547,6 +489,21 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     }
   }
 
+  /// 将 Provider 层错误码映射为本地化文本。
+  ///
+  /// 仅处理 [isNarrativeErrorCode] 返回 true 的静态错误码；
+  /// 自由格式错误文本（如 LLM 异常信息）直接原样返回。
+  String _localizeNarrativeError(AppLocalizations l10n, String errorCode) {
+    return switch (errorCode) {
+      narrativeErrorGenFailed => l10n.narrativeProviderGenFailed,
+      narrativeErrorAutoSaveFail => l10n.narrativeProviderAutoSaveFail,
+      narrativeErrorSaveFail => l10n.narrativeProviderSaveFail,
+      narrativeErrorHotReloadFail => l10n.narrativeProviderHotReloadFail,
+      narrativeErrorContractFallback => l10n.contractFallbackNotice,
+      _ => errorCode,
+    };
+  }
+
   /// 打开契约编辑器编辑当前正在游玩的 .meph 文件。
   ///
   /// 职责瘦身：本方法只负责「打开编辑器」——保存动作产生的文件写入，
@@ -577,23 +534,23 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     // 文件监听已检测到写入并触发 [NarrativeNotifier.hotReloadContract]
   }
 
-  /// 弹出「另存为分支」对话框，输入分支名生成 `faust.branch.meph`。
+  /// 弹出「另存为分支」对话框，输入分支名 + 可选「命运说明」，
+  /// 生成 `faust.branch.meph`（命运说明以 `@命运:` 标记写入子版）。
   Future<void> _showSaveBranchDialog() async {
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(narrativeProvider.notifier);
     final l10n = AppLocalizations.of(context);
 
-    final branchName = await TextInputDialog.show(
-      context,
-      title: l10n.narrativeBranchDialogTitle,
-      labelText: l10n.narrativeBranchLabel,
-      hintText: l10n.narrativeBranchHint,
-      confirmText: l10n.narrativeConfirm,
-      validate: (value) => value.isNotEmpty,
-    );
+    final result = await SaveBranchDialog.show(context);
+    if (result == null) return;
 
-    if (branchName == null || branchName.isEmpty) return;
-    final fileName = await notifier.saveChild(branchName: branchName);
+    final (branchName, branchTitle) = result;
+    if (branchName.isEmpty) return;
+
+    final fileName = await notifier.saveChild(
+      branchName: branchName,
+      branchTitle: branchTitle,
+    );
     if (!mounted) return;
     if (fileName != null) {
       messenger.showSnackBar(

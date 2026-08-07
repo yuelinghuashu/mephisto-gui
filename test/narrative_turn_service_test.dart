@@ -203,6 +203,7 @@ class MockLlmClient extends LlmClient {
     required List<LlmMessage> messages,
     required void Function(String chunk) onChunk,
     Duration timeout = const Duration(seconds: 60),
+    Future<void>? cancelSignal,
   }) async {
     capturedMessages.add(messages);
     onChunk(reply);
@@ -224,6 +225,7 @@ class ThrowingLlmClient extends LlmClient {
     required List<LlmMessage> messages,
     required void Function(String chunk) onChunk,
     Duration timeout = const Duration(seconds: 60),
+    Future<void>? cancelSignal,
   }) async {
     throw Exception('mock 网络错误');
   }
