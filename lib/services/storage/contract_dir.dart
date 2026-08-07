@@ -17,7 +17,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 const String _assetPrefix = 'assets/contracts/';
 
 /// 内置模板列表（首次启动时复制到用户目录）
-const List<String> _builtinContracts = ['faust.meph', 'dantes.meph'];
+///
+/// 除母版契约外，还预置「官方示范子版」（命运支流枝叶）：
+///   - `dantes.bonapart.meph`：基督山伯爵 × 波拿巴党卧底 if 线
+///   - `faust.utopia.meph`：浮士德 × 理想国 / 乌托邦 if 线
+/// 首页分组逻辑会自动将它们显示为对应母版下的子版，直观呈现「树根 + 枝叶」。
+const List<String> _builtinContracts = [
+  'faust.meph',
+  'dantes.meph',
+  'dantes.bonapart.meph',
+  'faust.utopia.meph',
+];
 
 /// 首次种子标记前缀（SharedPreferences key 前缀）
 ///

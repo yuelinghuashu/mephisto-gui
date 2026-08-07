@@ -75,6 +75,49 @@ void main() {
       expect(omen.condition, contains('roll(1d100)'));
       expect(omen.action, startsWith('注入 '));
     });
+
+    test('解析 dantes.bonapart.meph（官方示范子版：波拿巴党卧底线）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/dantes.bonapart.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '埃德蒙·唐泰斯');
+      // 状态：伊夫堡地牢，警惕度提升
+      final state = {for (final s in contract.state) s.key: s.value};
+      expect(state['位置'], const StringValue('伊夫堡地牢'));
+      expect(state['警惕度'], const IntValue(70));
+      // 记忆/历史为运行时产物，契约模板不应预置
+      expect(contract.memories, isEmpty);
+      expect(contract.history, isEmpty);
+      // 波拿巴线核心规则
+      final shake = contract.rules.firstWhere((r) => r.name == '身份动摇');
+      expect(shake.condition, contains('波拿巴'));
+      // 互斥组「抉择」：答应 = 踏入波拿巴党
+      final agree = contract.rules.firstWhere((r) => r.name == '答允密使');
+      expect(agree.group, '抉择');
+    });
+
+    test('解析 faust.utopia.meph（官方示范子版：理想国 / 乌托邦线）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/faust.utopia.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '浮士德');
+      // 状态：前所未有的平静（契约临界设定）
+      final state = {for (final s in contract.state) s.key: s.value};
+      expect(state['情绪'], const StringValue('前所未有的平静'));
+      // 记忆/历史为运行时产物，契约模板不应预置
+      expect(contract.memories, isEmpty);
+      expect(contract.history, isEmpty);
+      // 呼应原典「满足即终结」的规则
+      final critical = contract.rules.firstWhere((r) => r.name == '契约临界');
+      expect(critical.condition, contains('roll(1d100)'));
+      // 「说出停留」：浮士德亲口说出原典台词
+      final stay = contract.rules.firstWhere((r) => r.name == '说出停留');
+      expect(stay.action, contains('请停留一下'));
+    });
   });
 
   group('MephParser - 值类型推断', () {
@@ -157,7 +200,11 @@ void main() {
       expect(
         () => parseMeph('【角色名】\nA\n【角色名】\nB'),
         throwsA(
-          isA<MephParseError>().having((e) => e.message, 'message', contains('重复的区块')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('重复的区块'),
+          ),
         ),
       );
     });
@@ -166,7 +213,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[规则] if 条件'),
         throwsA(
-          isA<MephParseError>().having((e) => e.message, 'message', contains('->')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('->'),
+          ),
         ),
       );
     });
@@ -175,8 +226,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 包含 "x" -> 状态.堕落指数 + = 10'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('复合运算符')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('复合运算符'),
+          ),
         ),
       );
     });
@@ -185,8 +239,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 包含 "x" -> 状态.堕落指数 - = 10'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('复合运算符')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('复合运算符'),
+          ),
         ),
       );
     });
@@ -195,8 +252,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 包含 "x" -> 注入 "暗影" && 状态.堕落指数 + = 10'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('复合运算符')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('复合运算符'),
+          ),
         ),
       );
     });
@@ -219,8 +279,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 状态.灵魂完整度 > = 30 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('比较运算符')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('比较运算符'),
+          ),
         ),
       );
     });
@@ -229,8 +292,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 状态.情绪 = = "暴怒" -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('比较运算符')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('比较运算符'),
+          ),
         ),
       );
     });
@@ -239,8 +305,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 状态.位置 ! = "书斋" -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('比较运算符')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('比较运算符'),
+          ),
         ),
       );
     });
@@ -249,8 +318,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll(1d100) > = 80 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('比较运算符')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('比较运算符'),
+          ),
         ),
       );
     });
@@ -273,8 +345,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 不 包含 "黑暗" -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('不包含')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('不包含'),
+          ),
         ),
       );
     });
@@ -283,8 +358,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 包 含 "黑暗" -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('包含')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('包含'),
+          ),
         ),
       );
     });
@@ -306,8 +384,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 包含 "x" -> 注 入 "阴影"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('注入')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('注入'),
+          ),
         ),
       );
     });
@@ -316,8 +397,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 状 态.灵魂完整度 < 30 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('状态')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('状态'),
+          ),
         ),
       );
     });
@@ -326,8 +410,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll (1d100) >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('roll')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('roll'),
+          ),
         ),
       );
     });
@@ -337,16 +424,22 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll 1d100 >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('缺少')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('缺少'),
+          ),
         ),
       );
       // roll 与表达式之间缺失 '('（无空格）：同样静默失效
       expect(
         () => parseMeph('【规则】\n[错误] if roll1d100 >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('缺少')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('缺少'),
+          ),
         ),
       );
     });
@@ -356,16 +449,22 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll(1d100 >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('缺少')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('缺少'),
+          ),
         ),
       );
       // 括号内部内容直到行尾都未闭合
       expect(
         () => parseMeph('【规则】\n[错误] if roll(1d100 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('缺少')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('缺少'),
+          ),
         ),
       );
     });
@@ -374,8 +473,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll( 1d100) >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('骰子表达式')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('骰子表达式'),
+          ),
         ),
       );
     });
@@ -384,8 +486,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll(1 d100) >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('骰子表达式')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('骰子表达式'),
+          ),
         ),
       );
     });
@@ -394,8 +499,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll(1d 100) >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('骰子表达式')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('骰子表达式'),
+          ),
         ),
       );
     });
@@ -404,8 +512,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll(2d100) >= 70 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('骰子表达式')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('骰子表达式'),
+          ),
         ),
       );
     });
@@ -414,8 +525,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if roll(1d6) >= 4 -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('骰子表达式')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('骰子表达式'),
+          ),
         ),
       );
       // 合法面数不误报：1d2 与 1d100
@@ -453,16 +567,22 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if (包含 "深渊" || 包含 "凝视" -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('括号不匹配')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('括号不匹配'),
+          ),
         ),
       );
       // 多余右括号
       expect(
         () => parseMeph('【规则】\n[错误] if 包含 "深渊") && 包含 "凝视" -> 注入 "x"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('括号不匹配')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('括号不匹配'),
+          ),
         ),
       );
     });
@@ -471,8 +591,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 包含 "x" -> 注入 "a" &&状态.堕落指数 += 5'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('&&')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('&&'),
+          ),
         ),
       );
     });
@@ -481,8 +604,11 @@ void main() {
       expect(
         () => parseMeph('【规则】\n[错误] if 包含 "x" -> [group:combat 注入 "a"'),
         throwsA(
-          isA<MephParseError>()
-              .having((e) => e.message, 'message', contains('互斥组')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('互斥组'),
+          ),
         ),
       );
     });
@@ -519,7 +645,11 @@ void main() {
       expect(
         () => parseMeph('【状态】\n灵魂完整度：50'),
         throwsA(
-          isA<MephParseError>().having((e) => e.message, 'message', contains('列表项')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('列表项'),
+          ),
         ),
       );
     });
@@ -528,7 +658,11 @@ void main() {
       expect(
         () => parseMeph('# 只有注释\n\n\n'),
         throwsA(
-          isA<MephParseError>().having((e) => e.message, 'message', contains('没有有效区块')),
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains('没有有效区块'),
+          ),
         ),
       );
     });

@@ -33,13 +33,17 @@ void main() {
     });
   }
 
-  test('目录未种子 → 首次调用复制内置模板', () async {
+  test('目录未种子 → 首次调用复制内置模板（含官方示范子版）', () async {
     seedDir(tempDir.path);
 
     await ensureContracts();
 
+    // 母版契约
     expect(File('${tempDir.path}/faust.meph').existsSync(), isTrue);
     expect(File('${tempDir.path}/dantes.meph').existsSync(), isTrue);
+    // 官方示范子版（命运支流枝叶）
+    expect(File('${tempDir.path}/dantes.bonapart.meph').existsSync(), isTrue);
+    expect(File('${tempDir.path}/faust.utopia.meph').existsSync(), isTrue);
     // 内容是完整的内置模板（非空）
     final faust = File('${tempDir.path}/faust.meph').readAsStringSync();
     expect(faust, contains('【角色名】'));
