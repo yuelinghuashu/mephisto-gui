@@ -91,6 +91,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeContractSaved => '✦ 契约已保存';
 
   @override
+  String get homeNoBranches => '此母版暂未创建子版分支';
+
+  @override
   String get emptyStateNoContract => '契约虚空';
 
   @override
@@ -198,6 +201,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get narrativeFileWatchUnavailable => '⚠ 文件监听不可用，规则热重载将失效（叙事不受影响）';
 
   @override
+  String get narrativeRestoreFailed => '╳ 存档恢复失败：存档文件可能存在但内容已损坏，已从母版开始新叙事';
+
+  @override
   String narrativeErrorPrefix(Object error) {
     return '╳ $error，梅菲斯特以凡俗之力回应';
   }
@@ -277,7 +283,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get previewSheetClose => '关闭';
 
   @override
-  String get settingsAppearance => '外观';
+  String get settingsTheme => '主题';
+
+  @override
+  String get settingsThemeDescription => '明暗主题模式。';
 
   @override
   String get settingsThemeSystem => '跟随系统';
@@ -287,6 +296,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsThemeDark => '暗色';
+
+  @override
+  String get settingsLanguage => '界面语言';
+
+  @override
+  String get settingsLanguageDescription => '简体中文 / English。';
 
   @override
   String get settingsNarrativeWidth => '叙事内容宽度';
@@ -305,6 +320,44 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsWidthFull => '满屏';
+
+  @override
+  String get settingsHistoryWindow => '历史消息窗口';
+
+  @override
+  String get settingsHistoryWindowDescription =>
+      '发送给 LLM 的历史对话条数上限。窗口越小，token 消耗越低；窗口越大，模型对前文的记忆越完整。';
+
+  @override
+  String get settingsHistoryWindowNarrow => '20 条';
+
+  @override
+  String get settingsHistoryWindowMedium => '40 条';
+
+  @override
+  String get settingsHistoryWindowWide => '60 条';
+
+  @override
+  String get settingsHistoryWindowFull => '全部发送';
+
+  @override
+  String get settingsMemoryLimit => '记忆注入上限';
+
+  @override
+  String get settingsMemoryLimitDescription =>
+      '每轮发送给 LLM 的记忆条数上限。窗口越小，token 消耗越低；超过上限时高权重记忆（≥4 星）全部保留，其余按权重降序补足。';
+
+  @override
+  String get settingsMemoryLimitCompact => '10 条';
+
+  @override
+  String get settingsMemoryLimitStandard => '20 条';
+
+  @override
+  String get settingsMemoryLimitExtended => '30 条';
+
+  @override
+  String get settingsMemoryLimitFull => '全部注入';
 
   @override
   String get settingsNarrativeRules => '叙事规则';

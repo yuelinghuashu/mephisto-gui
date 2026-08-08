@@ -44,6 +44,7 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
 - **Rule Engine**: Supports condition matching (contains/state/dice), action execution (state changes/memory injection), and mutually exclusive groups
 - **Dice System**: `roll(1d2)` binary judgment / `roll(1d100)` high-precision fate judgment, with a "Fate Verdict" card rendering
 - **Memory System**: Automatically extracts key event summaries, auto-compresses when over the limit, shaping long-term narrative consistency
+- **Context Window**: Choose a history message tier (20 / 40 / 60 / All) on the settings page to control LLM token consumption and prevent long conversations from diluting response quality
 - **Child Save System**: Master contracts are read-only; runtime dialogues generate child snapshots, supporting branches and restoration
 - **Rule Hot-Reload**: Edit in the narrative page ✏️ or save the `.meph` in VSCode → **only rules take effect instantly**, with dialogue/state/memory/history all preserved
 - **Customizable Style**: Freely set narrative rules to precisely control output literary style (poetic dialogue / stark realism, etc.)
@@ -58,7 +59,9 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
 2. **Select a Contract**: On the home page, choose a built-in contract (Faust / Edmond Dantès) or import your own `.meph` file
    - Desktop: You can customize the contract directory on the settings page; Android: switch between internal/external storage on the settings page; iOS: uses the app sandbox directory
 3. **Enter Fate Guidance**: On the narrative page, enter scene progressions, and the AI will unfold the narrative in third-person literary prose
-4. **Customize Narrative Rules (optional)**: Edit style rules on the settings page, for example:
+4. **Adjust Context Window (optional)**: On the settings page, "History Message Window" offers 20 / 40 / 60 / Send All tiers,
+   controlling how many historical dialogue messages are sent to the LLM (consider tightening it on long conversations to save tokens and keep responses focused)
+5. **Customize Narrative Rules (optional)**: Edit style rules on the settings page, for example:
 
    ```text
    Generate the story in the poetic dialogue style of the original Faust
@@ -91,7 +94,6 @@ Faust
 [契约觉醒] if 包含 "契约" && roll(1d100) -> 状态.灵魂完整度 += 10
 ```
 
-> The example above intentionally keeps Chinese content—the contract files themselves are written in Chinese by convention.
 > Full block descriptions, value types, and error handling can be found in [docs/contract-syntax.md](docs/contract-syntax.md),
 > and the rule engine (conditions / actions / dice / mutual exclusion groups) is detailed in [docs/rule-engine.md](docs/rule-engine.md).
 
@@ -189,7 +191,7 @@ that automatically runs on Linux / Windows / macOS:
 | ---------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Windows**                                                | ✅ Verified on real device                      | Default window 1280×720 + centered on screen verified                                                                                                    |
 | **Linux**                                                  | ✅ Real device + local build passed             | Includes `flutter build linux` native compilation (C++ runner changes)                                                                                   |
-| **Android**                                                | ✅ Verified on real device                      | The **interaction experience** of external ↔ internal storage switching is pending actual testing                                                        |
+| **Android**                                                | ✅ Verified on real device                      | The **interaction experience** of external ↔ internal storage switching has been verified                                                              |
 | **macOS**                                                  | ⚠️ Code-adapted only, **never compiled or run** | Window centering Swift code, XIB size changes not verified on real macOS                                                                                 |
 | **iOS**                                                    | ⚠️ Code-adapted only, **never compiled or run** | Sandbox directory, file picker interactions not verified on real devices                                                                                 |
 | **Legacy HarmonyOS** (HarmonyOS 2/3/4, Android-compatible) | ✅ Can run this project's Android APK           | Essentially an Android compatibility layer; existing `path_provider` / `file_selector` sandbox adaptations can be used directly; **not actually tested** |
@@ -220,7 +222,6 @@ that automatically runs on Linux / Windows / macOS:
 2. **macOS window centering**: `MainFlutterWindow.swift` dynamically centers based on `NSScreen.main.visibleFrame`;
    Swift API usage is correct, but not compiled on real macOS—signature/timing risks exist.
 3. **iOS contract import**: `file_selector` (UIDocumentPicker) actual interaction on iOS is unverified.
-4. **Android storage switching**: The directory experience after sandbox ↔ external storage switching (data visibility, switching timing) has not been actually tested.
 
 ### Guide for Filing Issues
 

@@ -55,7 +55,12 @@ class NarrativeState extends Equatable {
     this.attachedContexts = const [],
   });
 
-  /// 创建状态的副本（用于更新）
+  /// 创建状态的副本（用于更新）。
+  ///
+  /// 性能优化：所有参数均为 null（无任何字段变化）时直接返回 `this`，
+  /// 避免创建相同内容的新对象——流式输出过程中 [NarrativeNotifier] 会在
+  /// 50ms 节流窗口内频繁调用 copyWith，短路可减少无谓的对象创建与
+  /// Equatable 比较（以及 Riverpod 通知）。
   NarrativeState copyWith({
     Contract? contract,
     String? sourceFileName,
@@ -69,6 +74,21 @@ class NarrativeState extends Equatable {
     List<String>? attachedFileNames,
     List<String>? attachedContexts,
   }) {
+    // 所有参数均为 null → 无变化，直接返回自身
+    if (contract == null &&
+        sourceFileName == null &&
+        messages == null &&
+        currentState == null &&
+        memories == null &&
+        history == null &&
+        isGenerating == null &&
+        streamingContent == null &&
+        lastError == null &&
+        attachedFileNames == null &&
+        attachedContexts == null) {
+      return this;
+    }
+
     return NarrativeState(
       contract: contract ?? this.contract,
       sourceFileName: sourceFileName ?? this.sourceFileName,

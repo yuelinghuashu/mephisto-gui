@@ -178,12 +178,13 @@ CondNode? _compileAtom(String c) {
 /// 防止长期运行下无界增长。
 CondNode? compileCondition(String cond) {
   final now = _clock();
-  final cached = _conditionCache[cond];
 
-  if (cached != null) {
+  // 使用 containsKey 而非 `!= null` 判断：编译失败的条目（值为 null）
+  // 也应命中缓存，避免每次评估时都重新走一遍完整编译流程。
+  if (_conditionCache.containsKey(cond)) {
     // 命中：更新最近访问时间
     _conditionCacheAccess[cond] = now;
-    return cached;
+    return _conditionCache[cond];
   }
 
   // 未命中：编译并插入，随后按容量上限淘汰最久未用的条目
@@ -211,6 +212,16 @@ void _evictIfNeeded() {
     _conditionCache.remove(entry.key);
     _conditionCacheAccess.remove(entry.key);
   }
+}
+
+/// 清除条件编译缓存（含 LRU 辅助数据与时钟计数器）。
+///
+/// 由契约切换（[switchContract]）时调用：旧契约的条件规则不再需要，
+/// 释放内存防止长期运行/多契约切换下缓存积累无用编译结果。
+void clearConditionCache() {
+  _conditionCache.clear();
+  _conditionCacheAccess.clear();
+  _clockCounter = 0;
 }
 
 /// 编译（无缓存版本，供 [compileCondition] 调用）。

@@ -102,8 +102,14 @@ class Message extends Equatable {
         diceResults: diceResults,
       );
 
+  // 注意：props 只包含「内容值」字段，不含 id / timestamp。
+  //
+  // `id` 是实例唯一标识（用于区分同一内容的多次出现），
+  // `timestamp` 是创建时间——两者都不是「值」的一部分。
+  // 含 id/timestamp 时，相同内容的消息在 Equatable 比较中永远不相等，
+  // 且全局自增 ID 计数器在各测试/实例间持续递增，导致非确定性行为。
   @override
-  List<Object?> get props => [id, role, content, timestamp, diceResults];
+  List<Object?> get props => [role, content, diceResults];
 }
 
 // ============================================================
@@ -174,6 +180,12 @@ class Rule extends Equatable {
 ///
 /// 代表引擎从对话中提取的关键事件摘要。
 /// 记忆会被自动提取、压缩和去重。
+///
+/// 极简设计（为"坚守人设"服务）：
+///   - [content]：记忆内容，**.meph【记忆】区块永久全量保存，永不删除**
+///   - [importance]：1-5 星重要性，仅用于**注入时的排序裁剪**——
+///     每轮把最重要的记忆优先喂给 LLM，窗口占满即止（模型读不到的仍在文件里，
+///     并非遗忘，只是这轮没带）
 @immutable
 class Memory extends Equatable {
   /// 记忆唯一标识
@@ -185,16 +197,47 @@ class Memory extends Equatable {
   /// 创建时间
   final DateTime createdAt;
 
+  /// 重要性权重（1-5，默认 3 = 中等）
+  ///
+  /// 注入提示词时按权重降序排序，保证人设核心/重大事件优先被模型看到；
+  /// 压缩时高权重（≥ [highImportanceThreshold]）永不丢弃。
+  final int importance;
+
   /// 构造函数
   Memory({
     String? id,
     required this.content,
     DateTime? createdAt,
+    this.importance = defaultImportance,
   }) : id = id ?? _generateUniqueId(),
        createdAt = createdAt ?? DateTime.now();
 
+  /// 默认权重（中等）
+  static const int defaultImportance = 3;
+
+  /// 高权重阈值：≥ 此值视为「核心记忆」，压缩时永不丢弃
+  static const int highImportanceThreshold = 4;
+
+  /// 最大权重
+  static const int maxImportance = 5;
+
+  /// 创建带权重/标签/置信度的记忆副本（保留 id / createdAt）。
+  Memory copyWith({
+    String? content,
+    int? importance,
+  }) {
+    return Memory(
+      id: id,
+      content: content ?? this.content,
+      createdAt: createdAt,
+      importance: importance ?? this.importance,
+    );
+  }
+
+  // 同上：props 仅按「内容」比较，id / createdAt / 元数据不参与等值判断
+  // （保持跨测试确定性，与 Message 设计一致）。
   @override
-  List<Object?> get props => [id, content, createdAt];
+  List<Object?> get props => [content];
 }
 
 // ============================================================

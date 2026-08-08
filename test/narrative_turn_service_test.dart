@@ -184,6 +184,62 @@ void main() {
     expect(messages.any((m) => m.content == '骰子结算'), isFalse);
     expect(messages.map((m) => m.role), containsAll(['user', 'assistant']));
   });
+
+  test('上下文窗口：超过 maxHistoryMessages 时只保留最近 N 条历史', () async {
+    capturedMessages.clear();
+    final s = serviceReturning('回应');
+    // 5 条历史消息，窗口上限 3 → 只保留最后 3 条（旧 2 条被截断）
+    final history = [
+      Message.fate('第1句'),
+      Message.assistant('回应1'),
+      Message.fate('第2句'),
+      Message.assistant('回应2'),
+      Message.fate('第3句'),
+    ];
+    await s.generate(
+      userInput: '本轮',
+      contract: contract(),
+      currentState: const {},
+      memories: const [],
+      priorMessages: history,
+      attachedContexts: const [],
+      narrativeRules: '默认',
+      config: config,
+      onChunk: (_) {},
+      maxHistoryMessages: 3,
+    );
+    final messages = capturedMessages.first;
+    // 系统 prompt [0] + 截断后的 3 条历史 + 本轮用户输入 [last]
+    expect(messages, hasLength(5));
+    expect(messages.map((m) => m.content), contains('第2句'));
+    expect(messages.map((m) => m.content), contains('第3句'));
+    expect(messages.map((m) => m.content), isNot(contains('第1句')));
+  });
+
+  test('上下文窗口：未传 maxHistoryMessages 时全部发送（默认不限制）', () async {
+    capturedMessages.clear();
+    final s = serviceReturning('回应');
+    final history = [
+      Message.fate('第1句'),
+      Message.assistant('回应1'),
+      Message.fate('第2句'),
+    ];
+    await s.generate(
+      userInput: '本轮',
+      contract: contract(),
+      currentState: const {},
+      memories: const [],
+      priorMessages: history,
+      attachedContexts: const [],
+      narrativeRules: '默认',
+      config: config,
+      onChunk: (_) {},
+    );
+    final messages = capturedMessages.first;
+    // 系统 prompt [0] + 全部 3 条历史 + 本轮用户输入 [last]
+    expect(messages, hasLength(5));
+    expect(messages.map((m) => m.content), contains('第1句'));
+  });
 }
 
 /// 固定返回指定文本的 mock LLM 客户端
@@ -204,6 +260,7 @@ class MockLlmClient extends LlmClient {
     required void Function(String chunk) onChunk,
     Duration timeout = const Duration(seconds: 60),
     Future<void>? cancelSignal,
+    int maxRetries = defaultMaxRetries,
   }) async {
     capturedMessages.add(messages);
     onChunk(reply);
@@ -226,6 +283,7 @@ class ThrowingLlmClient extends LlmClient {
     required void Function(String chunk) onChunk,
     Duration timeout = const Duration(seconds: 60),
     Future<void>? cancelSignal,
+    int maxRetries = defaultMaxRetries,
   }) async {
     throw Exception('mock 网络错误');
   }

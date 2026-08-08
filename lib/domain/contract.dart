@@ -91,6 +91,36 @@ class Contract extends Equatable {
   /// 创建空契约
   factory Contract.empty() => const Contract(roleName: '角色');
 
+  /// 创建契约副本（仅更新指定的字段，其余保留原值）。
+  ///
+  /// 用于状态迁移/保存路径中需要「保留大部分字段、仅替换部分区块」的场景，
+  /// 避免手工复制全部字段导致未来新增字段时漏同步。
+  Contract copyWith({
+    String? roleName,
+    List<StateItem>? anchor,
+    String? worldview,
+    String? background,
+    String? opening,
+    List<StateItem>? state,
+    List<Rule>? rules,
+    String? branchTitle,
+    List<Memory>? memories,
+    List<HistoryEntry>? history,
+  }) {
+    return Contract(
+      roleName: roleName ?? this.roleName,
+      anchor: anchor ?? this.anchor,
+      worldview: worldview ?? this.worldview,
+      background: background ?? this.background,
+      opening: opening ?? this.opening,
+      state: state ?? this.state,
+      rules: rules ?? this.rules,
+      branchTitle: branchTitle ?? this.branchTitle,
+      memories: memories ?? this.memories,
+      history: history ?? this.history,
+    );
+  }
+
   /// 获取状态映射（用于快速查找）
   Map<String, StateValue> get stateMap {
     return {for (final item in state) item.key: item.value};

@@ -34,16 +34,29 @@ class RadioSelectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 次要文本色：区分功能图标与选中指示的明暗状态
+    final secondaryColor = AppTheme.textSecondary(theme.brightness);
 
     return ListTile(
       onTap: onTap,
       dense: true,
-      leading: Icon(
-        selected ? Icons.brightness_1 : Icons.circle_outlined,
-        size: 18,
-        color: selected
-            ? AppTheme.gold
-            : AppTheme.textSecondary(theme.brightness),
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 功能图标（各设置区块传入的语义图标，如书卷渐进 / 主题 / 语言等）
+          Icon(
+            icon,
+            size: 20,
+            color: selected ? AppTheme.gold : secondaryColor,
+          ),
+          const SizedBox(width: 8),
+          // 选中指示（金色实心单选框 / 灰色空心单选框）
+          Icon(
+            selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+            size: 16,
+            color: selected ? AppTheme.gold : secondaryColor,
+          ),
+        ],
       ),
       title: Text(
         label,

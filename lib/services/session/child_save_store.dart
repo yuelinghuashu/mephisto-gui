@@ -53,23 +53,16 @@ class ChildSaveStore {
     // 确定目标文件名：
     //   - overwriteFileName 提供时直接覆盖（用于存档已存在时在原文件上修改）
     //   - 否则按 .child / 递增 / 分支名 生成新文件
+    //
+    // 优化：一次性列出目录中所有 .meph 文件名后在内存中判断，
+    // 避免 _resolveFileName 中多次同步磁盘 existsSync() 检查。
     final fileName = overwriteFileName ??
-        _resolveFileName(dir, baseName, branchName);
+        await _resolveFileName(dir, baseName, branchName);
 
     // 构造带「命运说明」的契约副本（branchTitle 非空时 serializer 输出 @命运 区块）
-    final effectiveContract = (branchTitle != null && branchTitle.trim().isNotEmpty)
-        ? Contract(
-            roleName: contract.roleName,
-            anchor: contract.anchor,
-            worldview: contract.worldview,
-            background: contract.background,
-            opening: contract.opening,
-            state: contract.state,
-            rules: contract.rules,
-            branchTitle: branchTitle.trim(),
-            memories: contract.memories,
-            history: contract.history,
-          )
+    final effectiveContract =
+        (branchTitle != null && branchTitle.trim().isNotEmpty)
+        ? contract.copyWith(branchTitle: branchTitle.trim())
         : contract;
 
     // 序列化子版
@@ -146,18 +139,24 @@ class ChildSaveStore {
   /// 解析目标文件名：
   ///   - branchName 为空：使用 `baseName.child.meph`，若已存在则 `baseName.child2.meph` 递增
   ///   - branchName 非空：使用 `baseName.branchName.meph`，若已存在则追加序号 `baseName.branchName2.meph`
-  static String _resolveFileName(
+  ///
+  /// 优化：一次性列出目录中所有 .meph 文件名后在内存中判断，
+  /// 避免多次同步磁盘 `existsSync()` 检查（文件多时显著减少 I/O）。
+  static Future<String> _resolveFileName(
     Directory dir,
     String baseName,
     String? branchName,
-  ) {
+  ) async {
     final suffix = branchName == null || branchName.isEmpty
         ? defaultChildSuffix
         : '.${branchName.trim()}';
 
+    // 批量列出所有 .meph 文件名，内存 Set 中去重判断（比循环磁盘检查快）
+    final existingNames = (await listMephFileNames(dir)).toSet();
+
     var fileName = '$baseName$suffix.meph';
     var counter = 2;
-    while (File('${dir.path}/$fileName').existsSync()) {
+    while (existingNames.contains(fileName)) {
       fileName = '$baseName$suffix$counter.meph';
       counter++;
     }

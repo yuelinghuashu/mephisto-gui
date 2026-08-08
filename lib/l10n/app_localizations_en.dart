@@ -92,6 +92,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeContractSaved => '✦ Contract saved';
 
   @override
+  String get homeNoBranches => 'This master has no child branches yet';
+
+  @override
   String get emptyStateNoContract => 'The Void of Contracts';
 
   @override
@@ -205,6 +208,10 @@ class AppLocalizationsEn extends AppLocalizations {
       '⚠ File watching unavailable; rule hot-reload is disabled (narrative unaffected)';
 
   @override
+  String get narrativeRestoreFailed =>
+      '╳ Save restore failed: the save file may exist but is corrupted; starting a new narrative from the master contract';
+
+  @override
   String narrativeErrorPrefix(Object error) {
     return '╳ $error. Mephisto responds with mortal strength';
   }
@@ -287,7 +294,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get previewSheetClose => 'Close';
 
   @override
-  String get settingsAppearance => 'Appearance';
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get settingsThemeDescription => 'Light/dark theme mode.';
 
   @override
   String get settingsThemeSystem => 'Follow System';
@@ -297,6 +307,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsThemeDark => 'Dark';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsLanguageDescription => 'Simplified Chinese / English.';
 
   @override
   String get settingsNarrativeWidth => 'Narrative Content Width';
@@ -316,6 +332,44 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsWidthFull => 'Full Screen';
+
+  @override
+  String get settingsHistoryWindow => 'History Message Window';
+
+  @override
+  String get settingsHistoryWindowDescription =>
+      'Upper limit of historical dialogue messages sent to the LLM. A smaller window reduces token consumption; a larger window gives the model more complete memory of earlier context.';
+
+  @override
+  String get settingsHistoryWindowNarrow => '20 messages';
+
+  @override
+  String get settingsHistoryWindowMedium => '40 messages';
+
+  @override
+  String get settingsHistoryWindowWide => '60 messages';
+
+  @override
+  String get settingsHistoryWindowFull => 'Send all';
+
+  @override
+  String get settingsMemoryLimit => 'Memory Injection Limit';
+
+  @override
+  String get settingsMemoryLimitDescription =>
+      'Upper limit of memory items sent to the LLM per turn. A smaller window reduces token consumption; when the limit is exceeded, high-importance memories (≥4 stars) are all kept, and the rest fill in by descending weight.';
+
+  @override
+  String get settingsMemoryLimitCompact => '10 items';
+
+  @override
+  String get settingsMemoryLimitStandard => '20 items';
+
+  @override
+  String get settingsMemoryLimitExtended => '30 items';
+
+  @override
+  String get settingsMemoryLimitFull => 'Inject all';
 
   @override
   String get settingsNarrativeRules => 'Narrative Rules';

@@ -134,10 +134,13 @@ RollExpr? parseRollExpr(String cond) {
 /// 评估骰子表达式，返回 (是否满足条件, 实际骰值)。
 ///
 /// 支持的格式：
+///   - `roll(1d2)`            → 安科二元判定：掷出 1 = 成功（是），掷出 2 = 失败（否）
 ///   - `roll(1d100)`          → 结果 >= 默认阈值（50%）
 ///   - `roll(1d100) >= 80`    → 自定义阈值判定
 ///
-/// 默认阈值：`sides / 2`，奇数时向上取整。
+/// 默认判定：
+///   - 1d2（安科传统）：掷出 1 = 成功；掷出 2 = 失败，各 50%
+///   - 1d100：阈值 = `sides / 2`，奇数时向上取整
 (bool, int) evalRoll(String cond, RollStore? rs) {
   final c = cond.trim();
   final result = _parseRollCore(c);
@@ -161,7 +164,12 @@ RollExpr? parseRollExpr(String cond) {
     };
   }
 
-  // 默认 50% 判定
+  // 默认判定：
+  //   - 1d2 二元判定（安科传统）：掷出 1 = 成功（是），掷出 2 = 失败（否），各 50%
+  //   - 1d100 高精度判定：50-100 算成功（50%）
+  if (sides == 2) {
+    return (total == 1, total);
+  }
   var threshold = sides ~/ 2;
   if (sides % 2 != 0) threshold++; // 奇数时向上取整
   return (total >= threshold, total);

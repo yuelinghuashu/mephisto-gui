@@ -120,6 +120,42 @@ Future<bool> isContractNameAvailable(String name) async {
   return !File('${dir.path}/$name').existsSync();
 }
 
+/// 级联重命名母版及其下所有子版（同步子树文件名前缀）。
+///
+/// 例如 `faust.meph` → `歌德.meph` 时，一并重命名：
+///   - `faust.dark.meph` → `歌德.dark.meph`
+///   - `faust.dark.light.meph` → `歌德.dark.light.meph`
+///
+/// 参数：
+///   - oldMasterName: 旧母版文件名（如 `faust.meph`）
+///   - newMasterName: 新母版文件名（如 `歌德.meph`）
+///
+/// 返回值：是否全部重命名成功（母版或任一子版失败时返回 false）。
+Future<bool> renameContractCascade(
+  String oldMasterName,
+  String newMasterName,
+) async {
+  // 母版重命名失败直接返回
+  if (!await renameContract(oldMasterName, newMasterName)) return false;
+
+  final oldPrefix = oldMasterName.replaceAll('.meph', '');
+  final newPrefix = newMasterName.replaceAll('.meph', '');
+
+  // 同步所有子版前缀（`旧前缀.*.meph` 且非母版自身）
+  final dir = await getContractsDirectory();
+  final allNames = await listMephFileNames(dir);
+  final children = allNames
+      .where((name) => name != oldMasterName)
+      .where((name) => name.startsWith('$oldPrefix.'))
+      .toList();
+  for (final child in children) {
+    final suffix = child.substring(oldPrefix.length);
+    final ok = await renameContract(child, '$newPrefix$suffix');
+    if (!ok) return false;
+  }
+  return true;
+}
+
 /// 级联删除母版及其下所有子版。
 ///
 /// 参数：
@@ -151,41 +187,47 @@ Future<int> deleteContractCascade(String masterFileName) async {
 // 文件名校验与角色名提取
 // ============================================================
 
-/// 解析文件名的「基础名 + 首个点分隔的下标」。
+/// 解析文件名为「基础名（去 `.meph` 后缀）的路径段列表」。
 ///
-/// 返回基础名（去掉 `.meph` 后缀）与第一个 `.` 的下标（无点时为 -1）。
-/// 三个文件名校验函数（[isChildFileName] / [extractMasterPrefix] /
-/// [extractBranchName]）共用此解析，消除重复的 `replaceAll + indexOf` 样板。
-(String base, int dotIndex) _splitBaseName(String fileName) {
-  final base = fileName.replaceAll('.meph', '');
-  return (base, base.indexOf('.'));
+/// 多级树模型：文件名中的 `.` 分段即层级。
+///   - `faust.meph`                 → [faust]
+///   - `faust.dark.meph`            → [faust, dark]
+///   - `faust.dark.light.meph`      → [faust, dark, light]
+/// 各文件名校验函数共用此解析，消除重复的 `replaceAll + indexOf` 样板。
+List<String> _splitBaseName(String fileName) {
+  return fileName.replaceAll('.meph', '').split('.');
 }
 
-/// 判断文件名是否为子版文件（`baseName.suffix.meph`，suffix 非空且非母版自身）。
+/// 判断文件名是否为子版文件（母版根 后还有路径段）。
 ///
 /// 例如：
 ///   - `faust.meph` -> false（母版）
-///   - `faust.child.meph` / `faust.dark.meph` -> true（子版）
-bool isChildFileName(String fileName) {
-  final (base, dotIndex) = _splitBaseName(fileName);
-  return dotIndex != -1 && dotIndex != base.length - 1;
-}
+///   - `faust.child.meph` / `faust.dark.meph` -> true（一级子版）
+///   - `faust.dark.light.meph` -> true（二级子版）
+bool isChildFileName(String fileName) => _splitBaseName(fileName).length >= 2;
 
-/// 提取母版基础名（如 `faust.child.meph` -> `faust`，`faust.meph` -> `faust`）。
-String extractMasterPrefix(String fileName) {
-  final (base, dotIndex) = _splitBaseName(fileName);
-  if (dotIndex == -1) return base;
-  return base.substring(0, dotIndex);
-}
+/// 提取母版基础名（如 `faust.child.meph` -> `faust`，`faust.dark.light.meph` -> `faust`）。
+String extractMasterPrefix(String fileName) => _splitBaseName(fileName).first;
 
-/// 提取子版分支名（如 `faust.dark.meph` -> `dark`，`faust.child.meph` -> `child`）。
+/// 提取子版分支名（取路径最后一段；如 `faust.dark.meph` -> `dark`，
+/// `faust.dark.light.meph` -> `light`）。
 ///
 /// 仅子版文件有分支名；母版（`faust.meph`）返回 null。
-/// 统一实现，消除各处重复的 `replaceAll('.meph', '') + indexOf('.')` 样板。
 String? extractBranchName(String fileName) {
-  final (base, dotIndex) = _splitBaseName(fileName);
-  if (dotIndex == -1 || dotIndex == base.length - 1) return null;
-  return base.substring(dotIndex + 1);
+  final segments = _splitBaseName(fileName);
+  return segments.length >= 2 ? segments.last : null;
+}
+
+/// 提取子版「分支路径」（去掉最后一段分支名后的完整前缀）。
+///
+/// 用于多级树中确定父节点路径：
+///   - `faust.dark.meph`            -> `faust`（父即母版）
+///   - `faust.dark.light.meph`      -> `faust.dark`（父为一级分支）
+///   - `faust.meph`（母版）         -> null（无父）
+String? extractBranchPath(String fileName) {
+  final segments = _splitBaseName(fileName);
+  if (segments.length < 2) return null;
+  return segments.take(segments.length - 1).join('.');
 }
 
 /// 从 .meph 内容中提取【角色名】。

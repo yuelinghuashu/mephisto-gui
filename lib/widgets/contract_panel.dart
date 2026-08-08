@@ -80,6 +80,17 @@ class ContractPanel extends StatelessWidget {
             ),
           ],
 
+          // ---- 角色背景 ----
+          if (contract.background.isNotEmpty) ...[
+            _sectionHeader(theme, '【角色背景】'),
+            _sectionBody(
+              Text(
+                contract.background.replaceAll('{角色名}', contract.roleName),
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ],
+
           // ---- 开局场景 ----
           if (contract.opening.isNotEmpty) ...[
             _sectionHeader(theme, '【开局场景】'),

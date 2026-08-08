@@ -35,11 +35,24 @@ void main() {
     );
   }
 
-  testWidgets('渲染全部配置区块', (tester) async {
+  testWidgets('宽屏：单页渲染全部配置区块', (tester) async {
     await tester.pumpWidget(buildSettings());
     await tester.pumpAndSettle();
 
-    expect(find.text('◉  外观'), findsOneWidget);
+    expect(find.text('🌗  主题'), findsOneWidget);
+    expect(find.text('🌐  界面语言'), findsOneWidget);
+    // 功能图标已渲染（书卷渐进替代电脑芯片/大脑，契合浮士德契约风格）
+    expect(find.byIcon(Icons.bookmark_border), findsOneWidget);
+    expect(find.byIcon(Icons.menu_book_outlined), findsOneWidget);
+    // auto_stories_outlined 同时用于「记忆 30 条」档位 +「LLM OpenAI 后端」→ 共 2 处
+    expect(find.byIcon(Icons.auto_stories_outlined), findsNWidgets(2));
+    expect(find.byIcon(Icons.auto_awesome), findsOneWidget);
+    // 主题模式图标（Auto Mode / 亮 / 暗）
+    expect(find.byIcon(Icons.brightness_auto_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.dark_mode_outlined), findsOneWidget);
+    // LLM 后端图标（地狱之火）
+    expect(find.byIcon(Icons.local_fire_department_outlined), findsOneWidget);
     expect(find.text('📐  叙事内容宽度'), findsOneWidget);
     expect(find.text('📜  叙事规则'), findsOneWidget);
     expect(find.text('⚜  契约目录'), findsOneWidget);
@@ -51,6 +64,61 @@ void main() {
     // LLM 后端选项
     expect(find.text('OpenAI 兼容'), findsOneWidget);
     expect(find.text('本地 Ollama'), findsOneWidget);
+  });
+
+  /// 设置移动端窄屏逻辑尺寸（390×844，devicePixelRatio=1.0）
+  void useNarrowScreen(WidgetTester tester) {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+  }
+
+  testWidgets('窄屏（移动端）：显示分区入口列表而非全部区块', (tester) async {
+    // 模拟移动端窄屏（<600 逻辑宽）
+    useNarrowScreen(tester);
+
+    await tester.pumpWidget(buildSettings());
+    await tester.pumpAndSettle();
+
+    // 入口列表显示 8 个分区标题
+    expect(find.text('主题'), findsOneWidget);
+    expect(find.text('界面语言'), findsOneWidget);
+    expect(find.text('叙事内容宽度'), findsOneWidget);
+    expect(find.text('历史消息窗口'), findsOneWidget);
+    expect(find.text('记忆注入上限'), findsOneWidget);
+    expect(find.text('叙事规则'), findsOneWidget);
+    expect(find.text('契约目录'), findsOneWidget);
+    expect(find.text('LLM 配置'), findsOneWidget);
+    // 不应展示各区块的具体内容（后端选择、主题选项等）
+    expect(find.text('跟随系统'), findsNothing);
+    expect(find.text('OpenAI 兼容'), findsNothing);
+  });
+
+  testWidgets('窄屏（移动端）：点击分区入口进入独立子页', (tester) async {
+    // 模拟移动端窄屏
+    useNarrowScreen(tester);
+
+    await tester.pumpWidget(buildSettings());
+    await tester.pumpAndSettle();
+
+    // 点击「LLM 配置」分区 → 进入独立子页，子页展示区块内容
+    // （入口列表较长，先滚动到可见再点击）
+    await tester.ensureVisible(find.text('LLM 配置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('LLM 配置'));
+    await tester.pumpAndSettle();
+
+    // 子页标题（带图标前缀）+ 区块内容出现
+    expect(find.text('⚚  LLM 配置'), findsOneWidget);
+    expect(find.text('OpenAI 兼容'), findsOneWidget);
+    expect(find.text('本地 Ollama'), findsOneWidget);
+    expect(find.text('API Key'), findsOneWidget);
+
+    // 返回入口页（Material AppBar 的自动 leading 是 BackButton；
+    // 测试 locale 为 zh，页面内化 tooltip 不是 'Back'，不能用 pageBack()）
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('LLM 配置'), findsOneWidget);
   });
 
   testWidgets('主题模式切换为暗色并持久化', (tester) async {

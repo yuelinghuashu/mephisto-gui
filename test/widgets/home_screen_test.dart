@@ -13,6 +13,9 @@ import 'test_helpers.dart';
 ///
 /// 通过 override contractGroupListProvider 注入内存分组，避免真实文件 IO；
 /// 删除测试使用真实临时文件验证「多选 → 确认 → 文件删除」闭环。
+///
+/// 多级树模型：`ContractGroup.children` 是**递归的子节点列表**，
+/// 层级通过文件名 `.` 分段表达（如 faust → faust.dark → faust.dark.light）。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -42,16 +45,39 @@ void main() {
     );
   }
 
-  // 样例：faust 母版 + 2 子版，dantes 母版无子版
+  // 单级子节点（一级：母版 → 分支）
+  ContractGroup child(String name, {String? branch, String? branchTitle}) {
+    return ContractGroup(
+      master: info(name, branch: branch, branchTitle: branchTitle),
+      children: [],
+    );
+  }
+
+  // 样例：faust 母版 + 2 一级子版，dantes 母版无子版
   List<ContractGroup> sampleGroups() => [
     ContractGroup(
       master: info('faust.meph'),
       children: [
-        info('faust.child.meph', branch: 'child'),
-        info('faust.dark.meph', branch: 'dark'),
+        child('faust.child.meph', branch: 'child'),
+        child('faust.dark.meph', branch: 'dark'),
       ],
     ),
     ContractGroup(master: info('dantes.meph'), children: []),
+  ];
+
+  // 多级树样例：faust → dark → light（二级分支）
+  List<ContractGroup> nestedGroups() => [
+    ContractGroup(
+      master: info('faust.meph'),
+      children: [
+        ContractGroup(
+          master: info('faust.dark.meph', branch: 'dark'),
+          children: [
+            child('faust.dark.light.meph', branch: 'light'),
+          ],
+        ),
+      ],
+    ),
   ];
 
   Widget buildHome({List<ContractGroup>? groups}) {
@@ -66,13 +92,39 @@ void main() {
     );
   }
 
+  testWidgets('多级树：逐级展开可见二级分支，收起后隐藏', (tester) async {
+    await tester.pumpWidget(buildHome(groups: nestedGroups()));
+    await tester.pumpAndSettle();
+
+    // 初始只显示母版，子版默认收起
+    expect(find.text('faust'), findsOneWidget);
+    expect(find.text('faust.dark.light.meph'), findsNothing);
+
+    // 展开第一层 → 显示 dark
+    await tester.tap(find.byTooltip('展开子版'));
+    await tester.pumpAndSettle();
+    expect(find.text('faust.dark.meph'), findsOneWidget);
+    // 二级 light 尚未展开
+    expect(find.text('faust.dark.light.meph'), findsNothing);
+
+    // 展开第二层 → 显示 light
+    await tester.tap(find.byTooltip('展开子版').last);
+    await tester.pumpAndSettle();
+    expect(find.text('faust.dark.light.meph'), findsOneWidget);
+
+    // 收起第二层 → light 隐藏
+    await tester.tap(find.byTooltip('收起子版').last);
+    await tester.pumpAndSettle();
+    expect(find.text('faust.dark.light.meph'), findsNothing);
+  });
+
   testWidgets('超长命运描述与超长文件名不溢出卡片边界（省略号截断）', (tester) async {
     // 超长 @命运 描述 + 超长分支名 + 远超卡片可用宽度的超长文件名
     final groups = [
       ContractGroup(
         master: info('faust.meph'),
         children: [
-          info(
+          child(
             'faust.verylongbranchnamechild.this-file-name-is-far-longer-than-'
             'any-card-can-fit-in-a-single-row-meph.meph',
             branch: 'very-long-branch-name',
@@ -196,11 +248,11 @@ void main() {
     final groups = [
       ContractGroup(
         master: info('faust.meph'),
-        children: [info('faust.child.meph', branch: 'child')],
+        children: [child('faust.child.meph', branch: 'child')],
       ),
       ContractGroup(
         master: info('goethe.meph'),
-        children: [info('goethe.utopia.meph', branch: 'utopia')],
+        children: [child('goethe.utopia.meph', branch: 'utopia')],
       ),
     ];
     await tester.pumpWidget(buildHome(groups: groups));

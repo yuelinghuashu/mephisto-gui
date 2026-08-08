@@ -16,7 +16,9 @@ import '../services/session/session_saver.dart';
 import '../services/storage/contract_repo.dart';
 import 'contract_provider.dart';
 import 'llm_settings_provider.dart';
+import 'narrative_memory_provider.dart';
 import 'narrative_rule_provider.dart';
+import 'narrative_window_provider.dart';
 
 // ============================================================
 // 叙事状态管理器（Notifier）
@@ -47,6 +49,15 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   /// 每次发送新消息时重新创建；[stopGenerating] 触发完成，
   /// [NarrativeTurnService] 和 [LlmClient] 收到后提前终止 SSE 读取。
   Completer<void>? _generationCancel;
+
+  /// 同步生成中标志位（双保险防重入）
+  ///
+  /// 与 [NarrativeState.isGenerating] 的区别：
+  ///   - `isGenerating` 是状态字段，通过 [MessageSent] dispatch 后异步生效，
+  ///     在状态更新前的微任务间隙，极端情况下仍可能有第二次 `sendMessage` 进入
+  ///   - 本标志在 `sendMessage` 入口立即同步置位，彻底消除竞态窗口，
+  ///     并在 `_generateCore` 成功/失败后统一复位
+  bool _isGeneratingInFlight = false;
 
   /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交，减少 Riverpod 通知。
   void _appendStreamChunk(String chunk) {
@@ -79,13 +90,23 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       _streamTimer = null;
       _streamBuffer.clear();
       _generationCancel = null;
+      _isGeneratingInFlight = false;
     });
 
     // 读取当前母版文件名（用于子版命名）
     final sourceName =
         ref.watch(currentContractNameProvider).value ?? defaultContractName;
-    // 契约加载失败时回退到空契约（避免崩溃）
-    final contract = ref.watch(contractProvider).value ?? Contract.empty();
+    // 契约加载失败时回退到空契约（避免崩溃）。
+    //
+    // 注意：`ref.watch(contractProvider).value` 在 provider 处于 error 状态时
+    // 会**重新抛出异常**导致整个 Notifier 崩溃，因此不能直接用 `.value`。
+    // 使用 `when` 显式处理 error：用户契约与内置模板都缺失的极端情况下，
+    // 至少保证叙事页不崩溃，以空契约兜底（与 [Contract.empty] 语义一致）。
+    final contract = ref.watch(contractProvider).when(
+      data: (c) => c,
+      loading: Contract.empty,
+      error: (_, _) => Contract.empty(),
+    );
     return NarrativeState(
       contract: contract,
       sourceFileName: sourceName,
@@ -104,7 +125,11 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   void sendMessage(String content) {
     if (content.trim().isEmpty) return;
     // 二次守卫：生成中禁止再次发送（UI 已禁用输入，极端连点/竞态时兜底）
-    if (state.isGenerating) return;
+    // 同步标志位 + 状态字段双保险，彻底消除「状态更新前重复进入」的竞态窗口
+    if (state.isGenerating || _isGeneratingInFlight) return;
+
+    // 入口立即置位同步标志（在 dispatch 之前），确保并发/连点无法穿透
+    _isGeneratingInFlight = true;
 
     final trimmed = content.trim();
     // 每次发送创建新的取消信号（覆盖上次生成可能遗留的已取消信号）
@@ -130,26 +155,42 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   /// 全局兜底：生成流程中任何未预期异常（如 Provider 加载失败、规则引擎异常）
   /// 都会在此捕获并重置生成状态，避免 UI 永久卡在"生成中"。
   Future<void> _generateCore(String userInput) async {
-    final sharedClient = ref.read(httpClientProvider);
-    final service = NarrativeTurnService(client: sharedClient);
+    // 复用全局 [NarrativeTurnService] 单例（轻量无状态，共享 HTTP 连接池）
+    final service = ref.read(narrativeTurnServiceProvider);
     // 每次发消息都强制 refresh（重新读 SharedPreferences），
     // 确保改 key 后不重启也能立即用新配置；llmConfigProvider 是 autoDispose
     final config = await ref.refresh(llmConfigProvider.future);
     final narrativeRules = ref.read(narrativeRuleProvider);
+    // 上下文窗口：保留最近 N 条历史消息（用户可在设置页调整；null = 全部发送）
+    final maxHistoryMessages = ref
+        .read(narrativeWindowProvider)
+        .maxHistoryMessages;
+    // 记忆注入灌窗：每轮最多带入 N 条记忆（用户可在设置页调整；null = 全部注入）
+    final maxMemories = ref.read(narrativeMemoryLimitProvider).maxMemories;
 
     final result = await service.generate(
       userInput: userInput,
       contract: state.contract,
       currentState: state.currentState,
       memories: state.memories,
-      // 历史消息 = 除去最后一条（本次命运指引）的所有消息
-      priorMessages: state.messages.take(state.messages.length - 1).toList(),
+      // 历史消息 = 除去最后一条（本次命运指引）的所有消息。
+      // 正常流程中 [_dispatch(MessageSent)] 已先追加用户消息，故列表至少 1 条；
+      // 但此处防御性处理空列表极端情况（避免未来调用顺序变更导致 take(-1) 越界）。
+      priorMessages: state.messages.length > 1
+          ? state.messages.take(state.messages.length - 1).toList()
+          : const [],
       attachedContexts: state.attachedContexts,
       narrativeRules: narrativeRules,
       config: config,
       onChunk: _appendStreamChunk,
       // 当前生成任务的取消信号（停止生成时触发）
       cancelSignal: _generationCancel?.future,
+      // 上下文窗口上限（保留最近 N 条历史消息，控制 token 消耗）
+      maxHistoryMessages: maxHistoryMessages,
+      // 记忆注入灌窗：每轮最多带入 N 条记忆（用户可配置；null = 全部注入），
+      // 超过时高权重（≥4）全部保留 + 其余按权重降序补足，
+      // 防止超长记忆列表无条件灌入导致 token 膨胀
+      maxMemories: maxMemories,
     );
 
     // 流式输出结束：先 flush 缓冲中的剩余 chunk，再聚合提交
@@ -166,9 +207,12 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       lastError: result.lastError,
     ));
 
-    // 记忆提取 + 自动保存子版（串行执行：先提取记忆，确保保存的快照包含最新记忆）
-    await _maybeExtractMemories(config: config);
+    // 先自动保存子版：优先保证进度持久化，不依赖 LLM 的慢速记忆提取。
+    // 记忆提取（MemoryManager）内部有 try-catch + 超时保护，异步执行不阻塞
+    // 生成本轮的完成（避免 `_isGeneratingInFlight` 长时间占位导致用户无法发下一条）。
+    // 提取成功更新 state.memories 后，下次自动保存自然包含新记忆。
     await _autoSaveChild();
+    unawaited(_maybeExtractMemories(config: config));
   }
 
   /// 生成回复的全局兜底包装：任何未预期异常都重置生成状态，避免卡死。
@@ -181,6 +225,11 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       // 错误以错误码形式暴露（provider.generation_failed），由 UI 层本地化翻译
       _flushStreamBuffer();
       _dispatch(const GenerationFailed(narrativeErrorGenFailed));
+    } finally {
+      // 无论成功/失败/异常，都必须复位同步标志位，允许下一次发送
+      _isGeneratingInFlight = false;
+      // 清理已完成/已取消的生成信号引用，避免悬挂引用占用内存
+      _generationCancel = null;
     }
   }
 
@@ -298,7 +347,8 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
 
   /// 记忆提取（委托 MemoryManager；LLM 配置由调用方传入）。
   Future<void> _maybeExtractMemories({LlmConfig? config}) async {
-    final manager = MemoryManager(client: ref.read(httpClientProvider));
+    // 复用全局 [MemoryManager] 单例（轻量无状态，共享 HTTP 连接池）
+    final manager = ref.read(memoryManagerProvider);
     final updated = await manager.maybeExtract(
       history: state.history,
       memories: state.memories,
@@ -338,34 +388,31 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     _dispatch(const SessionReset());
   }
 
-  /// 热重载规则：解析新内容并**仅应用规则区块**，保留契约其余全部字段。
+  /// 热重载契约：解析新内容并**应用规则 + 记忆中区块**，保留其他静态字段。
   ///
   /// 用于「叙事页内编辑当前契约」的运行时热更新：
-  ///   - 规则只在下一轮输入时由规则引擎重新求值，改规则不影响当前对话/
-  ///     状态/记忆，是最安全且有价值的实时调整对象
+  ///   - **规则**：只在下一轮输入时由规则引擎重新求值，改规则不影响当前
+  ///     对话/状态/记忆，是最安全且有价值的实时调整对象
+  ///   - **记忆**：记忆是运行时数据（用户可在编辑器/VSCode 中直接修改
+  ///     `[N]` 前缀调整权重），因此支持热更新。文件监听重新解析出的
+  ///     `[N] 前缀` 记忆会回写 [NarrativeState.memories]，即时生效
   ///   - 角色名/锚点/世界观/背景/开局场景/初始状态等「角色人格本体」区块
   ///     一律保留原运行版本——运行中改动它们会导致叙事前后矛盾（如历史
   ///     回复仍是旧角色口吻），因此即使编辑器里改动了也不生效
-  ///   - [NarrativeState.currentState] / [NarrativeState.memories] /
-  ///     [NarrativeState.history] / [NarrativeState.messages] 全部保留，
-  ///     不丢失任何运行进度
+  ///   - [NarrativeState.currentState] / [NarrativeState.history] /
+  ///     [NarrativeState.messages] 全部保留，不丢失任何运行进度
   ///   - 解析失败时不生效，仅记录错误（编辑器已有实时校验双保险）
   void hotReloadContract(String content) {
     try {
       final newContract = parseMeph(content);
-      final old = state.contract;
       state = state.copyWith(
-        contract: Contract(
-          roleName: old.roleName,
-          anchor: old.anchor,
-          worldview: old.worldview,
-          background: old.background,
-          opening: old.opening,
-          state: old.state,
+        contract: state.contract.copyWith(
           rules: newContract.rules, // 仅应用规则区块
-          memories: old.memories,
-          history: old.history,
         ),
+        // 记忆是运行时数据，支持热更新：
+        // 用户在应用内修改权重并自动存档后，文件含最新权重；
+        // 文件监听重新解析 → 回写 memories → 与内存状态保持一致
+        memories: newContract.memories,
       );
     } catch (e) {
       debugPrint('契约热重载失败: $e');
@@ -377,6 +424,21 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
 // ============================================================
 // Provider 定义
 // ============================================================
+
+/// 单轮叙事生成服务 Provider
+///
+/// 轻量无状态服务，全局复用同一实例（避免每轮对话重复构造 [NarrativeTurnService]）。
+/// 共享 [httpClientProvider] 中的 HTTP 客户端，实现连接复用。
+final narrativeTurnServiceProvider = Provider<NarrativeTurnService>((ref) {
+  return NarrativeTurnService(client: ref.watch(httpClientProvider));
+});
+
+/// 记忆管理服务 Provider
+///
+/// 与 [narrativeTurnServiceProvider] 同理，全局复用 [MemoryManager] 单例。
+final memoryManagerProvider = Provider<MemoryManager>((ref) {
+  return MemoryManager(client: ref.watch(httpClientProvider));
+});
 
 /// 叙事状态 Provider。
 final narrativeProvider = NotifierProvider<NarrativeNotifier, NarrativeState>(

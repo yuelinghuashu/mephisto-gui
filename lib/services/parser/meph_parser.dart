@@ -80,7 +80,7 @@ Contract _parseBlocks(List<Block> blocks) {
         rules.addAll(_parseRules(block));
         break;
       case '记忆':
-        memories.addAll(_parsePlainList(block).map((m) => Memory(content: m)));
+        memories.addAll(_parsePlainList(block));
         break;
       case '历史':
         history.addAll(_parseHistory(block));
@@ -136,9 +136,37 @@ String _parseTextBlock(Block block) {
   return block.content.map((l) => l.text).join('\n');
 }
 
-/// 解析【记忆】：`- 条目` 纯文本列表。
-List<String> _parsePlainList(Block block) {
-  return _scanEntries(block).map((e) => e.raw).toList();
+/// 记忆条目前缀正则：`[权重] 内容`（如 `[4] 浮士德与梅菲斯特立下赌约`）。
+///
+/// 可选的前缀（极简设计）：
+///   - `[权重]`：1-5 星重要性，用于注入时排序裁剪（人设核心优先被模型看到）
+/// 无前缀的旧格式条目自动兜底默认权重，100% 向后兼容。
+final RegExp _memoryPrefixPattern = RegExp(r'^\[(\d)\]\s+(.+)$');
+
+/// 解析【记忆】：`- 条目` 文本列表，支持可选结构化前缀 `[权重] `。
+///
+/// 无前缀 = 旧格式，兜底 `Memory(content: raw)`（默认权重 3）；
+/// 带前缀 = 解析权重存入 [Memory.importance]（供注入排序/压缩保护使用）。
+List<Memory> _parsePlainList(Block block) {
+  final memories = <Memory>[];
+  for (final entry in _scanEntries(block)) {
+    final match = _memoryPrefixPattern.firstMatch(entry.raw);
+    if (match == null) {
+      // 旧格式 / 无法识别前缀 → 兜底默认权重
+      memories.add(Memory(content: entry.raw));
+      continue;
+    }
+    final importance =
+        int.tryParse(match[1]!)?.clamp(1, Memory.maxImportance) ??
+        Memory.defaultImportance;
+    memories.add(
+      Memory(
+        content: match[2]!.trim(),
+        importance: importance,
+      ),
+    );
+  }
+  return memories;
 }
 
 /// 解析【规则】：
@@ -168,6 +196,28 @@ List<Rule> _parseRules(Block block) {
 ///
 /// 兼容 `]if`、`] if`、`]  if` 等写法；条件中即使包含 `]` 也不会误匹配。
 final RegExp _ruleNamePattern = RegExp(r'\]\s*if\b');
+
+/// roll 后紧跟空白（如 `roll (1d100)`）正则。
+final RegExp _rollSpaceParenPattern = RegExp(r'roll\s+\(');
+
+/// roll 后缺少左括号正则（如 `roll 1d100`、`roll1d100`）。
+///
+/// lookahead 限定 roll 后跟骰子特征（数字或 d），避免「状态.roll值」等
+/// 含 roll 子串的普通状态键被误报为缺左括号。
+final RegExp _rollMissingParenPattern =
+    RegExp(r'\broll(?=[\s]*\d|[\s]*d)(?!\s*\()');
+
+/// roll 左括号未闭合正则（如 `roll(1d100`、`roll(1d100 > 50`）。
+final RegExp _rollUnclosedParenPattern = RegExp(r'roll\([^)]*$');
+
+/// roll 括号内内容匹配正则（用于校验 `roll(1d2)` / `roll(1d100)`）。
+final RegExp _rollInnerPattern = RegExp(r'roll\(([^)]*)\)');
+
+/// 合法骰子面数正则（仅支持 1d2 二元判定 / 1d100 高精度判定）。
+final RegExp _validRollDicePattern = RegExp(r'^(1d2|1d100)$');
+
+/// 复合动作分隔符校验正则（`&&` 前后至少一边紧贴非空白字符）。
+final RegExp _badCompoundSeparatorPattern = RegExp(r'&&\S|\S&&');
 
 /// 屏蔽字符串中的双引号内容为 `""`（避免引号内文字被校验正则误报）。
 String _maskQuotedStrings(String s) => s.replaceAll(quotedStringPattern, '""');
@@ -343,7 +393,7 @@ void _validateKeywordSpacing(
   }
 
   // roll 后紧跟空白（如 `roll (1d100)`）导致 `roll(` 无法识别
-  if (RegExp(r'roll\s+\(').hasMatch(masked)) {
+  if (_rollSpaceParenPattern.hasMatch(masked)) {
     throw MephParseError(
       line: lineNumber,
       blockName: blockName,
@@ -356,7 +406,7 @@ void _validateKeywordSpacing(
   // lookahead 限定 roll 后跟骰子特征（数字或 d），避免「状态.roll值」等
   // 含 roll 子串的普通状态键被误报为缺左括号。
   final maskedCond = _maskQuotedStrings(condition);
-  if (RegExp(r'\broll(?=[\s]*\d|[\s]*d)(?!\s*\()').hasMatch(maskedCond)) {
+  if (_rollMissingParenPattern.hasMatch(maskedCond)) {
     throw MephParseError(
       line: lineNumber,
       blockName: blockName,
@@ -365,7 +415,7 @@ void _validateKeywordSpacing(
   }
   // roll 左括号未闭合（如 `roll(1d100`、`roll(1d100 > 50`，直到条件末尾
   // 都没有 `)`）导致 roll 表达式无法识别、条件静默失效，必须尽早报错。
-  if (RegExp(r'roll\([^)]*$').hasMatch(maskedCond)) {
+  if (_rollUnclosedParenPattern.hasMatch(maskedCond)) {
     throw MephParseError(
       line: lineNumber,
       blockName: blockName,
@@ -378,9 +428,9 @@ void _validateKeywordSpacing(
   //   - `roll(1d6)` / `roll(1d20)`：非受支持的面数（仅 1d2 二元判定 / 1d100 高精度判定）
   //   - `roll(d100)` / `roll(1dx)` / `roll(1d)`：非法格式
   // 以上任一情况都导致引擎静默妥协或条件从不匹配，必须尽早报错。
-  for (final m in RegExp(r'roll\(([^)]*)\)').allMatches(masked)) {
+  for (final m in _rollInnerPattern.allMatches(masked)) {
     final inner = m[1]!;
-    if (!RegExp(r'^(1d2|1d100)$').hasMatch(inner)) {
+    if (!_validRollDicePattern.hasMatch(inner)) {
       throw MephParseError(
         line: lineNumber,
         blockName: blockName,
@@ -433,7 +483,7 @@ void _validateCompoundSeparator(
 ) {
   final masked = _maskQuotedStrings(action);
   // `&&` 前后至少一边紧贴非空白字符（即缺少标准 ` && ` 分隔）
-  if (RegExp(r'&&\S').hasMatch(masked) || RegExp(r'\S&&').hasMatch(masked)) {
+  if (_badCompoundSeparatorPattern.hasMatch(masked)) {
     throw MephParseError(
       line: lineNumber,
       blockName: blockName,

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -117,6 +118,84 @@ void main() {
       );
 
       expect(result, isEmpty);
+    });
+
+    test('SocketException 在响应头到达前触发指数退避重试', () async {
+      var callCount = 0;
+      final mock = MockClient((request) async {
+        callCount++;
+        if (callCount == 1) {
+          // 第一次：模拟网络层连接拒绝（瞬时故障）
+          throw const SocketException('Connection refused');
+        }
+        // 第二次：成功返回 SSE
+        return http.Response('data: [DONE]\n\n', 200);
+      });
+
+      final client = LlmClient(
+        apiKey: 'test-key',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-v4-flash',
+        client: mock,
+      );
+
+      final result = await client.generateStream(
+        messages: [LlmMessage(role: 'user', content: 'hi')],
+        onChunk: (_) {},
+      );
+
+      expect(callCount, 2);
+      expect(result, isEmpty);
+    });
+
+    test('http.ClientException 在响应头到达前触发指数退避重试', () async {
+      var callCount = 0;
+      final mock = MockClient((request) async {
+        callCount++;
+        if (callCount == 1) {
+          throw http.ClientException('Connection closed before full header');
+        }
+        return http.Response('data: [DONE]\n\n', 200);
+      });
+
+      final client = LlmClient(
+        apiKey: 'test-key',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-v4-flash',
+        client: mock,
+      );
+
+      final result = await client.generateStream(
+        messages: [LlmMessage(role: 'user', content: 'hi')],
+        onChunk: (_) {},
+      );
+
+      expect(callCount, 2);
+      expect(result, isEmpty);
+    });
+
+    test('重试耗尽后仍抛 SocketException（不吞异常）', () async {
+      var callCount = 0;
+      final mock = MockClient((request) async {
+        callCount++;
+        throw const SocketException('Connection refused');
+      });
+
+      final client = LlmClient(
+        apiKey: 'test-key',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-v4-flash',
+        client: mock,
+      );
+
+      await expectLater(
+        client.generateStream(
+          messages: [LlmMessage(role: 'user', content: 'hi')],
+          onChunk: (_) {},
+        ),
+        throwsA(isA<SocketException>()),
+      );
+      expect(callCount, 2); // 1 次尝试 + 1 次重试
     });
 
     test('SSE data 行被 chunk 拆成两半时仍正确重组解析', () async {

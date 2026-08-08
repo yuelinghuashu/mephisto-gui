@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mephisto/domain/models.dart';
 import 'package:mephisto/services/parser/meph_parser.dart';
+import 'package:mephisto/services/parser/meph_serializer.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -185,6 +186,56 @@ void main() {
 ''');
       expect(contract.memories, hasLength(2));
       expect(contract.memories[0].content, '浮士德与梅菲斯特签订了契约');
+    });
+
+    test('解析记忆：可选结构化前缀 [权重] 拆分为重要性', () {
+      final contract = parseMeph('''
+【角色名】
+测试
+
+【记忆】
+- [4] 浮士德与梅菲斯特立下赌约
+- [2] 浮士德在书斋研读古卷
+- 无前缀旧格式记忆
+''');
+      expect(contract.memories, hasLength(3));
+
+      // 带 [权重] 前缀 → importance 被解析，前缀从内容中剥离
+      expect(contract.memories[0].content, '浮士德与梅菲斯特立下赌约');
+      expect(contract.memories[0].importance, 4);
+
+      expect(contract.memories[1].content, '浮士德在书斋研读古卷');
+      expect(contract.memories[1].importance, 2);
+
+      // 无前缀 → 兜底默认权重（向后兼容）
+      expect(contract.memories[2].content, '无前缀旧格式记忆');
+      expect(contract.memories[2].importance, Memory.defaultImportance);
+    });
+
+    test('记忆权重序列化回环：parseMeph(serializeMeph(contract)) 保留 importance', () {
+      // 构造含权重元数据的契约（Memory 非 const 构造，故不用 const）
+      final contract = Contract(
+        roleName: '浮士德',
+        memories: [
+          Memory(content: '核心主线', importance: 5),
+          Memory(content: '普通记忆', importance: 2),
+          Memory(content: '默认值记忆'), // 纯默认 → 序列化不输出前缀
+        ],
+      );
+
+      final serialized = serializeMeph(contract);
+      final reparsed = parseMeph(serialized);
+
+      // 权重前缀回环
+      expect(reparsed.memories[0].content, '核心主线');
+      expect(reparsed.memories[0].importance, 5);
+
+      expect(reparsed.memories[1].content, '普通记忆');
+      expect(reparsed.memories[1].importance, 2);
+
+      // 纯默认值保持原样输出，解析回默认权重
+      expect(reparsed.memories[2].content, '默认值记忆');
+      expect(reparsed.memories[2].importance, Memory.defaultImportance);
     });
   });
 

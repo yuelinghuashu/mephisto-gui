@@ -77,21 +77,35 @@ class DiceResult extends Equatable {
   ///
   /// 参考《浮士德》时代意象（星象学/命运纺织线/天平审判/希腊神话），
   /// 避免重复使用"命运"字样，每条文案采用不同主题。
+  ///
+  /// 分档基于骰子面数 [maxValue] 自适应：
+  ///   - 1d2（[maxValue] == 2）：安科二元判定，掷出 1 = 成功 / 掷出 2 = 失败，
+  ///     只有两种结果，直接映射到成功/失败两档文案（不参与 1d100 的三分层）
+  ///   - 1d100：75+ / 50-74 / <50（三分层）
   String get verdict {
+    // ---- 1d2 安科二元判定：结果只有成功/失败两种，直接映射两档文案 ----
+    if (maxValue == 2) {
+      return success ? '星辰垂青，编织线为你而亮' : '星象错乱，诸神移开注视';
+    }
+
+    // ---- 1d100 高精度判定：三分层 ----
+    final highBar = maxValue * 0.75; // 高分档
+    final midBar = maxValue * 0.5; // 中分档
+
     // 成功判定
     if (success) {
-      if (value >= 75) {
+      if (value >= highBar) {
         return '星辰垂青，编织线为你而亮';
-      } else if (value >= 50) {
+      } else if (value >= midBar) {
         return '天秤轻轻向你的名字倾斜';
       } else {
         return '一根细线，堪堪撑住你的名字';
       }
     }
     // 失败判定
-    if (value >= 50) {
+    if (value >= midBar) {
       return '星子偏移，你擦过了荣光的衣角';
-    } else if (value >= 25) {
+    } else if (value >= maxValue * 0.25) {
       return '线轴空转，编织声渐渐远去';
     } else {
       return '星象错乱，诸神移开注视';

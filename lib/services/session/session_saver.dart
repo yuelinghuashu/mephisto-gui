@@ -6,7 +6,6 @@
 library;
 
 import '../../domain/models.dart';
-import '../storage/contract_repo.dart';
 import 'child_save_store.dart';
 
 /// 会话存档服务
@@ -45,16 +44,21 @@ class SessionSaver {
     );
   }
 
-  /// 保存当前会话：已打开子版则直接覆盖原文件；母版则生成/递增 `.child` 子版。
+  /// 保存当前会话的**默认存档**（`.child`），决策 B：每个分支有自己的存档。
   ///
-  /// 将 [NarrativeNotifier] 中「子版覆盖 / 母版 .child 递增」的编排逻辑下沉到此，
-  /// 统一「当前打开文件决定覆盖或新建」的决策。
+  /// 多级树模型下，存档命名规则为「当前分支路径 + `.child`」：
+  ///   - 母版 `faust.meph`          → 覆盖 `faust.child.meph`
+  ///   - 分支 `faust.dark.meph`     → 覆盖 `faust.dark.child.meph`
+  ///   - 二级分支 `faust.dark.light.meph` → 覆盖 `faust.dark.light.child.meph`
+  ///   - 若已打开存档自身（`faust.dark.child.meph`）→ 覆盖它自己
+  ///
+  /// 从不递增序号：每次保存都覆盖当前分支的默认存档，保证数量不膨胀。
   ///
   /// 参数：
-  ///   - [sourceFileName]：当前打开的会话源文件（子版 → 覆盖；母版 → 新建 .child）
+  ///   - [sourceFileName]：当前打开的会话源文件（分支或存档）
   ///   - 其余为会话快照参数（与 [save] 一致）
   ///
-  /// 返回值：保存的子版文件名。
+  /// 返回值：保存的存档文件名。
   static Future<String> saveCurrent({
     required String sourceFileName,
     required Contract contract,
@@ -62,30 +66,39 @@ class SessionSaver {
     required List<Memory> memories,
     required List<HistoryEntry> history,
   }) {
-    // 已打开的是子版 → 直接覆盖；否则按默认 .child 生成/递增
-    final overwrite = isChildFileName(sourceFileName) ? sourceFileName : null;
+    // 计算「当前分支路径」（去掉 .child 存档尾段 / 文件名的层级前缀）：
+    //   faust.meph            → faust
+    //   faust.dark.meph       → faust.dark
+    //   faust.dark.child.meph → faust.dark（存档属于 dark 分支）
+    final branchPath = _stripChildSuffix(sourceFileName);
+    // 默认存档名 = 分支路径 + .child.meph
+    final defaultSaveName = '$branchPath.child.meph';
     return save(
-      masterFileName: sourceFileName,
+      masterFileName: branchPath,
       contract: contract,
       currentState: currentState,
       memories: memories,
       history: history,
-      overwriteFileName: overwrite,
+      // 总是覆盖当前分支的默认存档（不递增序号，保证数量不膨胀）
+      overwriteFileName: defaultSaveName,
     );
   }
 
-  /// 另存为分支：以母版基础名为 master + [branchName] 生成新分支文件。
+  /// 另存为分支：以**当前分支路径**为命名根 + [branchName] 生成新分支文件。
   ///
-  /// 与 [saveCurrent] 不同，本方法始终以「母版基础名」为命名根，
-  /// 避免从子版（如 `faust.child.meph`）另存时错误地得到 `child.dark.meph`。
+  /// 多级树模型下，从分支再另存会**继承派生路径**：
+  ///   - 母版 `faust.meph`                  → 另存 `dark`   → `faust.dark.meph`
+  ///   - 分支 `faust.dark.meph`             → 另存 `light`  → `faust.dark.light.meph`
+  ///   - 二级分支 `faust.dark.light.meph`   → 另存 `utopia` → `faust.dark.light.utopia.meph`
+  ///   - 存档 `faust.dark.child.meph`       → 另存 `light`  → `faust.dark.light.meph`（继承 dark）
   ///
   /// 参数：
-  ///   - [sourceFileName]：当前打开的会话源文件（仅用于提取母版前缀）
+  ///   - [sourceFileName]：当前打开的会话源文件（用于推导继承路径）
   ///   - [branchName]：自定义分支名（如 'dark'、'light'）
   ///   - [branchTitle]：可选「命运一句话」；以 `@命运:` 标记注入子版【角色背景】
   ///   - 其余为会话快照参数（与 [save] 一致）
   ///
-  /// 返回值：保存的分支文件名（如 `faust.dark.meph`）。
+  /// 返回值：保存的分支文件名（如 `faust.dark.light.meph`）。
   static Future<String> saveAsBranch({
     required String sourceFileName,
     required String branchName,
@@ -95,8 +108,10 @@ class SessionSaver {
     required List<Memory> memories,
     required List<HistoryEntry> history,
   }) {
+    // 从「当前分支路径」派生（而非母版根），实现多级继承
+    final branchPath = _stripChildSuffix(sourceFileName);
     return save(
-      masterFileName: extractMasterPrefix(sourceFileName),
+      masterFileName: branchPath,
       contract: contract,
       currentState: currentState,
       memories: memories,
@@ -104,5 +119,23 @@ class SessionSaver {
       branchName: branchName,
       branchTitle: branchTitle,
     );
+  }
+
+  /// 计算「当前分支路径」：去掉 `.child` 存档尾段后，提取层级前缀。
+  ///
+  /// - `faust.meph`            → `faust`
+  /// - `faust.dark.meph`       → `faust.dark`
+  /// - `faust.dark.child.meph` → `faust.dark`（.child 是存档后缀，非分支）
+  /// - `faust.dark.light.meph` → `faust.dark.light`
+  static String _stripChildSuffix(String sourceFileName) {
+    final base = sourceFileName.replaceAll('.meph', '');
+    // 去掉末尾的 .child 存档段
+    final trimmed = base.endsWith(ChildSaveStore.defaultChildSuffix)
+        ? base.substring(
+            0,
+            base.length - ChildSaveStore.defaultChildSuffix.length,
+          )
+        : base;
+    return trimmed;
   }
 }

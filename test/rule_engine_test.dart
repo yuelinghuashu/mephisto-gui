@@ -150,6 +150,25 @@ void main() {
       expect(matched, total >= 50);
     });
 
+    test('1d2 安科二元判定：1 = 成功，2 = 失败', () {
+      // 用 RollStore 掷骰并验证判定方向与安科规则一致：
+      //   matched ⇔ total == 1（掷出 1 = 成功，掷出 2 = 失败）
+      final rs = RollStore();
+      final total = rs.roll('roll(1d2)');
+      final (matched, _) = evalRoll('roll(1d2)', rs);
+      expect(total, inInclusiveRange(1, 2));
+      expect(matched, total == 1,
+        reason: '安科 1d2 判定：掷出 1 = 成功（是），掷出 2 = 失败（否）');
+    });
+
+    test('1d2 自定义阈值：>= 2 表示掷出 2 才成功（显式指定方向）', () {
+      final rs = RollStore();
+      final (matched1, _) = evalRoll('roll(1d2) >= 1', rs);
+      expect(matched1, isTrue, reason: 'roll(1d2) >= 1 永远成功');
+      final (matched2, _) = evalRoll('roll(1d2) > 2', rs);
+      expect(matched2, isFalse, reason: 'roll(1d2) > 2 永远失败');
+    });
+
     test('自定义阈值：必然成功/必然失败', () {
       final rs = RollStore();
       final (matched1, _) = evalRoll('roll(1d100) >= 1', rs);

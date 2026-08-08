@@ -1,4 +1,5 @@
 import '../../domain/models.dart';
+import '../memory/memory_manager.dart';
 
 /// 构建系统提示词（角色扮演叙事设定）。
 ///
@@ -12,7 +13,7 @@ import '../../domain/models.dart';
 ///   2. 世界设定：世界观 + 开局场景
 ///   3. 角色定义：你是谁 + 你的背景 + 锚点
 ///   4. 当前状态：运行时状态值
-///   5. 你记得的过往：长期记忆
+///   5. 你记得的过往：长期记忆（按重要性权重降序，受 [maxMemories] 灌窗裁剪）
 ///   6. 附加上下文 + 契约规则（动态注入）
 ///   7. 此刻：命运指引 + 行动引导
 ///   8. 要求：叙事约束（末尾收束）
@@ -25,13 +26,40 @@ import '../../domain/models.dart';
 ///     非空时整体替换默认约束 [defaultNarrativeRules]
 ///   - attachedContexts: 会话级附加上下文列表（如场景设定等文本文件内容），
 ///     支持多选；非空时注入【补充上下文】区块
+///   - maxMemories: 记忆注入条数上限（null = 不限制，全部注入）。
+///     超过上限时按「高权重（≥[Memory.highImportanceThreshold]）全部保留 +
+///     其余按权重降序补足上限」裁剪——窗口放不下的记忆**仍保存在 .meph
+///     存档中**，只是本轮不带，并非遗忘。
 String buildSystemPrompt({
   required Contract contract,
   required Map<String, StateValue> currentState,
   List<Memory> memories = const [],
   String? narrativeRules,
   List<String> attachedContexts = const [],
+  int? maxMemories,
 }) {
+  // ---- 记忆注入裁剪（灌窗）：高权重必带 + 低权重按降序补到上限 ----
+  // 仅当 maxMemories 非空且记忆数量超出上限时才裁剪；
+  // 使「每轮只带最重要的记忆」成为现实，同时保证放不下的仍在存档里。
+  // 高权重排序复用 [MemoryManager.sortByImportance]（消除重复排序逻辑）
+  List<Memory> effectiveMemories = memories;
+  if (maxMemories != null && memories.length > maxMemories) {
+    // 高权重记忆（人设核心）全部保留
+    final high = MemoryManager.sortByImportance(
+      memories
+          .where((m) => m.importance >= Memory.highImportanceThreshold)
+          .toList(),
+    );
+    // 其余按权重降序，补足剩余名额
+    final rest = MemoryManager.sortByImportance(
+      memories
+          .where((m) => m.importance < Memory.highImportanceThreshold)
+          .toList(),
+    );
+    final remainingSlots = (maxMemories - high.length).clamp(0, maxMemories);
+    effectiveMemories = [...high, ...rest.take(remainingSlots)];
+  }
+
   final buffer = StringBuffer();
 
   // ============================================================
@@ -88,10 +116,16 @@ String buildSystemPrompt({
 
   // ============================================================
   // 第五层：你记得的过往（长期记忆）
+  //
+  // 按重要性权重降序输出：高权重（核心记忆）在前，低权重在后，
+  // 让模型优先关注对当前剧情最关键的信息；同权重按原顺序稳定。
+  // 已由 [effectiveMemories] 依据 [maxMemories] 灌窗裁剪。
   // ============================================================
-  if (memories.isNotEmpty) {
+  if (effectiveMemories.isNotEmpty) {
     buffer.writeln('【你记得的过往】');
-    for (final memory in memories) {
+    // 复用共享排序工具（与 MemoryManager 保持一致）
+    final sorted = MemoryManager.sortByImportance(effectiveMemories);
+    for (final memory in sorted) {
       buffer.writeln('- ${memory.content}');
     }
     buffer.writeln();
@@ -150,7 +184,9 @@ const String defaultNarrativeRules = '''
 【互动要求】每段回复必须包含至少一名其他角色（非玩家）的对话和动作反应。如果场景中没有其他角色，请引入或创造至少一个互动对象。禁止只有玩家独角戏。
 
 正确示例：
-浮士德站在书斋窗前，望着窗外的月光，喃喃道：“我穷尽一生所学，却仍未触及世界的本质。”梅菲斯特从阴影中走出，笑道：“那么，与我作一场交易如何？”浮士德转过身，目光深沉：“交易？你开得出我付不起的价码吗？”
+浮士德站在书斋窗前，望着窗外的月光，喃喃道：“我穷尽一生所学，却仍未触及世界的本质。”
+
+梅菲斯特从阴影中走出，笑道：“那么，与我作一场交易如何？”浮士德转过身，目光深沉：“交易？你开得出我付不起的价码吗？”
 ''';
 
 /// 从锚点中提取风格描述。

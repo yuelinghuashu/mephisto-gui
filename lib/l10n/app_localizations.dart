@@ -230,6 +230,12 @@ abstract class AppLocalizations {
   /// **'✦ 契约已保存'**
   String get homeContractSaved;
 
+  /// No description provided for @homeNoBranches.
+  ///
+  /// In zh, this message translates to:
+  /// **'此母版暂未创建子版分支'**
+  String get homeNoBranches;
+
   /// No description provided for @emptyStateNoContract.
   ///
   /// In zh, this message translates to:
@@ -434,6 +440,12 @@ abstract class AppLocalizations {
   /// **'⚠ 文件监听不可用，规则热重载将失效（叙事不受影响）'**
   String get narrativeFileWatchUnavailable;
 
+  /// No description provided for @narrativeRestoreFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ 存档恢复失败：存档文件可能存在但内容已损坏，已从母版开始新叙事'**
+  String get narrativeRestoreFailed;
+
   /// No description provided for @narrativeErrorPrefix.
   ///
   /// In zh, this message translates to:
@@ -572,11 +584,17 @@ abstract class AppLocalizations {
   /// **'关闭'**
   String get previewSheetClose;
 
-  /// No description provided for @settingsAppearance.
+  /// No description provided for @settingsTheme.
   ///
   /// In zh, this message translates to:
-  /// **'外观'**
-  String get settingsAppearance;
+  /// **'主题'**
+  String get settingsTheme;
+
+  /// No description provided for @settingsThemeDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'明暗主题模式。'**
+  String get settingsThemeDescription;
 
   /// No description provided for @settingsThemeSystem.
   ///
@@ -595,6 +613,18 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'暗色'**
   String get settingsThemeDark;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In zh, this message translates to:
+  /// **'界面语言'**
+  String get settingsLanguage;
+
+  /// No description provided for @settingsLanguageDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'简体中文 / English。'**
+  String get settingsLanguageDescription;
 
   /// No description provided for @settingsNarrativeWidth.
   ///
@@ -631,6 +661,78 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'满屏'**
   String get settingsWidthFull;
+
+  /// No description provided for @settingsHistoryWindow.
+  ///
+  /// In zh, this message translates to:
+  /// **'历史消息窗口'**
+  String get settingsHistoryWindow;
+
+  /// No description provided for @settingsHistoryWindowDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'发送给 LLM 的历史对话条数上限。窗口越小，token 消耗越低；窗口越大，模型对前文的记忆越完整。'**
+  String get settingsHistoryWindowDescription;
+
+  /// No description provided for @settingsHistoryWindowNarrow.
+  ///
+  /// In zh, this message translates to:
+  /// **'20 条'**
+  String get settingsHistoryWindowNarrow;
+
+  /// No description provided for @settingsHistoryWindowMedium.
+  ///
+  /// In zh, this message translates to:
+  /// **'40 条'**
+  String get settingsHistoryWindowMedium;
+
+  /// No description provided for @settingsHistoryWindowWide.
+  ///
+  /// In zh, this message translates to:
+  /// **'60 条'**
+  String get settingsHistoryWindowWide;
+
+  /// No description provided for @settingsHistoryWindowFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部发送'**
+  String get settingsHistoryWindowFull;
+
+  /// No description provided for @settingsMemoryLimit.
+  ///
+  /// In zh, this message translates to:
+  /// **'记忆注入上限'**
+  String get settingsMemoryLimit;
+
+  /// No description provided for @settingsMemoryLimitDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'每轮发送给 LLM 的记忆条数上限。窗口越小，token 消耗越低；超过上限时高权重记忆（≥4 星）全部保留，其余按权重降序补足。'**
+  String get settingsMemoryLimitDescription;
+
+  /// No description provided for @settingsMemoryLimitCompact.
+  ///
+  /// In zh, this message translates to:
+  /// **'10 条'**
+  String get settingsMemoryLimitCompact;
+
+  /// No description provided for @settingsMemoryLimitStandard.
+  ///
+  /// In zh, this message translates to:
+  /// **'20 条'**
+  String get settingsMemoryLimitStandard;
+
+  /// No description provided for @settingsMemoryLimitExtended.
+  ///
+  /// In zh, this message translates to:
+  /// **'30 条'**
+  String get settingsMemoryLimitExtended;
+
+  /// No description provided for @settingsMemoryLimitFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部注入'**
+  String get settingsMemoryLimitFull;
 
   /// No description provided for @settingsNarrativeRules.
   ///

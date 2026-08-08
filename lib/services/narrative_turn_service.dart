@@ -75,6 +75,11 @@ class NarrativeTurnService {
   ///   - config: LLM 配置
   ///   - onChunk: 流式输出回调（逐 token）
   ///   - cancelSignal: 协作式取消信号；该 Future 完成后停止 LLM 流式读取
+  ///   - maxHistoryMessages: 上下文窗口上限（保留最近 N 条历史消息；
+  ///     null 表示不限制 = 全部发送）
+  ///   - maxMemories: 记忆注入条数上限（null = 不限制，全部注入）；
+  ///     超过上限时高权重记忆全部保留 + 其余按权重降序补足上限，
+  ///     放不下的记忆仍在存档中，仅本轮不带（不崩人设）
   Future<NarrativeTurnResult> generate({
     required String userInput,
     required Contract contract,
@@ -86,7 +91,16 @@ class NarrativeTurnService {
     required LlmConfig config,
     required void Function(String chunk) onChunk,
     Future<void>? cancelSignal,
+    int? maxHistoryMessages,
+    int? maxMemories,
   }) async {
+    // 0. 上下文窗口管理：保留最近 N 条历史消息（防止超长对话无限膨胀 token）
+    //    系统消息会被 _buildLlmMessages 过滤，为节省内存也在截断时一并丢弃。
+    final effectivePrior = maxHistoryMessages == null
+        ? priorMessages
+        : priorMessages.length > maxHistoryMessages
+              ? priorMessages.sublist(priorMessages.length - maxHistoryMessages)
+              : priorMessages;
     // 1. 规则引擎（主动/被动规则、骰子判定、状态变更、记忆注入）
     final ruleResult = RuleEngine(
       rules: contract.rules,
@@ -106,9 +120,10 @@ class NarrativeTurnService {
       contract: contract,
       currentState: ruleResult.newState,
       memories: [...memories, ...injectedMemories],
-      priorMessages: priorMessages,
+      priorMessages: effectivePrior,
       attachedContexts: attachedContexts,
       narrativeRules: narrativeRules,
+      maxMemories: maxMemories,
     );
 
     // 4. 调用 LLM（流式）；空响应或异常时回退本地回复
@@ -129,11 +144,11 @@ class NarrativeTurnService {
         cancelSignal: cancelSignal,
       );
       reply = streamed.trim().isEmpty
-          ? localReply(userInput, roleName: contract.roleName)
+          ? localReply(userInput, contract: contract)
           : streamed;
     } catch (e) {
       debugPrint('LLM 调用失败，回退到本地回复: $e');
-      reply = localReply(userInput, roleName: contract.roleName);
+      reply = localReply(userInput, contract: contract);
       lastError = 'LLM 调用失败: $e';
     }
 
@@ -168,6 +183,7 @@ class NarrativeTurnService {
     required List<Message> priorMessages,
     required List<String> attachedContexts,
     required String narrativeRules,
+    int? maxMemories,
   }) {
     final history = priorMessages
         .where((m) => m.role != MessageRole.system)
@@ -186,6 +202,7 @@ class NarrativeTurnService {
           memories: memories,
           narrativeRules: narrativeRules,
           attachedContexts: attachedContexts,
+          maxMemories: maxMemories,
         ),
       ),
       ...history,

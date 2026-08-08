@@ -135,4 +135,60 @@ void main() {
     expect(prompt, contains('追加规则'));
     expect(prompt, contains('当包含 "契约"时：状态.灵魂完整度 -= 10'));
   });
+
+  test('记忆灌窗裁剪：maxMemories 超限时高权重全部保留 + 低权重按降序补足', () {
+    final prompt = buildSystemPrompt(
+      contract: baseContract,
+      currentState: const {},
+      memories: [
+        Memory(content: '核心誓言', importance: 5),
+        Memory(content: '重要战斗', importance: 4),
+        Memory(content: '次要线索', importance: 2),
+        Memory(content: '普通日常'),
+        Memory(content: '边缘细节', importance: 1),
+      ],
+      maxMemories: 3,
+    );
+    // 高权重（5、4）必带，且只能再补 1 条权重最高的低权重（3）
+    expect(prompt, contains('- 核心誓言'));
+    expect(prompt, contains('- 重要战斗'));
+    expect(prompt, contains('- 普通日常'));
+    // 被裁剪的记忆不在本轮提示词中（仍在存档里，并非遗忘）
+    expect(prompt, isNot(contains('- 次要线索')));
+    expect(prompt, isNot(contains('- 边缘细节')));
+  });
+
+  test('记忆灌窗裁剪：未传 maxMemories 时全部注入（向后兼容）', () {
+    final prompt = buildSystemPrompt(
+      contract: baseContract,
+      currentState: const {},
+      memories: [
+        Memory(content: '核心誓言', importance: 5),
+        Memory(content: '普通日常'),
+        Memory(content: '边缘细节', importance: 1),
+      ],
+    );
+    expect(prompt, contains('- 核心誓言'));
+    expect(prompt, contains('- 普通日常'));
+    expect(prompt, contains('- 边缘细节'));
+  });
+
+  test('记忆灌窗裁剪：高权重数量超过上限时全部保留（人设核心永不丢弃）', () {
+    final prompt = buildSystemPrompt(
+      contract: baseContract,
+      currentState: const {},
+      memories: [
+        Memory(content: '誓言一', importance: 5),
+        Memory(content: '誓言二', importance: 4),
+        Memory(content: '誓言三', importance: 4),
+        Memory(content: '普通记忆'),
+      ],
+      maxMemories: 2,
+    );
+    // 上限 2 但高权重有 3 条 → 高权重全部保留（宁可超一点也不丢人设核心）
+    expect(prompt, contains('- 誓言一'));
+    expect(prompt, contains('- 誓言二'));
+    expect(prompt, contains('- 誓言三'));
+    expect(prompt, isNot(contains('- 普通记忆')));
+  });
 }

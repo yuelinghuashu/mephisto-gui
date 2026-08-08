@@ -6,7 +6,9 @@ library;
 
 export 'contract_provider.dart';
 export 'llm_settings_provider.dart';
+export 'narrative_memory_provider.dart';
 export 'narrative_provider.dart';
 export 'narrative_rule_provider.dart';
 export 'narrative_width_provider.dart';
+export 'narrative_window_provider.dart';
 export 'settings_provider.dart';

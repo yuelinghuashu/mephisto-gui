@@ -1,19 +1,18 @@
-import 'dart:io';
-
-import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
-import '../app/theme.dart';
-import '../providers/narrative_rule_provider.dart';
-import '../providers/narrative_width_provider.dart';
-import '../providers/settings_provider.dart';
-import '../services/storage/contract_dir.dart';
+import '../widgets/settings/contracts_dir_section.dart';
+import '../widgets/settings/language_section.dart';
 import '../widgets/settings/llm_config_section.dart';
-import '../widgets/settings/radio_selection_tile.dart';
+import '../widgets/settings/narrative_memory_section.dart';
+import '../widgets/settings/narrative_rules_section.dart';
+import '../widgets/settings/narrative_width_section.dart';
+import '../widgets/settings/narrative_window_section.dart';
 import '../widgets/settings/section_card.dart';
+import '../widgets/settings/section_header.dart';
+import '../widgets/settings/theme_mode_section.dart';
+import 'settings_section_page.dart';
 
 /// 设置页：契约目录管理、LLM 配置、外观
 ///
@@ -21,509 +20,197 @@ import '../widgets/settings/section_card.dart';
 ///   - 金色衬线体区块标题（◉ / ⚜ / ⚚）
 ///   - 暖色羊皮纸卡片容器（surfaceVariant）
 ///   - 金色选中态的复古 ListTile
-///   - 桌面端限制内容宽度（maxWidth 600），避免内容无限拉伸
-class SettingsScreen extends ConsumerStatefulWidget {
+///
+/// 响应式布局：
+///   - **宽屏（≥600）**：单页垂直堆叠全部 7 个区块（桌面端优先，内容居中 600px）
+///   - **窄屏（<600，移动端）**：切换为「分区入口列表 + 点击进入独立子页」——
+///     7 个分区以紧凑 ListTile 展示（图标 + 标题 + 副标题），无需滚动 2-3 屏
+///     定位目标；各区块组件通过 [SettingsSectionPage] 延迟实例化，进入对应
+///     子页才构建。
+///
+/// 各区块实现已拆分至 [lib/widgets/settings/] 下的独立组件，
+/// 本页只负责「响应式组装 + 导航」。
+class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
+  /// 窄屏阈值：低于此宽度时切换为分区导航模式（与叙事页移动端判定一致）
+  static const double mobileBreakpoint = 600;
+
+  /// 设置分区配置（icon + 标题 + 区块 builder）
+  ///
+  /// 宽屏模式直接内联渲染全部区块；窄屏模式作为入口列表渲染。
+  static List<_SettingsSection> _sections(AppLocalizations l10n) => [
+    _SettingsSection(
+      icon: '🌗',
+      title: l10n.settingsTheme,
+      subtitle: l10n.settingsThemeDescription,
+      builder: (_) => const ThemeModeSection(),
+    ),
+    _SettingsSection(
+      icon: '🌐',
+      title: l10n.settingsLanguage,
+      subtitle: l10n.settingsLanguageDescription,
+      builder: (_) => const LanguageSection(),
+    ),
+    _SettingsSection(
+      icon: '📐',
+      title: l10n.settingsNarrativeWidth,
+      subtitle: l10n.settingsWidthDescription,
+      builder: (_) => const NarrativeWidthSection(),
+    ),
+    _SettingsSection(
+      icon: '🪟',
+      title: l10n.settingsHistoryWindow,
+      subtitle: l10n.settingsHistoryWindowDescription,
+      builder: (_) => const NarrativeWindowSection(),
+    ),
+    _SettingsSection(
+      icon: '🧠',
+      title: l10n.settingsMemoryLimit,
+      subtitle: l10n.settingsMemoryLimitDescription,
+      builder: (_) => const NarrativeMemorySection(),
+    ),
+    _SettingsSection(
+      icon: '📜',
+      title: l10n.settingsNarrativeRules,
+      subtitle: l10n.settingsRulesDescription,
+      builder: (_) => const NarrativeRulesSection(),
+    ),
+    _SettingsSection(
+      icon: '⚜',
+      title: l10n.settingsContractsDir,
+      subtitle: l10n.settingsDesktopDirDescription,
+      builder: (_) => const ContractsDirSection(),
+    ),
+    _SettingsSection(
+      icon: '⚚',
+      title: l10n.settingsLlmConfig,
+      subtitle: l10n.settingsLlmDescription,
+      builder: (_) => const LlmConfigSection(),
+    ),
+  ];
+
   @override
-  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final isNarrow = MediaQuery.sizeOf(context).width < mobileBreakpoint;
 
-class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  String? _contractsDirPath;
-
-  /// 叙事规则编辑控制器
-  late final TextEditingController _narrativeRulesController;
-
-  /// 当前是否使用 Android 外部存储（仅 Android 可能为 true）
-  bool _useExternalStorage = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadContractsDir();
-    // 加载当前叙事规则到编辑框
-    _narrativeRulesController = TextEditingController(
-      text: ref.read(narrativeRuleProvider),
+    return Scaffold(
+      appBar: AppBar(title: Text('📜 ${l10n.homeSettings}'), centerTitle: false),
+      body: isNarrow
+          ? _buildNarrowList(context, l10n)
+          : _buildWideList(context, l10n),
     );
   }
 
-  @override
-  void dispose() {
-    _narrativeRulesController.dispose();
-    super.dispose();
-  }
-
-  /// 保存叙事规则
-  Future<void> _saveNarrativeRules() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppLocalizations.of(context);
-    await ref
-        .read(narrativeRuleProvider.notifier)
-        .save(_narrativeRulesController.text);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsRulesSaved)),
-    );
-  }
-
-  /// 恢复默认叙事规则
-  Future<void> _resetNarrativeRules() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppLocalizations.of(context);
-    await ref.read(narrativeRuleProvider.notifier).reset();
-    _narrativeRulesController.text = ref.read(narrativeRuleProvider);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsRulesReset)),
-    );
-  }
-
-  /// 加载当前契约目录路径 + 外部存储状态
-  Future<void> _loadContractsDir() async {
-    final dir = await getContractsDirectory();
-    final useExternal = await isUsingMobileExternalStorage();
-    if (mounted) {
-      setState(() {
-        _contractsDirPath = dir.path;
-        _useExternalStorage = useExternal;
-      });
-    }
-  }
-
-  /// 构建叙事内容宽度选择器
-  Widget _buildWidthSelector(ThemeData theme) {
-    final currentWidth = ref.watch(narrativeWidthProvider);
-    final l10n = AppLocalizations.of(context);
-
-    return Column(
+  /// 宽屏：单页垂直堆叠全部区块（与旧版一致，内容居中 600px）。
+  Widget _buildWideList(BuildContext context, AppLocalizations l10n) {
+    final sections = _sections(l10n);
+    return ListView(
+      padding: const EdgeInsets.all(20),
       children: [
-        for (final width in NarrativeWidth.values) ...[
-          RadioSelectionTile(
-            icon: switch (width) {
-              NarrativeWidth.narrow => Icons.smartphone,
-              NarrativeWidth.medium => Icons.book,
-              NarrativeWidth.wide => Icons.menu_book,
-              NarrativeWidth.full => Icons.photo_size_select_large,
-            },
-            // 档位文案走 ARB 国际化（Narrow / Medium / Wide / Full Screen）
-            label: switch (width) {
-              NarrativeWidth.narrow => l10n.settingsWidthNarrow,
-              NarrativeWidth.medium => l10n.settingsWidthMedium,
-              NarrativeWidth.wide => l10n.settingsWidthWide,
-              NarrativeWidth.full => l10n.settingsWidthFull,
-            },
-            selected: currentWidth == width,
-            onTap: () =>
-                ref.read(narrativeWidthProvider.notifier).setWidth(width),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < sections.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 28),
+                  _labeledSection(
+                    icon: sections[i].icon,
+                    title: sections[i].title,
+                    child: sections[i].builder(context),
+                  ),
+                ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
-          if (width != NarrativeWidth.values.last) const Divider(height: 1),
-        ],
+        ),
       ],
     );
   }
 
-  /// 选择新的契约目录（桌面端：系统目录选择器）。
-  Future<void> _changeContractsDir() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppLocalizations.of(context);
-
-    // 打开系统目录选择器
-    final selected = await getDirectoryPath(
-      initialDirectory: _contractsDirPath,
-    );
-
-    if (selected == null || selected.isEmpty) return; // 用户取消
-
-    // 保存新目录
-    final ok = await setContractsDirectory(selected);
-    if (!ok) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsDirChangeFail)));
-      return;
-    }
-
-    // 刷新显示 + 提示
-    await _loadContractsDir();
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsDirChanged(selected))),
-    );
-  }
-
-  /// iOS：「更改目录」提示（iOS 系统沙盒限制，仅应用内目录）。
-  Future<void> _iosChangeContractsDir() async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(
-      SnackBar(content: Text(AppLocalizations.of(context).settingsIosSandboxNotice)),
-    );
-  }
-
-  /// Android：切换「内部沙盒 ↔ 应用外部存储」。
-  Future<void> _toggleMobileStorage() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppLocalizations.of(context);
-    final enabled = await setMobileExternalStorage(!_useExternalStorage);
-    if (!enabled) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsStorageSwitchFail)));
-      return;
-    }
-    await _loadContractsDir();
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          _useExternalStorage
-              ? l10n.settingsStorageExternalSwitched
-              : l10n.settingsStorageInternalSwitched,
-        ),
-      ),
-    );
-  }
-
-  /// 用系统文件管理器打开契约文件夹（仅桌面端可用）。
-  Future<void> _openContractsDir() async {
-    final messenger = ScaffoldMessenger.of(context);
-    final l10n = AppLocalizations.of(context);
-    final dir = await getContractsDirectory();
-
-    if (!dir.existsSync()) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsDirNotExist)));
-      return;
-    }
-
-    // Linux 用 xdg-open，macOS 用 open，Windows 用 explorer
-    // 移动端沙盒目录不可由用户直接浏览，此操作仅桌面端提供
-    try {
-      if (Platform.isLinux) {
-        await Process.run('xdg-open', [dir.path]);
-      } else if (Platform.isMacOS) {
-        await Process.run('open', [dir.path]);
-      } else if (Platform.isWindows) {
-        await Process.run('explorer', [dir.path]);
-      } else {
-        messenger.showSnackBar(
-          SnackBar(content: Text(l10n.settingsPlatformNotSupported)),
-        );
-      }
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.settingsOpenFolderFail('$e'))),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final themeMode = ref.watch(themeModeProvider);
-    final l10n = AppLocalizations.of(context);
-
-    return Scaffold(
-      appBar: AppBar(title: Text('📜 ${l10n.homeSettings}'), centerTitle: false),
-      // 滚动区域占满全屏宽（鼠标在屏幕任意位置滚动都生效，桌面端友好）；
-      // 内容宽度约束下移到内部列，保持内容居中固定 600px。
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-              // ============================================================
-              // 外观设置
-              // ============================================================
-              _SectionHeader(icon: '◉', title: l10n.settingsAppearance),
-              const SizedBox(height: 12),
-
-              // ---- 主题模式选择（ListTile 需要 Material 祖先以绘制水波纹）----
-              SectionCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    RadioSelectionTile(
-                      icon: Icons.brightness_auto_outlined,
-                      label: l10n.settingsThemeSystem,
-                      selected: themeMode == ThemeMode.system,
-                      onTap: () => ref
-                          .read(themeModeProvider.notifier)
-                          .setThemeMode(ThemeMode.system),
-                    ),
-                    const Divider(height: 1),
-                    RadioSelectionTile(
-                      icon: Icons.light_mode_outlined,
-                      label: l10n.settingsThemeLight,
-                      selected: themeMode == ThemeMode.light,
-                      onTap: () => ref
-                          .read(themeModeProvider.notifier)
-                          .setThemeMode(ThemeMode.light),
-                    ),
-                    const Divider(height: 1),
-                    RadioSelectionTile(
-                      icon: Icons.dark_mode_outlined,
-                      label: l10n.settingsThemeDark,
-                      selected: themeMode == ThemeMode.dark,
-                      onTap: () => ref
-                          .read(themeModeProvider.notifier)
-                          .setThemeMode(ThemeMode.dark),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // ============================================================
-              // 界面语言
-              // ============================================================
-              _SectionHeader(icon: '🌐', title: l10n.languageLabel),
-              const SizedBox(height: 12),
-
-              SectionCard(
-                padding: EdgeInsets.zero,
-                child: Column(
-                  children: [
-                    RadioSelectionTile(
-                      icon: Icons.translate,
-                      label: l10n.languageChinese,
-                      selected: ref.watch(languageProvider) == 'zh',
-                      onTap: () =>
-                          ref.read(languageProvider.notifier).setLanguage('zh'),
-                    ),
-                    const Divider(height: 1),
-                    RadioSelectionTile(
-                      icon: Icons.language,
-                      label: l10n.languageEnglish,
-                      selected: ref.watch(languageProvider) == 'en',
-                      onTap: () =>
-                          ref.read(languageProvider.notifier).setLanguage('en'),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // ============================================================
-              // 叙事内容宽度（桌面端阅读偏好）
-              // ============================================================
-              _SectionHeader(icon: '📐', title: l10n.settingsNarrativeWidth),
-              const SizedBox(height: 8),
-              Text(
-                l10n.settingsWidthDescription,
-                style: theme.textTheme.labelLarge,
-              ),
-              const SizedBox(height: 12),
-
-              // ---- 宽度选择（羊皮纸卡片容器） ----
-              SectionCard(
-                padding: EdgeInsets.zero,
-                child: _buildWidthSelector(theme),
-              ),
-              const SizedBox(height: 28),
-
-              // ============================================================
-              // 叙事规则（输出约束，可自定义编辑）
-              // ============================================================
-              _SectionHeader(icon: '📜', title: l10n.settingsNarrativeRules),
-              const SizedBox(height: 8),
-              Text(
-                l10n.settingsRulesDescription,
-                style: theme.textTheme.labelLarge,
-              ),
-              const SizedBox(height: 12),
-
-              // ---- 规则编辑卡片 ----
-              SectionCard(
-                child: Column(
-                  children: [
-                    // 多行规则编辑框
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 220),
-                      child: TextField(
-                        controller: _narrativeRulesController,
-                        maxLines: null,
-                        expands: true,
-                        textAlignVertical: TextAlignVertical.top,
-                        style: const TextStyle(fontSize: 13, height: 1.5),
-                        decoration: InputDecoration(
-                          hintText: l10n.settingsRulesHint,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // 操作按钮
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.restart_alt),
-                          label: Text(l10n.settingsResetRules),
-                          onPressed: _resetNarrativeRules,
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton.icon(
-                          icon: const Icon(Icons.save_outlined),
-                          label: Text(l10n.settingsSaveRules),
-                          onPressed: _saveNarrativeRules,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // ============================================================
-              // 契约目录设置（平台自适应）
-              // ============================================================
-              _SectionHeader(icon: '⚜', title: l10n.settingsContractsDir),
-              const SizedBox(height: 8),
-              Text(
-                switch (defaultTargetPlatform) {
-                  TargetPlatform.android => l10n.settingsAndroidDirDescription,
-                  TargetPlatform.iOS => l10n.settingsIosDirDescription,
-                  _ => l10n.settingsDesktopDirDescription,
-                },
-                style: theme.textTheme.labelLarge,
-              ),
-              const SizedBox(height: 12),
-
-              // ---- 羊皮纸卡片容器 ----
-              SectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 当前路径显示（始终显示真实完整路径，不隐藏）
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _contractsDirPath ?? l10n.settingsDirLoading,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontFamily: 'monospace',
-                            fontSize: 13,
-                          ),
-                        ),
-                        // 移动端附加上下文说明（不替代路径，仅补充解释）
-                        if (defaultTargetPlatform == TargetPlatform.android) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            _useExternalStorage
-                                ? l10n.settingsAndroidExternalLocation
-                                : l10n.settingsAndroidInternalLocation,
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(color: theme.hintColor),
-                          ),
-                        ],
-                        if (defaultTargetPlatform == TargetPlatform.iOS) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            l10n.settingsIosLocation,
-                            style: theme.textTheme.labelSmall
-                                ?.copyWith(color: theme.hintColor),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    switch (defaultTargetPlatform) {
-                      // ---- Android：内部沙盒 ↔ 外部存储切换 ----
-                      TargetPlatform.android => Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _useExternalStorage
-                                  ? l10n.settingsAndroidExternalStorage
-                                  : l10n.settingsAndroidInternalStorage,
-                              style: theme.textTheme.labelMedium,
-                            ),
-                          ),
-                          OutlinedButton.icon(
-                            icon: Icon(
-                              _useExternalStorage
-                                  ? Icons.storage_outlined
-                                  : Icons.sd_card_outlined,
-                            ),
-                            label: Text(
-                              _useExternalStorage
-                                  ? l10n.settingsSwitchToInternal
-                                  : l10n.settingsSwitchToExternal,
-                            ),
-                            onPressed: _toggleMobileStorage,
-                          ),
-                        ],
-                      ),
-                      // ---- iOS：点击如实提示（沙盒限制，不隐藏） ----
-                      TargetPlatform.iOS => Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          FilledButton.icon(
-                            icon: const Icon(Icons.folder_open),
-                            label: Text(l10n.settingsChangeDir),
-                            onPressed: _iosChangeContractsDir,
-                          ),
-                        ],
-                      ),
-                      // ---- 桌面端：系统目录选择器 + 打开文件夹 ----
-                      _ => Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          FilledButton.icon(
-                            icon: const Icon(Icons.folder_open),
-                            label: Text(l10n.settingsChangeDir),
-                            onPressed: _changeContractsDir,
-                          ),
-                          const SizedBox(width: 12),
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.open_in_new),
-                            label: Text(l10n.settingsOpenFolder),
-                            onPressed: _openContractsDir,
-                          ),
-                        ],
-                      ),
-                    },
-                  ],
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // ============================================================
-              // LLM 配置
-              // ============================================================
-              _SectionHeader(icon: '⚚', title: l10n.settingsLlmConfig),
-              const SizedBox(height: 8),
-              Text(
-                l10n.settingsLlmDescription,
-                style: theme.textTheme.labelLarge,
-              ),
-              const SizedBox(height: 12),
-
-              const LlmConfigSection(),
-              const SizedBox(height: 24),
-                ],
-              ),
+  /// 窄屏（移动端）：分区入口列表，点击进入独立子页。
+  ///
+  /// 入口页只渲染 ListTile（图标 + 标题 + 副标题摘要），不实例化区块，
+  /// 避免进入设置页就触发 `ContractsDirSection` 等组件的 IO 初始化；
+  /// 区块内容通过 [SettingsSectionPage] 在子页中延迟构建。
+  Widget _buildNarrowList(BuildContext context, AppLocalizations l10n) {
+    final sections = _sections(l10n);
+    return ListView.separated(
+      padding: const EdgeInsets.all(20),
+      itemCount: sections.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        final section = sections[index];
+        return SectionCard(
+          padding: EdgeInsets.zero,
+          child: ListTile(
+            leading: Text(
+              section.icon,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
             ),
+            title: Text(
+              section.title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            subtitle: Text(
+              section.subtitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SettingsSectionPage(
+                    title: '${section.icon}  ${section.title}',
+                    builder: section.builder,
+                  ),
+                ),
+              );
+            },
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+
+  /// 带 [SectionHeader] 标题的区块包装（宽屏单页模式使用）。
+  Widget _labeledSection({
+    required String icon,
+    required String title,
+    required Widget child,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SectionHeader(icon: icon, title: title),
+        const SizedBox(height: 12),
+        child,
+      ],
     );
   }
 }
 
-/// 区块标题（金色衬线体 + 项目符号）
-class _SectionHeader extends StatelessWidget {
+/// 设置分区配置（宽屏内联渲染 / 窄屏入口列表共用）
+class _SettingsSection {
   final String icon;
   final String title;
+  final String subtitle;
+  final WidgetBuilder builder;
 
-  const _SectionHeader({required this.icon, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Text(
-      '$icon  $title',
-      style: theme.textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.bold,
-        color: AppTheme.gold,
-      ),
-    );
-  }
+  const _SettingsSection({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.builder,
+  });
 }

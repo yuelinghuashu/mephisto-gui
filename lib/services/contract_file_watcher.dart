@@ -12,6 +12,13 @@
 ///     后记录的一致则忽略，避免死循环
 ///   - 监听不可用（如网络文件系统）时通过 [onUnavailable] 回调提醒用户，
 ///     叙事主流程不受影响
+///
+/// v1.2.0 增强：
+///   - 监听目标从「单一当前源文件」扩展为「当前源文件 + 其母版」，
+///     使外部修改母版 .meph 也能被感知（创作者通常编辑母版）
+///   - mtime 抑制改为「按文件名记录」，母版/子版各自独立抑制，
+///     外部修改母版不会被子版 mtime 误拦截
+///   - [onFileChanged] 回调传入**实际变化**的文件名，而非固定的当前源文件名
 library;
 
 import 'dart:async';
@@ -20,6 +27,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import 'storage/contract_dir.dart';
+import 'storage/contract_repo.dart';
 
 /// 契约文件变更监听器
 ///
@@ -33,7 +41,7 @@ import 'storage/contract_dir.dart';
 /// watcher.dispose();
 /// ```
 class ContractFileWatcher {
-  /// 文件变更回调（传入当前监听的文件名）
+  /// 文件变更回调（传入实际变化的文件名：当前源文件或其母版）
   final Future<void> Function(String fileName) onFileChanged;
 
   /// 监听不可用回调（文件系统不支持监听/监听流报错时触发）
@@ -48,23 +56,39 @@ class ContractFileWatcher {
   /// 当前监听的文件名（用于 sourceFileName 变化时重新绑定）
   String _watchedFileName = '';
 
+  /// 母版文件名（当前源文件为子版时 = 母版名；母版自身时 = null）
+  String? _masterFileName;
+
   /// 契约目录（start 时解析并缓存）
   Directory? _contractsDir;
 
-  /// 上次处理完的文件 mtime（抑制 saveChild 自我触发监听造成死循环）
-  DateTime? _lastProcessedMtime;
+  /// 上次处理完的各文件 mtime（按文件名记录；抑制 saveChild 自我触发监听）
+  final Map<String, DateTime> _lastProcessedMtimes = {};
 
   ContractFileWatcher({
     required this.onFileChanged,
     this.onUnavailable,
   });
 
-  /// 当前监听的文件名
+  /// 当前监听的文件名（当前源文件；含子版情形）
   String get watchedFileName => _watchedFileName;
+
+  /// 当前监听的目标文件列表（当前源文件 + 母版；去重）
+  List<String> get watchedTargets {
+    final names = <String>[_watchedFileName];
+    final master = _masterFileName;
+    if (master != null && master != _watchedFileName) {
+      names.add(master);
+    }
+    return names;
+  }
 
   /// 开始或重新绑定对指定 .meph 文件的监听。
   ///
   /// 文件名未变化时不重复绑定；文件名变化时先取消旧订阅再绑定新文件。
+  ///
+  /// 监听目标 = 当前源文件 + 其母版：创作者通常在 VSCode 编辑母版，
+  /// 若只监听当前源文件（进入叙事后自动存档切到子版），外部改母版将无法感知。
   ///
   /// 注意：完整路径 = 契约目录（[getContractsDirectory]）+ 文件名，
   /// 与 [readContract] / [saveContract] 的路径解析保持一致。
@@ -74,6 +98,10 @@ class ContractFileWatcher {
 
     cancel();
     _watchedFileName = fileName;
+    // 计算母版文件名：当前源文件为子版时 = 母版根 + .meph
+    _masterFileName = isChildFileName(fileName)
+        ? '${extractMasterPrefix(fileName)}.meph'
+        : null;
 
     try {
       final dir = await getContractsDirectory();
@@ -95,39 +123,87 @@ class ContractFileWatcher {
     }
   }
 
+  /// 从目录事件中提取实际变化的文件名。
+  ///
+  ///   - [FileSystemModifyEvent] / [FileSystemCreateEvent]：取 [FileSystemEvent.path]
+  ///   - [FileSystemMoveEvent]：取 destination（原子保存 = rename 覆盖，
+  ///     事件流中目标文件名才是最终落盘的文件）
+  ///
+  /// 返回 null 表示该事件不含文件路径信息。
+  String? _eventFileName(FileSystemEvent event) {
+    final path = switch (event) {
+      FileSystemModifyEvent(:final path) => path,
+      FileSystemCreateEvent(:final path) => path,
+      FileSystemDeleteEvent(:final path) => path,
+      FileSystemMoveEvent(:final destination) => destination,
+    };
+    if (path == null || path.isEmpty) return null;
+    // 目录事件（path 为目录自身）与不属于契约目录的文件均不在监听范围
+    final name = path.split(Platform.pathSeparator).last;
+    if (name.isEmpty || name == _contractsDir?.path) return null;
+    if (!name.endsWith('.meph')) return null;
+    return name;
+  }
+
+  /// 判断变化的文件是否为当前监听目标（当前源文件或其母版）。
+  bool _isWatchedTarget(String fileName) {
+    return watchedTargets.contains(fileName);
+  }
+
   /// 处理目录事件：防抖后触发文件变更回调。
-  void _onDirEvent(FileSystemEvent _) {
-    // 防抖：短时间内多次写入只触发一次（500ms）
+  ///
+  /// 仅当实际变化的文件名命中监听目标时才进入防抖处理，
+  /// 避免目录中其他 .meph 文件的写入（如别的契约/子版）误触发。
+  void _onDirEvent(FileSystemEvent event) {
+    final changedName = _eventFileName(event);
+    if (changedName == null || !_isWatchedTarget(changedName)) return;
+
+    // 防抖：短时间内多次写入只触发一次（500ms）；
+    // 记录实际变化的文件名，防抖结束后按它读取最新内容
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
-      // mtime 抑制：saveChild 自己写文件也会触发事件，
-      // 但 mtime 与上次处理后记录的一致 → 忽略，避免死循环
-      final file = _watchedFile();
-      if (file == null || !file.existsSync()) return;
-      final mtime = file.lastModifiedSync();
-      if (mtime == _lastProcessedMtime) return;
-
-      // 处理期间暂停监听，避免「写 → 监听 → 再写」死循环；完成后恢复
-      _sub?.pause();
-      try {
-        await onFileChanged(_watchedFileName);
-        // 记录处理完的 mtime，抑制 saveChild 写文件触发的下一次监听
-        final updated = _watchedFile();
-        _lastProcessedMtime =
-            updated != null && updated.existsSync()
-                ? updated.lastModifiedSync()
-                : null;
-      } finally {
-        _sub?.resume();
-      }
+      await _processChangedFile(changedName);
     });
   }
 
-  /// 当前监听文件的 [File] 对象（契约目录未解析时返回 null）。
-  File? _watchedFile() {
+  /// 处理实际变化的文件：mtime 抑制 → 回调 → 更新 mtime 记录。
+  Future<void> _processChangedFile(String fileName) async {
+    final file = _targetFile(fileName);
+    if (file == null || !file.existsSync()) return;
+    if (!_isWatchedTarget(fileName)) return;
+
+    final mtime = file.lastModifiedSync();
+    // mtime 抑制（按文件名独立记录）：saveChild 自己写文件也会触发事件，
+    // 但 mtime 与上次处理后记录的一致 → 忽略，避免死循环
+    if (mtime == _lastProcessedMtimes[fileName]) return;
+
+    // 处理期间暂停监听，避免「写 → 监听 → 再写」死循环；完成后恢复
+    _sub?.pause();
+    try {
+      await onFileChanged(fileName);
+    } catch (e) {
+      // 回调异常不应导致监听死循环：打印日志后继续执行 mtime 更新
+      debugPrint('文件变更回调异常: $e');
+    } finally {
+      // 无论回调成功/失败，都更新 mtime 并恢复监听，
+      // 防止异常导致的死循环（失败后不再重复触发同一文件）
+      final updated = _targetFile(fileName);
+      _lastProcessedMtimes[fileName] =
+          updated != null && updated.existsSync()
+              ? updated.lastModifiedSync()
+              : DateTime.fromMillisecondsSinceEpoch(0);
+      _sub?.resume();
+    }
+  }
+
+  /// 指定文件的 [File] 对象（契约目录未解析时返回 null）。
+  ///
+  /// 统一用 `/` 拼接（与 contract_repo.dart 等文件保持一致）；
+  /// dart:io 的 [File] 在 Windows 上也能正确解析 `/` 路径分隔符。
+  File? _targetFile(String fileName) {
     final dir = _contractsDir;
-    if (dir == null || _watchedFileName.isEmpty) return null;
-    return File('${dir.path}${Platform.pathSeparator}$_watchedFileName');
+    if (dir == null || fileName.isEmpty) return null;
+    return File('${dir.path}/$fileName');
   }
 
   /// 取消当前文件监听并清理定时器。
@@ -137,12 +213,19 @@ class ContractFileWatcher {
     _sub?.cancel();
     _sub = null;
     _watchedFileName = '';
+    _masterFileName = null;
     _contractsDir = null;
+    // 同时清除 mtime 记录：若 cancel 后立即 start 绑定同一个文件，
+    // 旧 mtime 可能抑制新监听的首轮事件（热重载失效）。
+    // [start] 每次重新绑定都应从全新状态开始。
+    _lastProcessedMtimes.clear();
   }
 
   /// 销毁监听器（取消订阅 + 清理定时器 + 清除 mtime 记录）。
+  ///
+  /// [cancel] 已清除 mtime，此处无需额外处理；
+  /// 保留此方法作为显式生命周期钩子，便于未来扩展。
   void dispose() {
     cancel();
-    _lastProcessedMtime = null;
   }
 }

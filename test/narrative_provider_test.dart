@@ -394,5 +394,58 @@ void main() {
       expect(messages[2].role, MessageRole.system);
       expect(messages.map((m) => m.content), ['命运', '回复', '骰子结算']);
     });
+
+    test('hotReloadContract 同时应用规则与记忆中区块', () async {
+      final container = await buildContainer();
+      final notifier = container.read(narrativeProvider.notifier);
+
+      // 准备带记忆和规则的完整契约文本
+      const content = '''
+【角色名】
+浮士德
+
+【规则】
+[新规则] if 包含 "试验" -> 状态.灵魂完整度 -= 5
+
+【记忆】
+- [5] 核心誓言：与梅菲斯特立下终极赌约
+- [4] 重大事件：在黑森林中遭遇狼人
+- 无前缀记忆（默认权重 3）
+''';
+
+      notifier.hotReloadContract(content);
+
+      final state = container.read(narrativeProvider);
+      // 规则已热更新
+      expect(state.contract.rules, hasLength(1));
+      expect(state.contract.rules.first.name, '新规则');
+      // 记忆已热更新（含权重解析）
+      expect(state.memories, hasLength(3));
+      expect(state.memories[0].content, '核心誓言：与梅菲斯特立下终极赌约');
+      expect(state.memories[0].importance, 5);
+      expect(state.memories[1].content, '重大事件：在黑森林中遭遇狼人');
+      expect(state.memories[1].importance, 4);
+      expect(state.memories[2].content, '无前缀记忆（默认权重 3）');
+      expect(state.memories[2].importance, Memory.defaultImportance);
+      // 角色等静态字段保留原运行版本
+      expect(state.contract.roleName, '浮士德');
+    });
+
+    test('hotReloadContract 解析失败时保留原状态', () async {
+      final container = await buildContainer();
+      final notifier = container.read(narrativeProvider.notifier);
+
+      notifier.hotReloadContract('【角色名】\n浮士德\n\n【记忆】\n- 没有权重');
+
+      // 记忆应成功应用（因为这段内容是合法契约）
+      final state = container.read(narrativeProvider);
+      expect(state.memories, hasLength(1));
+
+      // 再传入非法内容，应保留当前状态并设定错误提示
+      notifier.hotReloadContract('【规则】\n[不完整规则');
+      final state2 = container.read(narrativeProvider);
+      expect(state2.memories, hasLength(1)); // 记忆未被破坏
+      expect(state2.lastError, isNotEmpty); // 错误提示已设置
+    });
   });
 }

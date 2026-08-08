@@ -300,7 +300,7 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.wifi_tethering_outlined, size: 18),
+                      : const Icon(Icons.bolt, size: 18),
                   label: Text(_testing ? l10n.settingsTesting : l10n.settingsTestConnection),
                   onPressed: _testing ? null : _testConnection,
                 ),

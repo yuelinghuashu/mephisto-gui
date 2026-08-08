@@ -10,11 +10,13 @@ import '../domain/narrative_error.dart';
 import '../providers/providers.dart';
 import '../screens/contract_editor_screen.dart';
 import '../services/contract_file_watcher.dart';
+import '../services/narrative_error_localizer.dart';
 import '../services/parser/meph_serializer.dart';
+import '../services/session/child_save_store.dart';
 import '../services/storage/contract_repo.dart';
 import '../widgets/contract_menu_item.dart';
-import '../widgets/contract_panel.dart';
 import '../widgets/dialogs/save_branch_dialog.dart';
+import '../widgets/narrative/dashboard_bottom_sheet.dart';
 import '../widgets/narrative/dashboard_drawer.dart';
 import '../widgets/narrative/empty_state.dart';
 import '../widgets/narrative/input_bar.dart';
@@ -56,10 +58,31 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
   @override
   void initState() {
     super.initState();
-    // 进入叙事页时尝试恢复默认子版（若有存档）
-    Future.microtask(() {
-      if (mounted) {
-        ref.read(narrativeProvider.notifier).restoreSession();
+    // 进入叙事页时尝试恢复默认子版（若有存档）。
+    // 若存在存档但恢复失败（如文件被外部损坏），静默进入空会话会让用户
+    // 误以为存档丢失，因此通过 SnackBar 给出明确提示。
+    Future.microtask(() async {
+      if (!mounted) return;
+      // 首次监听：提前到 initState 中的 microtask 执行，
+      // 避免每次 build() 重复注册 addPostFrameCallback
+      _startFileWatch(ref.read(narrativeProvider).sourceFileName);
+
+      final notifier = ref.read(narrativeProvider.notifier);
+      final restored = await notifier.restoreSession();
+      if (restored || !mounted) return;
+
+      // 恢复失败：区分「无存档（正常情况）」与「存档存在但恢复失败（异常）」
+      final state = ref.read(narrativeProvider);
+      final hasSave = await ChildSaveStore.exists(
+        NarrativeNotifier.defaultChildFileName(state.sourceFileName),
+      );
+      if (hasSave && mounted) {
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text(l10n.narrativeRestoreFailed)),
+          );
       }
     });
   }
@@ -73,7 +96,10 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
 
   /// 启动对指定 .meph 文件的监听（仅在文件名变化时重新绑定）。
   ///
-  /// 外部编辑器保存 → 防抖 500ms → 读取文件 → 仅规则热重载（保留运行态）。
+  /// 监听目标 = 当前源文件 + 其母版：[ContractFileWatcher] 会自动推导母版名，
+  /// 使外部（VSCode）修改母版 .meph 也能被感知——创作者通常编辑母版契约。
+  ///
+  /// 外部编辑器保存 → 防抖 500ms → 读取实际变化文件 → 规则/记忆热重载（保留运行态）。
   /// 具体监听/防抖/mtime 抑制逻辑已抽至 [ContractFileWatcher]。
   Future<void> _startFileWatch(String fileName) async {
     // 文件名未变化时不重复绑定
@@ -83,7 +109,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     }
 
     final watcher = (_fileWatcher ??= ContractFileWatcher(
-      // 文件变更 → 读取最新内容 → 仅规则热重载 → 补存子版
+      // 文件变更 → 读取最新内容 → 规则/记忆热重载 → 补存子版
       onFileChanged: _handleFileChanged,
       onUnavailable: _showFileWatchUnavailable,
     ));
@@ -105,7 +131,12 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
       );
   }
 
-  /// 文件变更后的热重载处理：读取最新内容 → 仅规则热更新 → 补存子版。
+  /// 文件变更后的热重载处理：读取实际变化文件的最新内容 → 规则/记忆热更新 →
+  /// 补存子版。
+  ///
+  /// [fileName] 为**实际变化**的文件名（当前源文件名或其母版名）：
+  ///   - 修改子版（当前源）→ 按子版内容热重载
+  ///   - 修改母版 → 按母版内容热重载（创作者通常编辑母版）
   ///
   /// 注意：此回调由 [ContractFileWatcher] 在防抖 + mtime 抑制后调用，
   /// 且处理期间监听已由 watcher 暂停，完成后恢复（避免死循环）。
@@ -113,7 +144,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     if (!mounted) return;
     final notifier = ref.read(narrativeProvider.notifier);
 
-    // 读取最新内容（若文件已被删除则跳过）
+    // 读取实际变化文件的最新内容（若文件已被删除则跳过）
     final content = await readContract(fileName);
     if (content == null || !mounted) return;
 
@@ -143,7 +174,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final fallbackNotice = rawFallbackNotice == null
         ? null
         : isNarrativeErrorCode(rawFallbackNotice)
-            ? _localizeNarrativeError(l10n, rawFallbackNotice)
+            ? localizeNarrativeError(l10n, rawFallbackNotice)
             : rawFallbackNotice;
 
     // ---- 监听 LLM 错误：非空时提示用户，避免静默回退 ----
@@ -152,7 +183,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
         final l10n = AppLocalizations.of(context);
         // 错误码 → 本地化文本；自由格式错误文本（如 LLM 异常信息）直接展示
         final displayError = isNarrativeErrorCode(next)
-            ? _localizeNarrativeError(l10n, next)
+            ? localizeNarrativeError(l10n, next)
             : next;
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
@@ -165,16 +196,11 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     });
 
     // ---- 文件监听：sourceFileName 变化（重开子版/切换契约）时重绑 ----
+    // 首次绑定已在 initState 的 microtask 中完成，此处仅监听后续变化
     ref.listen(
       narrativeProvider.select((s) => s.sourceFileName),
       (prev, next) => _startFileWatch(next),
     );
-    // 首次监听（页面打开后立即绑定当前文件）
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _startFileWatch(ref.read(narrativeProvider).sourceFileName);
-      }
-    });
 
     // ---- 获取数据 ----
     final roleName = state.roleName;
@@ -284,7 +310,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                 icon: const Icon(Icons.dashboard),
                 onPressed: () {
                   if (isMobile) {
-                    _showDashboardBottomSheet();
+                    DashboardBottomSheet.show(context, state);
                   } else {
                     Scaffold.of(context).openEndDrawer();
                   }
@@ -369,89 +395,6 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     );
   }
 
-  /// 移动端仪表盘：从底部弹出面板展示契约数据。
-  ///
-  /// 桌面端使用右侧抽屉（[DashboardDrawer]），
-  /// 移动端屏幕较窄，改为底部弹出更符合操作习惯：
-  ///   - 高度约占屏幕 75%
-  ///   - 顶部显示拖动把手 + 标题 + 关闭按钮
-  ///   - 内容复用 [ContractPanel] 契约数据面板
-  void _showDashboardBottomSheet() {
-    final state = ref.read(narrativeProvider);
-    final theme = Theme.of(context);
-
-    showModalBottomSheet<void>(
-      context: context,
-      // 圆角面板（顶角）
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      // 背景色跟随主题表面色
-      backgroundColor: theme.scaffoldBackgroundColor,
-      // 允许向下拖动关闭
-      isScrollControlled: true,
-      // 高度约占屏幕 75%，给内容留出充足空间
-      builder: (context) => FractionallySizedBox(
-        heightFactor: 0.75,
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ---- 顶部拖动把手 ----
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 10, bottom: 4),
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: theme.dividerColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              // ---- 标题栏 ----
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-                child: Row(
-                  children: [
-                    const Text(
-                      '⚜',
-                      style: TextStyle(fontSize: 20, color: AppTheme.gold),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        AppLocalizations.of(context).narrativeDashboard,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      tooltip: AppLocalizations.of(context).narrativeClose,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(height: 1),
-              // ---- 契约数据面板（复用共享组件） ----
-              Expanded(
-                child: ContractPanel(
-                  contract: state.contract,
-                  currentState: state.currentState,
-                  memories: state.memories,
-                  history: state.history,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   /// 处理存档菜单选择。
   Future<void> _onSaveMenu(String value) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -487,21 +430,6 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
         );
         break;
     }
-  }
-
-  /// 将 Provider 层错误码映射为本地化文本。
-  ///
-  /// 仅处理 [isNarrativeErrorCode] 返回 true 的静态错误码；
-  /// 自由格式错误文本（如 LLM 异常信息）直接原样返回。
-  String _localizeNarrativeError(AppLocalizations l10n, String errorCode) {
-    return switch (errorCode) {
-      narrativeErrorGenFailed => l10n.narrativeProviderGenFailed,
-      narrativeErrorAutoSaveFail => l10n.narrativeProviderAutoSaveFail,
-      narrativeErrorSaveFail => l10n.narrativeProviderSaveFail,
-      narrativeErrorHotReloadFail => l10n.narrativeProviderHotReloadFail,
-      narrativeErrorContractFallback => l10n.contractFallbackNotice,
-      _ => errorCode,
-    };
   }
 
   /// 打开契约编辑器编辑当前正在游玩的 .meph 文件。
