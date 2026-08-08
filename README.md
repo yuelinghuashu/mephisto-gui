@@ -213,7 +213,7 @@ flutter test
 | 平台        | 最低版本                                                               | 推荐版本                               |
 | ----------- | ---------------------------------------------------------------------- | -------------------------------------- |
 | **Windows** | Windows 10（Flutter 桌面最低要求）                                     | Windows 11                             |
-| **Linux**   | 需 GTK 3（主流发行版均可）                                             | 近两年发布的发行版（如 Ubuntu 22.04+） |
+| **Linux**   | 需 GTK 3 + libsecret（构建需 `libsecret-1-dev`，运行需 `libsecret-1-0`） | 近两年发布的发行版（如 Ubuntu 22.04+） |
 | **Android** | Android 6.0（API 23，`minSdk = 23`，受 `flutter_secure_storage` 限制） | Android 10+（API 29）                  |
 | **iOS**     | iOS 13.0（项目配置 `IPHONEOS_DEPLOYMENT_TARGET`）                      | iOS 16+                                |
 | **macOS**   | macOS 10.15 Catalina（项目配置 `MACOSX_DEPLOYMENT_TARGET`）            | macOS 12 Monterey+                     |

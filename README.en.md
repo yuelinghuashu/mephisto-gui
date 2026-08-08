@@ -213,7 +213,7 @@ that automatically runs on Linux / Windows / macOS:
 | Platform    | Minimum                                                                   | Recommended                                |
 | ----------- | ------------------------------------------------------------------------- | ------------------------------------------ |
 | **Windows** | Windows 10 (Flutter desktop minimum)                                      | Windows 11                                 |
-| **Linux**   | GTK 3 required (supported by mainstream distros)                          | Recent distributions (e.g., Ubuntu 22.04+) |
+| **Linux**   | GTK 3 + libsecret required (`libsecret-1-dev` for build, `libsecret-1-0` for runtime) | Recent distributions (e.g., Ubuntu 22.04+) |
 | **Android** | Android 6.0 (API 23, `minSdk = 23`, required by `flutter_secure_storage`) | Android 10+ (API 29)                       |
 | **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`)                | iOS 16+                                    |
 | **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`)      | macOS 12 Monterey+                         |
