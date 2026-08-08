@@ -42,16 +42,14 @@ String _generateUniqueId() {
 ///   ```
 @immutable
 class Message extends Equatable {
-  /// 消息唯一标识（自动生成）
+  /// 唯一标识（自动生成）
   final String id;
 
-  /// 消息角色（命运/角色/系统）
+  /// 命运/角色/系统
   final MessageRole role;
 
-  /// 消息内容
   final String content;
 
-  /// 消息时间戳
   final DateTime timestamp;
 
   /// 骰子判定结果（仅系统消息承载，用于渲染「命运结算」卡片）
@@ -60,7 +58,6 @@ class Message extends Equatable {
   /// 而非普通纯文本消息。
   final List<DiceResult>? diceResults;
 
-  /// 构造函数
   Message({
     String? id,
     required this.role,

@@ -59,11 +59,10 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   ///     并在 `_generateCore` 成功/失败后统一复位
   bool _isGeneratingInFlight = false;
 
-  /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交，减少 Riverpod 通知。
+  /// 追加流式 chunk：累积到缓冲，按 50ms 节流窗口统一提交（减少 Riverpod 通知）。
   void _appendStreamChunk(String chunk) {
     _streamBuffer.write(chunk);
-    // 每次有新 chunk 到达时，重置 50ms 一次性定时器；
-    // 定时器触发即提交缓冲 —— 语义是「最后一片 chunk 后 50ms 提交」。
+    // 定时器语义是「最后一片 chunk 后 50ms 提交」
     _streamTimer ??= Timer(const Duration(milliseconds: 50), _flushStreamBuffer);
   }
 
@@ -77,7 +76,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     state = state.copyWith(streamingContent: state.streamingContent + pending);
   }
 
-  /// 将事件应用到状态（Reducer 风格：所有状态迁移统一走 [narrativeReducer]）。
+  /// 状态迁移统一走 [narrativeReducer]
   void _dispatch(NarrativeEvent event) {
     state = narrativeReducer(state, event);
   }

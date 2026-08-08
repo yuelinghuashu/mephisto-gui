@@ -273,6 +273,45 @@ void main() {
     expect(count, 1);
   });
 
+  test('start 初始化监听目标的 mtime 基线（防 macOS fsevents 误报）', () async {
+    seedDir();
+    final watched = File('${tempDir.path}/faust.meph');
+    await watched.writeAsString('初始内容');
+
+    final watcher = ContractFileWatcher(onFileChanged: (_) async {});
+    await watcher.start('faust.meph');
+    addTearDown(watcher.dispose);
+
+    // start 后应已建立监听目标的 mtime 基线（而非空 map）。
+    // 背景：macOS fsevents 是目录级事件，可能把「其他文件写入」误报为
+    // 监听目标的 modify 事件。若 start 时不初始化基线，第一次误报会被
+    // 当作真实变更处理（mtime 记录为 null → 不抑制）。
+    final contents = watcher.debugStartBaselineContents;
+    expect(contents, contains('faust.meph'));
+    expect(contents['faust.meph'], isNotNull);
+    // 基线值应为文件当前内容
+    expect(contents['faust.meph'], '初始内容');
+  });
+
+  test('start 子版时同时初始化母版 mtime 基线', () async {
+    seedDir();
+    final child = File('${tempDir.path}/faust.child.meph');
+    final master = File('${tempDir.path}/faust.meph');
+    await child.writeAsString('子版内容');
+    await master.writeAsString('母版内容');
+
+    final watcher = ContractFileWatcher(onFileChanged: (_) async {});
+    await watcher.start('faust.child.meph');
+    addTearDown(watcher.dispose);
+
+    // 子版 + 母版都应有基线（跨平台安全：macOS 目录级事件也可能误报母版）
+    final contents = watcher.debugStartBaselineContents;
+    expect(contents, contains('faust.child.meph'));
+    expect(contents, contains('faust.meph'));
+    expect(contents['faust.child.meph'], '子版内容');
+    expect(contents['faust.meph'], '母版内容');
+  });
+
   test('自动存档写入子版后 mtime 抑制不误伤母版热重载', () async {
     seedDir();
     final child = File('${tempDir.path}/faust.child.meph');

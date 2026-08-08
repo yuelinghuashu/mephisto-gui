@@ -289,23 +289,12 @@ Rule _parseRuleLine(String trimmed, int lineNumber, String blockName) {
     }
   }
 
-  // 校验动作中的运算符空格：`状态.键 + = 值` 这类「复合运算符符号与等号间有空格」
-  // 会导致 `+=` 无法识别、静默创建错误的状态键（如 `键 +`），必须尽早报错。
+  // 以下校验均针对「静默失败」场景：语法错误若未拦截，规则会**永久失效**
+  // 且无任何错误提示，用户难以发现。尽早报错是本解析器的核心设计。
   _validateOperatorSpacing(action, lineNumber, blockName);
-
-  // 校验条件中的比较运算符空格：`状态.键 > = 值`、`状态.键 = = 值`、`roll(1d100) > = 80`
-  // 会导致 `>=` / `==` / `!=` 无法识别、条件静默失效（规则永不触发），必须尽早报错。
   _validateComparisonOperatorSpacing(condition, lineNumber, blockName);
-
-  // 校验关键词空格：`不 包含 "x"`、`包 含 "x"` 会被拆开无法识别，
-  // 条件静默失效（规则永不触发），必须尽早报错。
   _validateKeywordSpacing(condition, action, lineNumber, blockName);
-
-  // 校验条件括号匹配：`( ... || ...` 缺右括号时条件静默编译失败
   _validateParenBalance(condition, lineNumber, blockName);
-
-  // 校验复合动作分隔符：`&&` 前后缺空格时整段被当作 LLM 指令，
-  // 注入/状态变更静默丢失，必须尽早报错。
   _validateCompoundSeparator(action, lineNumber, blockName);
 
   return Rule(

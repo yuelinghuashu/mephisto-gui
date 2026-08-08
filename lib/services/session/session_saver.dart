@@ -10,18 +10,11 @@ import 'child_save_store.dart';
 
 /// 会话存档服务
 class SessionSaver {
-  /// 保存当前会话快照为子版文件。
+  /// 保存会话快照为子版文件（失败时抛异常，由调用方决定错误处理）。
   ///
-  /// - [masterFileName]：母版文件名（决定子版基础名；`faust.meph` → `faust.*.meph`）
-  /// - [contract]：母版契约
-  /// - [currentState]：运行时状态
-  /// - [memories]：运行时记忆
-  /// - [history]：运行时历史
-  /// - [branchName]：可选自定义分支名（如 'dark'）；null 时使用默认 `.child`
-  /// - [branchTitle]：可选「命运一句话」；以 `@命运:` 标记注入子版【角色背景】
+  /// - [branchName]：null 时使用默认 `.child`
+  /// - [branchTitle]：以 `@命运:` 标记注入子版【角色背景】
   /// - [overwriteFileName]：直接覆盖的文件名（已存在子版时传入）
-  ///
-  /// 返回值：保存的子版文件名；保存失败时抛异常（由调用方决定错误处理）。
   static Future<String> save({
     required String masterFileName,
     required Contract contract,
@@ -91,14 +84,6 @@ class SessionSaver {
   ///   - 分支 `faust.dark.meph`             → 另存 `light`  → `faust.dark.light.meph`
   ///   - 二级分支 `faust.dark.light.meph`   → 另存 `utopia` → `faust.dark.light.utopia.meph`
   ///   - 存档 `faust.dark.child.meph`       → 另存 `light`  → `faust.dark.light.meph`（继承 dark）
-  ///
-  /// 参数：
-  ///   - [sourceFileName]：当前打开的会话源文件（用于推导继承路径）
-  ///   - [branchName]：自定义分支名（如 'dark'、'light'）
-  ///   - [branchTitle]：可选「命运一句话」；以 `@命运:` 标记注入子版【角色背景】
-  ///   - 其余为会话快照参数（与 [save] 一致）
-  ///
-  /// 返回值：保存的分支文件名（如 `faust.dark.light.meph`）。
   static Future<String> saveAsBranch({
     required String sourceFileName,
     required String branchName,
@@ -129,7 +114,7 @@ class SessionSaver {
   /// - `faust.dark.light.meph` → `faust.dark.light`
   static String _stripChildSuffix(String sourceFileName) {
     final base = sourceFileName.replaceAll('.meph', '');
-    // 去掉末尾的 .child 存档段
+    // 丢弃末尾的 .child 存档段
     final trimmed = base.endsWith(ChildSaveStore.defaultChildSuffix)
         ? base.substring(
             0,

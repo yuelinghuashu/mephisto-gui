@@ -50,22 +50,19 @@ class ChildSaveStore {
     final dir = await getContractsDirectory();
     final baseName = masterFileName.replaceAll('.meph', '');
 
-    // 确定目标文件名：
-    //   - overwriteFileName 提供时直接覆盖（用于存档已存在时在原文件上修改）
-    //   - 否则按 .child / 递增 / 分支名 生成新文件
-    //
-    // 优化：一次性列出目录中所有 .meph 文件名后在内存中判断，
+    // overwriteFileName 提供时直接覆盖（已存在子版时在原文件上修改）；
+    // 否则按 .child / 递增 / 分支名 生成新文件。
+    // 一次性列出目录中所有 .meph 文件名后在内存中判断，
     // 避免 _resolveFileName 中多次同步磁盘 existsSync() 检查。
     final fileName = overwriteFileName ??
         await _resolveFileName(dir, baseName, branchName);
 
-    // 构造带「命运说明」的契约副本（branchTitle 非空时 serializer 输出 @命运 区块）
+    // branchTitle 非空时 serializer 输出 @命运 区块
     final effectiveContract =
         (branchTitle != null && branchTitle.trim().isNotEmpty)
         ? contract.copyWith(branchTitle: branchTitle.trim())
         : contract;
 
-    // 序列化子版
     final content = serializeMeph(
       effectiveContract,
       runtimeState: currentState,
@@ -73,7 +70,6 @@ class ChildSaveStore {
       history: history,
     );
 
-    // 写入文件
     final file = File('${dir.path}/$fileName');
     await file.writeAsString(content);
     return fileName;

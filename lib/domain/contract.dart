@@ -40,41 +40,33 @@ class Contract extends Equatable {
   /// 角色名（必选）
   final String roleName;
 
-  /// 锚点列表（推荐，核心人格设定）
+  /// 锚点（核心人格设定，推荐）
   final List<StateItem> anchor;
 
-  /// 世界观（可选）
   final String worldview;
 
-  /// 角色背景（可选）
   final String background;
 
-  /// 开局场景（可选）
   final String opening;
 
-  /// 初始状态（可选）
   final List<StateItem> state;
 
-  /// 规则列表（可选）
   final List<Rule> rules;
 
   // ==========================================================
   // 系统区块（由程序自动生成）
   // ==========================================================
 
-  /// 命运说明（分支的一句话描述，来自系统保留区块 `@命运`）
+  /// 分支的一句话描述（来自系统保留区块 `@命运`）
   ///
   /// 仅子版可能有；用户在「另存为分支」时填写。
   /// 非空时 serializer 输出 `@命运` 区块，首页据此展示「命运一句话」。
   final String branchTitle;
 
-  /// 记忆列表
   final List<Memory> memories;
 
-  /// 历史列表
   final List<HistoryEntry> history;
 
-  /// 构造函数
   const Contract({
     required this.roleName,
     this.anchor = const [],
@@ -88,12 +80,11 @@ class Contract extends Equatable {
     this.history = const [],
   });
 
-  /// 创建空契约
   factory Contract.empty() => const Contract(roleName: '角色');
 
-  /// 创建契约副本（仅更新指定的字段，其余保留原值）。
+  /// 创建副本（仅更新指定字段，其余保留原值）。
   ///
-  /// 用于状态迁移/保存路径中需要「保留大部分字段、仅替换部分区块」的场景，
+  /// 用于状态迁移/保存路径中「保留大部分字段、仅替换部分区块」的场景，
   /// 避免手工复制全部字段导致未来新增字段时漏同步。
   Contract copyWith({
     String? roleName,
@@ -121,7 +112,6 @@ class Contract extends Equatable {
     );
   }
 
-  /// 获取状态映射（用于快速查找）
   Map<String, StateValue> get stateMap {
     return {for (final item in state) item.key: item.value};
   }

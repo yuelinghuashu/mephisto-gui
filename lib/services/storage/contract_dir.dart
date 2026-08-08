@@ -47,13 +47,9 @@ String _seededKeyFor(Directory dir) => '$_seededPrefix${dir.path}';
 
 /// 用户自定义契约目录（SharedPreferences key）
 ///
-/// 用户可选指定位置存放契约文件，保存后所有契约操作指向该目录。
-/// 未配置时使用默认位置（应用文档目录/contracts/）。
-///
 /// 值含义（按平台）：
 ///   - 桌面端：任意目录路径（如 `~/Mephisto/contracts`）
-///   - Android：外部存储标记 [mobileExternalMarker] 表示应用外部存储；
-///     其他值或未配置表示内部沙盒（应用文档目录）
+///   - Android：外部存储标记 [mobileExternalMarker] 表示应用外部存储
 ///   - iOS：未配置（系统沙盒限制，仅应用内目录）
 const String _contractsDirKey = 'mephisto_contracts_directory';
 
@@ -64,17 +60,7 @@ const String _contractsDirKey = 'mephisto_contracts_directory';
 /// 内部沙盒（默认）使用 [getApplicationDocumentsDirectory]，同样随卸载清除。
 const String mobileExternalMarker = 'mobile_external';
 
-/// 获取契约目录路径。
-///
-/// 优先级：
-///   1. 用户通过设置页指定的存储位置
-///      - 桌面端：任意目录路径（如 `~/Mephisto/contracts`）
-///      - Android：外部存储标记 [mobileExternalMarker] → 应用外部目录
-///   2. 默认位置
-///      - 桌面端：用户主目录下的 `Mephisto/contracts/`
-///      - 移动端：应用文档目录下的 `Mephisto/contracts/`（沙盒内）
-///
-/// 目录不存在时自动创建。
+/// 获取契约目录路径（用户自定义优先）。目录不存在时自动创建。
 Future<Directory> getContractsDirectory() async {
   final prefs = await SharedPreferences.getInstance();
 

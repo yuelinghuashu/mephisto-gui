@@ -65,6 +65,25 @@ class ContractFileWatcher {
   /// 上次处理完的各文件 mtime（按文件名记录；抑制 saveChild 自我触发监听）
   final Map<String, DateTime> _lastProcessedMtimes = {};
 
+  /// 各监听目标上次处理时的内容快照（按文件名记录）。
+  ///
+  /// 用于 macOS fsevents 目录级事件误报的过滤：
+  /// fsevents 可能把「目录内其他文件的写入」报告为监听目标的 modify 事件，
+  /// 但监听目标文件的内容实际上**没有变化** —— 通过内容比较即可识别并忽略。
+  ///
+  /// 与 [_lastProcessedMtimes] 的区别：
+  ///   - [_lastProcessedMtimes]：处理后记录（mtime），用于抑制「saveChild
+  ///     自身写文件」的循环触发（防死循环）
+  ///   - [_lastProcessedContents]：处理前读取并缓存（内容），用于过滤
+  ///     macOS 目录级误报——误报时目标文件内容未变，读取结果与缓存相同
+  /// 使用内容而非 mtime 做误报过滤：mtime 在快速连续写入下可能因文件系统
+  /// 精度限制而相同（真实修改可能被误判为未变），内容比较则精确无误。
+  final Map<String, String> _lastProcessedContents = {};
+
+  /// 测试用：暴露 start 时的内容基线（供单元测试验证初始化行为）。
+  @visibleForTesting
+  Map<String, String> get debugStartBaselineContents => _lastProcessedContents;
+
   ContractFileWatcher({
     required this.onFileChanged,
     this.onUnavailable,
@@ -108,6 +127,25 @@ class ContractFileWatcher {
       _contractsDir = dir;
       if (!dir.existsSync()) return;
 
+      // 初始化监听目标的内容基线（用于 macOS fsevents 目录级事件过滤）。
+      //
+      // 背景：macOS fsevents 是目录级事件流，可能把「目录内其他文件的写入」
+      // 报告为监听目标文件的 modify 事件（路径精度不如 Linux inotify）。
+      // 建立内容基线后，_onDirEvent 中可通过「内容未变化」识别误报并忽略。
+      // 使用内容而非 mtime 作为基线依据：mtime 在快速连续写入下精度不足，
+      // 内容比较则精确无误（真实修改必然导致内容变化）。
+      for (final name in watchedTargets) {
+        final file = _targetFile(name);
+        if (file != null && file.existsSync()) {
+          try {
+            _lastProcessedContents[name] = await file.readAsString();
+          } catch (e) {
+            // 读取失败（文件被占用/权限）时跳过缓存，首次事件正常触发
+            debugPrint('初始化契约内容基线失败: $name ($e)');
+          }
+        }
+      }
+
       final sub = dir.watch().listen(
         _onDirEvent,
         onError: (Object e) {
@@ -138,9 +176,12 @@ class ContractFileWatcher {
       FileSystemMoveEvent(:final destination) => destination,
     };
     if (path == null || path.isEmpty) return null;
-    // 目录事件（path 为目录自身）与不属于契约目录的文件均不在监听范围
+    // 目录事件（path 为目录自身）与不属于契约目录的文件均不在监听范围。
+    // 注意：这里必须比较**完整路径**（path == _contractsDir.path），
+    // 而非文件名（name == _contractsDir.path）——文件名只是路径最后一段，
+    // 与目录完整路径永远不会相等，导致目录事件无法被正确过滤。
     final name = path.split(Platform.pathSeparator).last;
-    if (name.isEmpty || name == _contractsDir?.path) return null;
+    if (name.isEmpty || path == _contractsDir?.path) return null;
     if (!name.endsWith('.meph')) return null;
     return name;
   }
@@ -154,9 +195,33 @@ class ContractFileWatcher {
   ///
   /// 仅当实际变化的文件名命中监听目标时才进入防抖处理，
   /// 避免目录中其他 .meph 文件的写入（如别的契约/子版）误触发。
+  ///
+  /// macOS fsevents 目录级事件过滤：
+  ///   - fsevents 可能把「目录内其他文件（如 dantes.meph）的写入」报告为
+  ///     监听目标文件（如 faust.meph）的 modify 事件
+  ///   - 此时监听目标文件的内容**未发生变化** → 与 [start] 时记录的内容
+  ///     比对即可识别并忽略（真实修改必然导致内容变化）
+  ///   - 注意：此过滤发生在**防抖前**，即使 mtime 精度不足也不会误抑制
+  ///     真实修改（内容比较精确无误）
   void _onDirEvent(FileSystemEvent event) {
     final changedName = _eventFileName(event);
     if (changedName == null || !_isWatchedTarget(changedName)) return;
+
+    // 内容基线过滤（防 macOS fsevents 误报）：
+    // 如果事件报告的目标文件内容与基线相同 → 其他文件写入的误报
+    final file = _targetFile(changedName);
+    if (file != null && file.existsSync()) {
+      try {
+        final currentContent = file.readAsStringSync();
+        final baselineContent = _lastProcessedContents[changedName];
+        if (baselineContent != null && currentContent == baselineContent) {
+          return;
+        }
+      } catch (e) {
+        // 读取失败（文件被占用/权限）时跳过内容检查，继续走防抖处理
+        debugPrint('读取契约内容失败: $changedName ($e)');
+      }
+    }
 
     // 防抖：短时间内多次写入只触发一次（500ms）；
     // 记录实际变化的文件名，防抖结束后按它读取最新内容
@@ -192,6 +257,15 @@ class ContractFileWatcher {
           updated != null && updated.existsSync()
               ? updated.lastModifiedSync()
               : DateTime.fromMillisecondsSinceEpoch(0);
+      // 同步更新内容缓存：后续 macOS fsevents 误报（内容未变）时，
+      // 与最新内容比较可正确识别并忽略（真实修改后的新内容作为新基线）
+      if (updated != null && updated.existsSync()) {
+        try {
+          _lastProcessedContents[fileName] = updated.readAsStringSync();
+        } catch (e) {
+          debugPrint('更新契约内容缓存失败: $fileName ($e)');
+        }
+      }
       _sub?.resume();
     }
   }
@@ -219,6 +293,7 @@ class ContractFileWatcher {
     // 旧 mtime 可能抑制新监听的首轮事件（热重载失效）。
     // [start] 每次重新绑定都应从全新状态开始。
     _lastProcessedMtimes.clear();
+    _lastProcessedContents.clear();
   }
 
   /// 销毁监听器（取消订阅 + 清理定时器 + 清除 mtime 记录）。

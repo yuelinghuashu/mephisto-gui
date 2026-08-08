@@ -14,20 +14,12 @@ import 'contract_dir.dart';
 // 契约 CRUD
 // ============================================================
 
-/// 列出所有 .meph 契约文件
-///
-/// 返回值：契约文件名列表（如 ['faust.meph', 'dantes.meph']）。
 Future<List<String>> listContracts() async {
   final dir = await getContractsDirectory();
   return listMephFileNames(dir);
 }
 
-/// 读取指定契约文件的内容
-///
-/// 参数：
-///   - name: 契约文件名（如 `faust.meph`）
-///
-/// 返回值：契约文件完整内容；文件不存在时返回 null。
+/// 读取契约文件内容（文件不存在时返回 null）
 Future<String?> readContract(String name) async {
   final dir = await getContractsDirectory();
   final file = File('${dir.path}/$name');
@@ -35,23 +27,13 @@ Future<String?> readContract(String name) async {
   return file.readAsString();
 }
 
-/// 保存契约文件（创建或覆盖）
-///
-/// 参数：
-///   - name: 契约文件名（如 `my_story.meph`）
-///   - content: 契约文件完整内容
 Future<void> saveContract(String name, String content) async {
   final dir = await getContractsDirectory();
   final file = File('${dir.path}/$name');
   await file.writeAsString(content);
 }
 
-/// 删除契约文件
-///
-/// 参数：
-///   - name: 契约文件名
-///
-/// 返回值：是否删除成功（false 表示文件不存在或删除失败）。
+/// 删除契约文件（false = 文件不存在或删除失败）
 Future<bool> deleteContract(String name) async {
   final dir = await getContractsDirectory();
   final file = File('${dir.path}/$name');
@@ -64,13 +46,7 @@ Future<bool> deleteContract(String name) async {
   }
 }
 
-/// 导入本地 .meph 文件到契约目录。
-///
-/// 参数：
-///   - sourcePath: 本地 .meph 文件的完整路径
-///   - fileName: 目标文件名（如 `my_story.meph`）
-///
-/// 返回值：保存后的完整文件路径；导入失败时抛出异常。
+/// 导入本地 .meph 文件到契约目录（失败时抛出异常）
 Future<String> importContract(String sourcePath, String fileName) async {
   final dir = await getContractsDirectory();
   final source = File(sourcePath);

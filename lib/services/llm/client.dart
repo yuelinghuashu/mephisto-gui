@@ -24,16 +24,13 @@ const int retryBaseDelayMs = 500;
 
 /// LLM 消息（API 格式）
 class LlmMessage {
-  /// 角色（user、assistant、system）
+  /// user、assistant、system
   final String role;
 
-  /// 内容
   final String content;
 
-  /// 构造函数
   LlmMessage({required this.role, required this.content});
 
-  /// 转换为 JSON 格式
   Map<String, dynamic> toJson() => {'role': role, 'content': content};
 }
 
@@ -58,24 +55,13 @@ class LlmClient {
     this.client,
   });
 
-  /// 生成回复（流式输出）
+  /// 生成回复（SSE 流式输出）。
   ///
-  /// 使用 `http.Client().send` 逐行读取 SSE（Server-Sent Events）响应，
-  /// 每收到一个 content delta 就调用 [onChunk]，实现真正的逐 token 回调。
-  ///
-  /// 行为说明：
-  ///   - 网络超时：默认 60 秒，可通过 [timeout] 覆盖；
-  ///     同时应用于「响应头到达」与「流式数据读取」（两次独立的 [timeout] 保护，
-  ///     避免服务端建立连接但不发送数据时永久挂起）
-  ///   - API 错误：状态码非 200 时抛出 [Exception]（含响应体）
-  ///   - 解析错误：单行解析失败仅打印日志，不影响后续内容
-  ///   - 协作式取消：传入 [cancelSignal] 后，该 Future 完成（如用户点击
-  ///     「停止生成」）时提前终止 SSE 读取，返回已累积的内容（不抛异常）
-  ///   - 重试：仅当「响应头到达前」发生网络层瞬时故障
-  ///     （[TimeoutException] 超时 / [SocketException] 连接异常 /
-  ///     [http.ClientException] 客户端异常）时按指数退避重试最多 [maxRetries] 次。
-  ///     **流式读取中途超时不重试**（此时已累积部分内容，重发整个请求会导致
-  ///     回复重复），业务错误（HTTP 4xx/5xx）也不重试——它们不会因重试而成功
+  /// 关键行为：
+  ///   - 超时：默认 60 秒，同时保护「响应头到达」与「流式数据读取」
+  ///   - 重试：仅「响应头到达前」的网络层瞬时故障（超时/连接/客户端异常）
+  ///     按指数退避重试；流式中途超时、API 4xx/5xx 均不重试
+  ///   - 取消：传入 [cancelSignal] 后提前终止 SSE 读取，返回已累积内容
   ///   - 返回：完整拼接后的回复内容
   Future<String> generateStream({
     required List<LlmMessage> messages,
