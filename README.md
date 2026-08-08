@@ -67,9 +67,18 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
    以《浮士德》原典的诗句对白风格生成故事
    ```
 
-> **🔒 安全提示**：API Key 以明文保存于本地偏好存储（shared_preferences），
-> 仅限在可信的个人设备上使用。请勿在共享/公共设备上配置 API Key，
-> 并避免将存储文件外泄；如需更高级别的保护，请考虑使用系统级密钥库。
+> **🔒 安全提示**：API Key 已持久化到系统级安全存储
+> （Android Keystore / iOS · macOS Keychain / Windows DPAPI / Linux libsecret），
+> 而非明文磁盘文件；旧版本残留的明文 Key 将在首次读取时自动迁移。
+> 请遵循以下最佳实践，最大限度降低泄露风险：
+>
+> - **使用「从剪贴板导入」**：设置页 API Key 输入框旁的剪贴板图标可一键导入，
+>   避免手输 Key 时长期残留于剪贴板
+> - **勿在共享/公共设备上配置**：即使有安全存储，也建议只在自有设备上使用
+> - **勿截图 / 勿发到聊天群 / 勿同步到云盘备份**
+>
+> > 极端场景（安全存储不可用，如系统密钥环异常）会自动降级为 SharedPreferences
+> > 明文存储，仅影响本地设备——功能不受损，但不建议在共享设备上依赖该降级路径。
 
 ## ✍️ 契约语法
 
@@ -141,6 +150,7 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 - **Flutter**（多端 UI）
 - **Riverpod**（状态管理）
 - **SharedPreferences**（偏好持久化）
+- **flutter_secure_storage**（系统密钥链存储 API Key：Android Keystore / iOS·macOS Keychain / Windows DPAPI / Linux libsecret）
 - **HTTP**（OpenAI 兼容 SSE 流式调用）
 - **MephParser**（自研契约解析器）
 
@@ -171,7 +181,7 @@ flutter test
 ```
 
 测试覆盖规则引擎、Meph 解析、LLM、记忆、存档、Provider 与 UI 全链路，
-另有 `tool/validate_build_config.py` 对 Android/iOS/打包脚本做 11 项静态断言。
+另有 `tool/validate_build_config.py` 对 Android/iOS/打包脚本做 15 项静态断言。
 
 ## 🚀 CI / CD
 
@@ -179,33 +189,34 @@ flutter test
 在 Linux / Windows / macOS 三平台自动运行：
 
 - `validate-build-config`：actionlint 工作流语法检查 + `tool/validate_build_config.py` 构建配置断言
-- `analyze-and-test`：`flutter analyze` + `flutter test`
+- `analyze-and-test`：`flutter analyze` + `flutter test`（三平台）
+- `build-macos-ios`：macOS Release 与 iOS Release（no-codesign）编译验证
 - 桌面平台构建（Release），发布工作流见 [`.github/workflows/release.yml`](.github/workflows/release.yml)
 
 ## 🛠️ 平台支持与测试声明
 
-> **诚实标注**：本项目由个人维护，受硬件与账号条件限制，以下平台**未经过真机/构建验证**，
+> **诚实标注**：本项目由个人维护，受硬件与账号条件限制，以下平台**未经过真机验证**，
 > 可能存在尚未发现的 bug。在对应平台发布前，请务必先完成验证。
 
-| 平台                                          | 验证状态                        | 说明                                                                                                |
-| --------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- |
-| **Windows**                                   | ✅ 真机验证                     | 窗口默认尺寸 1280×720 + 屏幕居中已验证                                                              |
-| **Linux**                                     | ✅ 真机验证 + 本机构建通过      | 含 `flutter build linux` 原生编译（C++ runner 改动）                                                |
-| **Android**                                   | ✅ 真机验证                     | 外部存储 ↔ 内部沙盒切换的交互体验已验证                                                             |
-| **macOS**                                     | ⚠️ 仅代码适配，**从未编译运行** | 窗口居中 Swift 代码、XIB 尺寸改动未在真实 macOS 验证                                                |
-| **iOS**                                       | ⚠️ 仅代码适配，**从未编译运行** | 沙盒目录、文件选择器交互未在真实设备验证                                                            |
-| **旧版鸿蒙**（HarmonyOS 2/3/4，兼容 Android） | ✅ 可运行本项目 Android APK     | 本质是 Android 兼容层，现有 `path_provider` / `file_selector` 沙盒适配可直接用；**未实测**          |
-| **纯血鸿蒙**（HarmonyOS NEXT / 5.0+）         | ⛔ **不支持**                   | Flutter 官方无此平台目标，需用 OpenHarmony Flutter 分支独立建工程并逐依赖移植（独立工作量，未立项） |
+| 平台                                          | 验证状态                       | 说明                                                                                                |
+| --------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **Windows**                                   | ✅ 真机验证                    | 窗口默认尺寸 1280×720 + 屏幕居中已验证                                                              |
+| **Linux**                                     | ✅ 真机验证 + 本机构建通过     | 含 `flutter build linux` 原生编译（C++ runner 改动）                                                |
+| **Android**                                   | ✅ 真机验证                    | 外部存储 ↔ 内部沙盒切换的交互体验已验证                                                             |
+| **macOS**                                     | ⚠️ CI 编译通过，**未真机运行** | macOS Release 构建已在 GitHub Actions 验证编译；窗口居中 Swift 行为仍需真机验证                     |
+| **iOS**                                       | ⚠️ CI 编译通过，**未真机运行** | iOS Release（no-codesign）构建已在 GitHub Actions 验证编译；沙盒/文件选择器交互未在真实设备验证     |
+| **旧版鸿蒙**（HarmonyOS 2/3/4，兼容 Android） | ✅ 可运行本项目 Android APK    | 本质是 Android 兼容层，现有 `path_provider` / `file_selector` 沙盒适配可直接用；**未实测**          |
+| **纯血鸿蒙**（HarmonyOS NEXT / 5.0+）         | ⛔ **不支持**                  | Flutter 官方无此平台目标，需用 OpenHarmony Flutter 分支独立建工程并逐依赖移植（独立工作量，未立项） |
 
 ### 系统版本要求
 
-| 平台        | 最低版本                                                                   | 推荐版本                               |
-| ----------- | -------------------------------------------------------------------------- | -------------------------------------- |
-| **Windows** | Windows 10（Flutter 桌面最低要求）                                         | Windows 11                             |
-| **Linux**   | 需 GTK 3（主流发行版均可）                                                 | 近两年发布的发行版（如 Ubuntu 22.04+） |
-| **Android** | Flutter 工具链默认 `minSdk`（跟随 `flutter.minSdkVersion`，当前约 API 21） | Android 10+（API 29）                  |
-| **iOS**     | iOS 13.0（项目配置 `IPHONEOS_DEPLOYMENT_TARGET`）                          | iOS 16+                                |
-| **macOS**   | macOS 10.15 Catalina（项目配置 `MACOSX_DEPLOYMENT_TARGET`）                | macOS 12 Monterey+                     |
+| 平台        | 最低版本                                                               | 推荐版本                               |
+| ----------- | ---------------------------------------------------------------------- | -------------------------------------- |
+| **Windows** | Windows 10（Flutter 桌面最低要求）                                     | Windows 11                             |
+| **Linux**   | 需 GTK 3（主流发行版均可）                                             | 近两年发布的发行版（如 Ubuntu 22.04+） |
+| **Android** | Android 6.0（API 23，`minSdk = 23`，受 `flutter_secure_storage` 限制） | Android 10+（API 29）                  |
+| **iOS**     | iOS 13.0（项目配置 `IPHONEOS_DEPLOYMENT_TARGET`）                      | iOS 16+                                |
+| **macOS**   | macOS 10.15 Catalina（项目配置 `MACOSX_DEPLOYMENT_TARGET`）            | macOS 12 Monterey+                     |
 
 > **说明**：
 >

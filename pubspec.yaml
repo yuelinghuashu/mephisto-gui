@@ -3,7 +3,7 @@ description: "Mephisto 叙事引擎——在契约框架内驱动命运持续推
 publish_to: "none"
 license: MIT
 
-version: 1.1.0+1
+version: 1.2.0+2
 
 environment:
   sdk: ^3.12.2
@@ -16,6 +16,7 @@ dependencies:
   equatable: ^2.1.0
   http: ^1.6.0
   shared_preferences: ^2.5.3
+  flutter_secure_storage: ^9.2.0
   file_selector: ^1.0.3
   path_provider: ^2.1.5
   meta: ^1.18.0

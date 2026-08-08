@@ -134,7 +134,7 @@ jobs:
           Architecture: amd64
           Maintainer: yuelinghuashu <1263476185@qq.com>
           Description: Mephisto 叙事引擎——用契约书写命运，在 AI 驱动下推进长线叙事。
-          Depends: libgtk-3-0
+          Depends: libgtk-3-0, libsecret-1-0
           EOF
 
           # dpkg-deb 打包

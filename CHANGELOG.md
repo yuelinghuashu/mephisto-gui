@@ -5,7 +5,7 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.2.0] - 上下文窗口 · 记忆权重体系 · 编辑器健壮性（未发布）
+## [1.2.0] - 上下文窗口 · 记忆权重体系 · 编辑器健壮性 · API Key加密
 
 ### ✨ 新特性
 
@@ -37,6 +37,8 @@
 - 高权重上限：`highImportanceCap = 15`，超限降级压缩防 token 失控
 - LLM 网络重试：三类网络异常统一指数退避
 - 文件监听异常防护：回调失败仍恢复监听，防死循环
+- API Key 安全最佳实践：设置页新增「从剪贴板导入」按钮，避免手输时 Key 残留剪贴板；README 补充泄露防护指南
+- **API Key 改用系统密钥链存储**：引入 `flutter_secure_storage`，API Key 持久化到系统级安全存储（Android Keystore / iOS·macOS Keychain / Windows DPAPI / Linux libsecret），旧明文在首次读取时自动迁移；密钥链不可用时优雅降级 SharedPreferences 明文（功能不受损）
 
 ### 🧹 重构
 
@@ -57,7 +59,10 @@
 - 确认 `flutter gen-l10n` 工作流与 ARB 一致
 - 移除应用内记忆编辑 UI，统一「编辑器改 `[N]` 前缀」
 - 新增测试：文件监听、窗口档位、本地兜底、LLM 重试、记忆权重、记忆热重载、设置页响应式
-- 测试总数：**286 个**
+- 测试总数：**290 个**（新增 LLM 配置加密存储 / 明文迁移 / 降级测试）
+- 新增 `build-macos-ios` job：push/PR 验证 `flutter build macos --release` 与 `flutter build ios --release --no-codesign`
+- 构建配置断言扩至 15 项：`validate_build_config.py` 增加 macOS/iOS 构建步骤存在性校验
+- README 平台声明同步：macOS / iOS 从「从未编译运行」更新为「CI 编译通过，未真机运行」
 
 ## [1.1.0] - 规则热重载 · 国际化 · 文档
 

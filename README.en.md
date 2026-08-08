@@ -67,9 +67,18 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
    Generate the story in the poetic dialogue style of the original Faust
    ```
 
-> **🔒 Security Note**: The API Key is stored in plaintext in local preference storage (shared_preferences),
-> and is only intended for use on trusted personal devices. Do not configure your API Key on shared/public devices,
-> and avoid exposing the storage file. For higher-level protection, consider using a system-level keystore.
+> **🔒 Security Note**: The API Key is persisted to system-level secure storage
+> (Android Keystore / iOS · macOS Keychain / Windows DPAPI / Linux libsecret),
+> rather than a plaintext disk file; legacy plaintext keys left by older versions are auto-migrated on first read.
+> Follow these best practices to minimize the risk of leakage:
+>
+> - **Use "Paste from Clipboard"**: The clipboard icon next to the API Key field on the settings page allows one-click import,
+>   avoiding the Key lingering in your clipboard after manual entry
+> - **Do not configure on shared/public devices**: even with secure storage, only use on your own device
+> - **Do not screenshot / send in chat groups / sync to cloud backups**
+>
+> > In extreme cases (secure storage unavailable, e.g., system keyring failure), it gracefully falls back to
+> > SharedPreferences plaintext—functionality is unaffected, but relying on that fallback on shared devices is not advised.
 
 ## ✍️ Contract Syntax
 
@@ -140,6 +149,7 @@ For writing `.meph` contracts, we recommend the **Mephisto VSCode plugin** for a
 - **Flutter** (Multi-platform UI)
 - **Riverpod** (State management)
 - **SharedPreferences** (Preference persistence)
+- **flutter_secure_storage** (System-keychain API Key storage: Android Keystore / iOS·macOS Keychain / Windows DPAPI / Linux libsecret)
 - **HTTP** (OpenAI-compatible SSE streaming calls)
 - **MephParser** (Self-developed contract parser)
 
@@ -170,7 +180,7 @@ flutter test
 ```
 
 Tests cover the rule engine, Meph parser, LLM, memory, saves, Providers, and the full UI chain,
-along with `tool/validate_build_config.py` which performs 11 static assertions on Android/iOS/build scripts.
+along with `tool/validate_build_config.py` which performs 15 static assertions on Android/iOS/build scripts.
 
 ## 🚀 CI / CD
 
@@ -178,34 +188,35 @@ The project includes a GitHub Actions workflow (see [`.github/workflows/ci.yml`]
 that automatically runs on Linux / Windows / macOS:
 
 - `validate-build-config`: actionlint workflow syntax check + `tool/validate_build_config.py` build configuration assertions
-- `analyze-and-test`: `flutter analyze` + `flutter test`
+- `analyze-and-test`: `flutter analyze` + `flutter test` (three platforms)
+- `build-macos-ios`: macOS Release and iOS Release (no-codesign) compilation verification
 - Desktop platform builds (Release); release workflow in [`.github/workflows/release.yml`](.github/workflows/release.yml)
 
 ## 🛠️ Platform Support & Testing Statement
 
 > **Honest Disclosure**: This project is maintained by an individual. Due to hardware and account constraints,
-> the following platforms have **not been verified on real devices/builds** and may contain undiscovered bugs.
+> the following platforms have **not been verified on real devices** and may contain undiscovered bugs.
 > Please verify thoroughly before releasing on any platform.
 
-| Platform                                                   | Verification Status                             | Notes                                                                                                                                                    |
-| ---------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Windows**                                                | ✅ Verified on real device                      | Default window 1280×720 + centered on screen verified                                                                                                    |
-| **Linux**                                                  | ✅ Real device + local build passed             | Includes `flutter build linux` native compilation (C++ runner changes)                                                                                   |
-| **Android**                                                | ✅ Verified on real device                      | The **interaction experience** of external ↔ internal storage switching has been verified                                                              |
-| **macOS**                                                  | ⚠️ Code-adapted only, **never compiled or run** | Window centering Swift code, XIB size changes not verified on real macOS                                                                                 |
-| **iOS**                                                    | ⚠️ Code-adapted only, **never compiled or run** | Sandbox directory, file picker interactions not verified on real devices                                                                                 |
-| **Legacy HarmonyOS** (HarmonyOS 2/3/4, Android-compatible) | ✅ Can run this project's Android APK           | Essentially an Android compatibility layer; existing `path_provider` / `file_selector` sandbox adaptations can be used directly; **not actually tested** |
-| **Pure HarmonyOS** (HarmonyOS NEXT / 5.0+)                 | ⛔ **Not supported**                            | Flutter has no official target for this platform; requires an OpenHarmony Flutter fork and per-dependency migration (independent effort, not planned)    |
+| Platform                                                   | Verification Status                            | Notes                                                                                                                                                    |
+| ---------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Windows**                                                | ✅ Verified on real device                     | Default window 1280×720 + centered on screen verified                                                                                                    |
+| **Linux**                                                  | ✅ Real device + local build passed            | Includes `flutter build linux` native compilation (C++ runner changes)                                                                                   |
+| **Android**                                                | ✅ Verified on real device                     | The **interaction experience** of external ↔ internal storage switching has been verified                                                                |
+| **macOS**                                                  | ⚠️ CI build passed, **not run on real device** | macOS Release build verified on GitHub Actions; window centering Swift behavior still needs real-device verification                                     |
+| **iOS**                                                    | ⚠️ CI build passed, **not run on real device** | iOS Release (no-codesign) build verified on GitHub Actions; sandbox/file-picker interactions not verified on real devices                                |
+| **Legacy HarmonyOS** (HarmonyOS 2/3/4, Android-compatible) | ✅ Can run this project's Android APK          | Essentially an Android compatibility layer; existing `path_provider` / `file_selector` sandbox adaptations can be used directly; **not actually tested** |
+| **Pure HarmonyOS** (HarmonyOS NEXT / 5.0+)                 | ⛔ **Not supported**                           | Flutter has no official target for this platform; requires an OpenHarmony Flutter fork and per-dependency migration (independent effort, not planned)    |
 
 ### System Version Requirements
 
-| Platform    | Minimum                                                                                 | Recommended                                |
-| ----------- | --------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **Windows** | Windows 10 (Flutter desktop minimum)                                                    | Windows 11                                 |
-| **Linux**   | GTK 3 required (supported by mainstream distros)                                        | Recent distributions (e.g., Ubuntu 22.04+) |
-| **Android** | Flutter toolchain default `minSdk` (follows `flutter.minSdkVersion`, currently ~API 21) | Android 10+ (API 29)                       |
-| **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`)                              | iOS 16+                                    |
-| **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`)                    | macOS 12 Monterey+                         |
+| Platform    | Minimum                                                                   | Recommended                                |
+| ----------- | ------------------------------------------------------------------------- | ------------------------------------------ |
+| **Windows** | Windows 10 (Flutter desktop minimum)                                      | Windows 11                                 |
+| **Linux**   | GTK 3 required (supported by mainstream distros)                          | Recent distributions (e.g., Ubuntu 22.04+) |
+| **Android** | Android 6.0 (API 23, `minSdk = 23`, required by `flutter_secure_storage`) | Android 10+ (API 29)                       |
+| **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`)                | iOS 16+                                    |
+| **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`)      | macOS 12 Monterey+                         |
 
 > **Notes**:
 >

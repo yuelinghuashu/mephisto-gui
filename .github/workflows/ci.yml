@@ -65,3 +65,32 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  # ============================================================
+  # macOS / iOS 构建验证（编译层面）
+  # ============================================================
+  # 每次 push/PR 都尝试验证 macOS 与 iOS 的编译，防止平台级
+  # 编译错误在发布时才被发现。README 此前标注「macOS/iOS 从未
+  # 编译运行」——本 job 是第一步（先确认能编译），
+  # 真机运行验证仍需人工（无 Apple 开发者证书/真机条件）。
+  build-macos-ios:
+    name: Build macOS & iOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build macOS (Release)
+        run: flutter build macos --release -t lib/app/main.dart
+
+      - name: Build iOS (Release, no codesign)
+        run: flutter build ios --release --no-codesign -t lib/app/main.dart

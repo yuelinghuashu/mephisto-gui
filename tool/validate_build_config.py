@@ -112,11 +112,15 @@ def check_workflow_paths() -> None:
 
     check('ci.yml 包含 flutter analyze', 'flutter analyze' in ci)
     check('ci.yml 包含 flutter test', 'flutter test' in ci)
+    check('ci.yml 包含 macOS/iOS 构建验证', 'build-macos-ios' in ci)
+    check('ci.yml 包含 flutter build macos', 'flutter build macos --release' in ci)
+    check('ci.yml 包含 flutter build ios', 'flutter build ios --release' in ci)
     check('release.yml 包含 Android 构建', 'flutter build apk --release' in release)
     check('release.yml 包含 Linux 构建', 'flutter build linux --release' in release)
     check('release.yml 包含 Windows 构建', 'flutter build windows --release' in release)
     check('release.yml 包含 macOS 构建', 'flutter build macos --release' in release)
     check('release.yml 包含 iOS 构建', 'flutter build ios --release' in release)
+    check('release.yml 包含 iOS no-codesign', '--no-codesign' in release)
 
 
 def main() -> None:

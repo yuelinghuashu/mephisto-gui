@@ -496,6 +496,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsApiKeyHint => 'sk-... (can be empty for Ollama)';
 
   @override
+  String get settingsApiKeyPaste => 'Paste from Clipboard';
+
+  @override
+  String get settingsApiKeyPasteSuccess => '✦ API Key imported from clipboard';
+
+  @override
+  String get settingsApiKeyPasteEmpty =>
+      '╳ Nothing importable found in clipboard';
+
+  @override
   String get settingsBaseUrlLabel => 'Base URL';
 
   @override

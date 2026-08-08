@@ -950,6 +950,24 @@ abstract class AppLocalizations {
   /// **'sk-...（Ollama 可留空）'**
   String get settingsApiKeyHint;
 
+  /// No description provided for @settingsApiKeyPaste.
+  ///
+  /// In zh, this message translates to:
+  /// **'从剪贴板导入'**
+  String get settingsApiKeyPaste;
+
+  /// No description provided for @settingsApiKeyPasteSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'✦ 已从剪贴板导入 API Key'**
+  String get settingsApiKeyPasteSuccess;
+
+  /// No description provided for @settingsApiKeyPasteEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ 剪贴板中没有可导入的内容'**
+  String get settingsApiKeyPasteEmpty;
+
   /// No description provided for @settingsBaseUrlLabel.
   ///
   /// In zh, this message translates to:

@@ -477,6 +477,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsApiKeyHint => 'sk-...（Ollama 可留空）';
 
   @override
+  String get settingsApiKeyPaste => '从剪贴板导入';
+
+  @override
+  String get settingsApiKeyPasteSuccess => '✦ 已从剪贴板导入 API Key';
+
+  @override
+  String get settingsApiKeyPasteEmpty => '╳ 剪贴板中没有可导入的内容';
+
+  @override
   String get settingsBaseUrlLabel => 'Base URL';
 
   @override

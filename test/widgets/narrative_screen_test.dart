@@ -9,6 +9,7 @@ import 'package:mephisto/domain/models.dart';
 import 'package:mephisto/providers/providers.dart';
 import 'package:mephisto/screens/narrative_screen.dart';
 import 'package:mephisto/screens/settings_screen.dart';
+import 'package:mephisto/services/storage/secure_key_value_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'test_helpers.dart';
 
@@ -63,6 +64,14 @@ void main() {
     ],
   );
 
+  /// 内存版安全存储（替代真实 FlutterSecureStorage）。
+  ///
+  /// 在 testWidgets 的 FakeAsync 环境中，真实 FlutterSecureStorage 的
+  /// platform channel 没有 handler，调用会永远挂起（而非抛异常），
+  /// 导致 llmConfigProvider.future 永不 resolve、生成流程卡死。
+  /// override 为内存实现即可聚焦 UI 行为的测试。
+  final secureStore = _MemorySecureStore();
+
   /// 构建叙事页：注入 mock HTTP 客户端（LLM 调用失败 → 本地兜底回复）
   /// 并 override 契约 Provider（避免真实文件 IO）。
   ///
@@ -77,11 +86,10 @@ void main() {
         ),
         contractProvider.overrideWith((ref) async => testContract),
         currentContractNameProvider.overrideWith((ref) async => 'faust.meph'),
+        secureKeyValueStoreProvider.overrideWithValue(secureStore),
       ],
       child: localizedAppWithRoutes(
-        routes: {
-          '/settings': (_) => const SettingsScreen(),
-        },
+        routes: {'/settings': (_) => const SettingsScreen()},
         home: const NarrativeScreen(),
       ),
     );
@@ -94,10 +102,7 @@ void main() {
     expect(find.text('📜 契约已立'), findsOneWidget);
     expect(find.text('写下命运的指引，叙事将在契约中生长...'), findsOneWidget);
     // 开局场景来自契约文件
-    expect(
-      find.textContaining('烛火摇曳的书斋中'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('烛火摇曳的书斋中'), findsOneWidget);
     // 状态条展示规则数（契约含 1 条规则 → 独立文本节点 "1 "）
     expect(find.text('1 '), findsOneWidget);
     expect(find.text('规则'), findsOneWidget);
@@ -114,15 +119,11 @@ void main() {
           contractProvider.overrideWith((ref) async => testContract),
           currentContractNameProvider.overrideWith((ref) async => 'faust.meph'),
           contractFallbackNoticeProvider.overrideWith(
-            () => _PrefilledFallbackNoticeController(
-              '当前契约文件缺失或损坏，已加载内置模板',
-            ),
+            () => _PrefilledFallbackNoticeController('当前契约文件缺失或损坏，已加载内置模板'),
           ),
         ],
         child: localizedAppWithRoutes(
-          routes: {
-            '/settings': (_) => const SettingsScreen(),
-          },
+          routes: {'/settings': (_) => const SettingsScreen()},
           home: const NarrativeScreen(),
         ),
       ),
@@ -187,10 +188,7 @@ void main() {
     // 避免遗留未完成异步；输入框恢复可用
     llmCompleter.complete(http.Response('', 500));
     await tester.pumpAndSettle();
-    expect(
-      tester.widget<TextField>(find.byType(TextField)).enabled,
-      isTrue,
-    );
+    expect(tester.widget<TextField>(find.byType(TextField)).enabled, isTrue);
   });
 
   testWidgets('设置按钮可跳转设置页', (tester) async {
@@ -202,4 +200,18 @@ void main() {
     // 设置页标题出现（路由跳转成功）
     expect(find.text('📜 设置'), findsOneWidget);
   });
+}
+
+/// 测试用：内存版安全存储（替代 FlutterSecureStorage，见 [buildNarrativeScreen]）。
+class _MemorySecureStore implements SecureKeyValueStore {
+  final Map<String, String> _data = {};
+
+  @override
+  Future<String?> read(String key) async => _data[key];
+
+  @override
+  Future<void> write(String key, String value) async => _data[key] = value;
+
+  @override
+  Future<void> delete(String key) async => _data.remove(key);
 }

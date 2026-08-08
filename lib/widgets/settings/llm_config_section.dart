@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
@@ -133,6 +134,24 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     );
   }
 
+  /// 从剪贴板导入 API Key（避免手输 Key 时复制到剪贴板长期残留）。
+  Future<void> _pasteApiKey() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = data?.text?.trim() ?? '';
+    if (text.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.settingsApiKeyPasteEmpty)),
+      );
+      return;
+    }
+    setState(() => _apiKeyController.text = text);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.settingsApiKeyPasteSuccess)),
+    );
+  }
+
   /// 测试 LLM 连接：使用表单当前字段（无需先保存）发一个最小流式请求验证连通性。
   ///
   /// - OpenAI 兼容：需要有效 API Key + Model；失败原因（网络/鉴权/模型不存在）即时反馈
@@ -249,6 +268,11 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
                 decoration: InputDecoration(
                   labelText: l10n.settingsApiKeyLabel,
                   hintText: l10n.settingsApiKeyHint,
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.content_paste_outlined),
+                    tooltip: l10n.settingsApiKeyPaste,
+                    onPressed: _pasteApiKey,
+                  ),
                 ),
               ),
             if (!isOllama) const SizedBox(height: 12),
