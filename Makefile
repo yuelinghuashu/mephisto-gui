@@ -4,11 +4,11 @@
 #   git tag v1.0.1 && git push origin v1.0.1
 # 会自动构建全平台并发布到 GitHub Releases，无需本机构建。
 
-TARGET := lib/app/main.dart
+TARGET := lib/main.dart
 
 .PHONY: run debug test analyze validate-workflows validate-build-config clean
 
-run:            ## 开发运行（入口为 lib/app/main.dart）
+run:            ## 开发运行（入口为 lib/main.dart，转发至 lib/app/main.dart）
 	flutter run -t $(TARGET)
 
 debug:          ## Linux 桌面调试

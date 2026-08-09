@@ -16,6 +16,7 @@
 - **首页最近编辑排序**：顶层契约树按「子树最近编辑时间」降序排列，自动保存子版后母版树自动靠前
 - **LLM 超时/重试可配置**：设置页新增「超时（秒）」「最大重试」输入，适配慢网络/长文本场景
 - **非流式 JSON 响应兜底**：OpenAI 兼容代理返回标准 JSON（非 SSE）时自动提取 `choices[0].message.content`
+- **多角色舞台（数据层）**：契约根目录下的一层子目录 = 多角色舞台（文件夹名 = 舞台前缀），内含 N 份平级 `.meph` 角色卡；舞台目录自动发现、每份角色卡独立解析组装；公共世界观取第一个角色（字典序）
 
 ### 🐛 修复
 
@@ -44,8 +45,11 @@
 
 - 新增 GitHub Actions CI：push / PR 自动执行 `flutter analyze` + `flutter test`
 - CI 增加 Linux 桌面构建验证（`flutter build linux --debug`），不再只在推送后才发现打包问题
-- 安全存储升级：`flutter_secure_storage` 从 9.2.4 升级到 **11.0.0**（Android AES/GCM 加密等安全改进，平台子包同步升级；313 个测试全量回归通过）
-- 测试总数：**313 个**
+- 安全存储升级：`flutter_secure_storage` 从 9.2.4 升级到 **11.0.0**（Android AES/GCM 加密等安全改进，平台子包同步升级；323 个测试全量回归通过）
+- 清理根目录误建文件 `how f47ada9 --stat`（`git log` 命令参数被误当重定向目标的残留）
+- 新增多角色舞台数据层测试 10 个（舞台目录发现 / 角色卡解析 / 公共世界观）
+- **统一 Flutter 入口**：新增 `lib/main.dart` 转发入口（指向 `lib/app/main.dart`），修复 CI `flutter build linux` 报 `Target file lib/main.dart not found`；release.yml / Makefile 移除显式 `-t` 参数，各平台构建走默认入口
+- 测试总数：**323 个**
 
 ### 📚 文档
 

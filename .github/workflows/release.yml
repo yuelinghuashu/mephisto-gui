@@ -66,23 +66,23 @@ jobs:
 
       - name: Build Linux
         if: matrix.artifact == 'mephisto-linux'
-        run: flutter build linux --release -t lib/app/main.dart
+        run: flutter build linux --release
 
       - name: Build Android APK
         if: matrix.artifact == 'mephisto-android'
-        run: flutter build apk --release -t lib/app/main.dart
+        run: flutter build apk --release
 
       - name: Build Windows
         if: matrix.artifact == 'mephisto-windows'
-        run: flutter build windows --release -t lib/app/main.dart
+        run: flutter build windows --release
 
       - name: Build macOS
         if: matrix.artifact == 'mephisto-macos'
-        run: flutter build macos --release -t lib/app/main.dart
+        run: flutter build macos --release
 
       - name: Build iOS (no codesign)
         if: matrix.artifact == 'mephisto-ios'
-        run: flutter build ios --release --no-codesign -t lib/app/main.dart
+        run: flutter build ios --release --no-codesign
 
       # ============================================================
       # 打包：Linux → .deb（SVG 转 PNG 图标 + dpkg-deb）
