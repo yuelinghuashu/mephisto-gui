@@ -5,7 +5,8 @@
   1. AndroidManifest.xml 必须声明 INTERNET 权限（防止 Android Release 无法联网）
   2. iOS Info.plist 必须配置 ATS 本地网络（防止本地 Ollama 明文 HTTP 被拦截）
   3. release.yml 中 dpkg 版本号剥离必须同时处理 v/V 前缀（防止 dpkg 报错）
-  4. ci.yml / release.yml 中关键构建步骤存在（防止构建配置被误删）
+  4. ci.yml / release.yml 中关键步骤存在（ci 只承担代码检查 analyze/test，
+     发布构建/打包全部归 release.yml，防止职责漂移或配置被误删）
 
 用法：
   python3 tool/validate_build_config.py
@@ -104,17 +105,21 @@ def check_release_workflow_version_pattern() -> None:
 
 
 def check_workflow_paths() -> None:
-    """ci.yml / release.yml 中关键构建与检查步骤必须存在。"""
+    """ci.yml 只承担代码检查；release.yml 承担全部发布构建与打包。"""
     with open(CI_WORKFLOW, encoding='utf-8') as f:
         ci = f.read()
     with open(RELEASE_WORKFLOW, encoding='utf-8') as f:
         release = f.read()
 
+    # ---- CI 职责：仅代码检查（analyze + test），不进行平台构建 ----
     check('ci.yml 包含 flutter analyze', 'flutter analyze' in ci)
     check('ci.yml 包含 flutter test', 'flutter test' in ci)
-    check('ci.yml 包含 macOS/iOS 构建验证', 'build-macos-ios' in ci)
-    check('ci.yml 包含 flutter build macos', 'flutter build macos --release' in ci)
-    check('ci.yml 包含 flutter build ios', 'flutter build ios --release' in ci)
+    check(
+        'ci.yml 不承担平台构建（发布构建归 release.yml）',
+        'flutter build' not in ci and 'sudo apt-get' not in ci,
+    )
+
+    # ---- release.yml 职责：全部平台发布构建 ----
     check('release.yml 包含 Android 构建', 'flutter build apk --release' in release)
     check('release.yml 包含 Linux 构建', 'flutter build linux --release' in release)
     check('release.yml 包含 Windows 构建', 'flutter build windows --release' in release)

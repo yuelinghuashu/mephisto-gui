@@ -44,7 +44,6 @@
 ### 🔧 工程化
 
 - 新增 GitHub Actions CI：push / PR 自动执行 `flutter analyze` + `flutter test`
-- CI 增加 Linux 桌面构建验证（`flutter build linux --debug`），不再只在推送后才发现打包问题
 - 安全存储升级：`flutter_secure_storage` 从 9.2.4 升级到 **11.0.0**（Android AES/GCM 加密等安全改进，平台子包同步升级；323 个测试全量回归通过）
 - 清理根目录误建文件 `how f47ada9 --stat`（`git log` 命令参数被误当重定向目标的残留）
 - 新增多角色舞台数据层测试 10 个（舞台目录发现 / 角色卡解析 / 公共世界观）
