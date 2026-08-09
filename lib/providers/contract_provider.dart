@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +10,7 @@ import '../services/engine/condition.dart';
 import '../services/parser/meph_parser.dart';
 import '../services/storage/contract_dir.dart';
 import '../services/storage/contract_repo.dart';
+import '../services/storage/meph_file_name.dart';
 
 /// 当前使用的契约文件名（存储在 shared_preferences）
 const String contractPrefKey = 'mephisto_current_contract';
@@ -59,7 +62,11 @@ final currentContractNameProvider = FutureProvider<String>((ref) async {
 ///      回退到 assets 同名内置模板作为最后防线（[_builtinFallback]），
 ///      避免叙事页静默崩溃为 [Contract.empty]（「角色」空壳、无开局场景）。
 ///
-/// 仅当用户文件与内置模板均不可用时才进入 [AsyncError]。
+/// 契约加载最终兜底：用户自定义契约（非内置模板名）缺失/损坏时，
+/// 不抛异常进入 [AsyncError]（异常会引发 Notifier/UI watch 的复杂
+/// error 处理时序），而是返回 [Contract.empty] 空契约 + 设置兜底提示。
+///
+/// 仅当用户文件与内置模板均不可用时才走到这条最终兜底。
 final contractProvider = FutureProvider<Contract>((ref) async {
   // 1. 确保契约目录存在
   await ensureContracts();
@@ -81,7 +88,7 @@ final contractProvider = FutureProvider<Contract>((ref) async {
     }
   }
 
-  // 4. 回退到 assets 内置模板；仍不可用时抛异常
+  // 4. 回退到 assets 内置模板；仍不可用时返回空契约 + 兜底提示
   final fallback = await _builtinFallback(name);
   if (fallback != null) {
     // 已回退内置模板：置错误码提示，UI 顶部展示并翻译，
@@ -90,7 +97,14 @@ final contractProvider = FutureProvider<Contract>((ref) async {
         .setNotice(narrativeErrorContractFallback);
     return fallback;
   }
-  throw Exception('契约文件不存在: $name');
+
+  // 用户自定义契约（非内置模板名）缺失/损坏：
+  //   - 不能静默替换成内置的浮士德契约（误导），因此不尝试内置兜底
+  //   - 返回空契约（roleName: '角色'）保证叙事页不崩溃
+  //   - 同步设置 fallback notice → 叙事页顶部警告条可见
+  ref.read(contractFallbackNoticeProvider.notifier)
+      .setNotice(narrativeErrorContractFallback);
+  return Contract.empty();
 });
 
 /// 合法契约文件名的正则（字母、数字、中文、`.`、`_`、`-`）。
@@ -105,8 +119,9 @@ final RegExp _contractNamePattern = RegExp(r'^[\u4e00-\u9fa5\w.-]+$');
 /// 始终可进入叙事，避免回退为 [Contract.empty]（「角色」空壳、无开局场景）。
 ///
 /// 仅在 [name] 恰好是内置模板名时兜底成功；用户自定义契约（非内置名）
-/// 缺失时返回 null 交给调用方抛「契约文件不存在」——避免将用户的自定义
-/// 契约引用静默替换成内置的浮士德契约（误导）。
+/// 缺失时返回 null，由调用方（[contractProvider]）回落为 [Contract.empty]
+/// 空契约 + 兜底提示——避免将用户的自定义契约引用静默替换成内置的
+/// 浮士德契约（误导）。
 Future<Contract?> _builtinFallback(String name) async {
   // 基础校验：非空 + 仅含合法文件名字符，避免脏数据进入 assets 路径
   if (name.isEmpty || !_contractNamePattern.hasMatch(name)) return null;
@@ -146,6 +161,13 @@ class ContractInfo {
   /// 用于首页展示更可读的支流描述；未填写时为 null，首页回落为显示 [branchName]。
   final String? branchTitle;
 
+  /// 文件最后修改时间（用于首页按「最近编辑」排序最近使用的契约）。
+  ///
+  /// 取整棵子树的最大 mtime（含子版）：自动保存/编辑子版时，
+  /// 母版卡片应反映整棵命运树的最新活动时间。
+  /// null 表示未知（文件不存在或读取失败），排序时视为最旧。
+  final DateTime? lastModified;
+
   /// 该文件所属的层级深度（母版根为 0，一级子版为 1，二级为 2 …）
   ///
   /// 首次访问时计算并缓存，避免 UI 渲染期间对同一节点反复执行
@@ -158,6 +180,7 @@ class ContractInfo {
     this.isChild = false,
     this.branchName,
     this.branchTitle,
+    this.lastModified,
   });
 
   /// 从文件名计算层级深度：`faust.meph` → 0，`faust.dark.meph` → 1。
@@ -201,6 +224,21 @@ class ContractGroup {
 
   /// 该节点所处的层级深度（母版根为 0，一级子版为 1 …）
   int get depth => master.depth;
+
+  /// 整棵子树的最近编辑时间（含自身与所有后代的最大 [ContractInfo.lastModified]）。
+  ///
+  /// 用于首页按「最近编辑」对顶级母版树排序：自动保存/编辑子版时，
+  /// 母版卡片应反映整棵命运树的最新活动时间。
+  /// null 表示整棵子树均无可用 mtime（此时按签名顺序兜底）。
+  DateTime? get latestModified {
+    final candidates = <DateTime>[
+      if (master.lastModified != null) master.lastModified!,
+      for (final child in children)
+        if (child.latestModified != null) child.latestModified!,
+    ];
+    if (candidates.isEmpty) return null;
+    return candidates.reduce((a, b) => a.isAfter(b) ? a : b);
+  }
 }
 
 /// 契约分组列表 Provider：按「层级路径」构建多级递归树
@@ -219,10 +257,23 @@ final contractGroupListProvider =
   final files = await listContracts();
 
   // 先解析所有文件信息（并行读取，文件多时避免串行 IO 拖慢首页加载）
+  final dir = await getContractsDirectory();
   final infos = await Future.wait(
     files.map((name) async {
       final content = await readContract(name);
       final roleName = content == null ? null : extractRoleName(content);
+      // 读取文件 mtime（用于首页「最近编辑」排序）；文件不存在时 null
+      // 使用异步 API 避免阻塞 UI 事件循环（同步 existsSync/lastModifiedSync
+      // 在文件较多或网络文件系统上可能卡顿）
+      final file = File('${dir.path}/$name');
+      DateTime? lastModified;
+      try {
+        lastModified = await file.exists()
+            ? await file.lastModified()
+            : null;
+      } catch (_) {
+        lastModified = null; // 读取失败（权限/IO 异常）时降级为 null
+      }
       return ContractInfo(
         fileName: name,
         roleName: roleName ?? name.replaceAll('.meph', ''),
@@ -231,6 +282,7 @@ final contractGroupListProvider =
         // 命运一句话（仅子版可能含 @命运: 标记；母版/旧分支为 null）
         branchTitle:
             content == null ? null : extractBranchTitle(content),
+        lastModified: lastModified,
       );
     }),
   );
@@ -310,6 +362,18 @@ final contractGroupListProvider =
   for (final first in allFirstSegments.difference(rootFirstSegments)) {
     groups.add(buildGroup(first));
   }
+
+  // 按「最近编辑」降序排序顶层母版树：
+  //   - 子树最新 mtime 越大 → 排越前（最近使用的契约优先展示）
+  //   - 无可用 mtime（mtime 全为 null）→ 保持原有字典序
+  groups.sort((a, b) {
+    final at = a.latestModified;
+    final bt = b.latestModified;
+    if (at == null && bt == null) return 0;
+    if (at == null) return 1;
+    if (bt == null) return -1;
+    return bt.compareTo(at);
+  });
 
   return groups;
 });

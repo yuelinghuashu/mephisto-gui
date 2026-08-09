@@ -80,7 +80,18 @@ void main() {
         currentContractNameProvider.overrideWith((ref) async => 'faust.meph'),
       ],
     );
-    addTearDown(container.dispose);
+    // 修复间歇性 30s 超时：dispose 前先让事件循环 flush 掉 pending 微任务
+    //（如 _autoSaveChild 的 SharedPreferences 读、记忆提取的异步尾巴），
+    // 避免异步链在 container 已销毁后继续读 provider 抛
+    // "Bad state: Tried to read a provider from a ProviderContainer that
+    // was already disposed" 导致测试超时。
+    addTearDown(() async {
+      // 让出多个事件循环轮次：让所有 pending Future 的 .then 回调完成
+      for (var i = 0; i < 3; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      container.dispose();
+    });
     // 预触发两个被 Notifier watch 的 FutureProvider，避免重建竞态
     await container.read(contractProvider.future);
     await container.read(currentContractNameProvider.future);
@@ -168,6 +179,39 @@ void main() {
       expect(state.messages, hasLength(2));
       expect(state.messages.first.content, '继续前行');
       expect(state.messages.last.content, '浮士德沉默着。');
+    });
+
+    test('契约最终兜底（Contract.empty）→ 叙事页正常初始化不崩溃', () async {
+      // contractProvider 已保证自身始终成功返回（自定义契约缺失时
+      // 返回空契约 + 设置 fallback notice，见 contract_provider_test）。
+      // 此处验证 NarrativeNotifier 在拿到空契约时正常初始化。
+      final container = ProviderContainer(
+        overrides: [
+          httpClientProvider.overrideWithValue(
+            MockClient((request) async => throw Exception('mock 网络错误')),
+          ),
+          contractProvider.overrideWith((ref) async => Contract.empty()),
+          currentContractNameProvider.overrideWith(
+            (ref) async => 'my_story.meph',
+          ),
+        ],
+      );
+      // 与 buildContainer 一致的 dispose 时序保护：先 flush 微任务再销毁
+      addTearDown(() async {
+        for (var i = 0; i < 3; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        container.dispose();
+      });
+      await container.read(contractProvider.future);
+      await container.read(currentContractNameProvider.future);
+
+      final state = container.read(narrativeProvider);
+      // 空契约兜底：角色名为「角色」，叙事页不崩溃
+      expect(state.roleName, '角色');
+      expect(state.messages, isEmpty);
+      expect(state.currentState, isEmpty);
+      expect(state.isGenerating, isFalse);
     });
   });
 

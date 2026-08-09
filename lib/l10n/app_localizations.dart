@@ -998,6 +998,30 @@ abstract class AppLocalizations {
   /// **'Max Tokens'**
   String get settingsMaxTokensLabel;
 
+  /// No description provided for @settingsTimeoutLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'超时（秒）'**
+  String get settingsTimeoutLabel;
+
+  /// No description provided for @settingsTimeoutHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'60'**
+  String get settingsTimeoutHint;
+
+  /// No description provided for @settingsRetriesLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'最大重试'**
+  String get settingsRetriesLabel;
+
+  /// No description provided for @settingsRetriesHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'1'**
+  String get settingsRetriesHint;
+
   /// No description provided for @settingsMaxTokensHint.
   ///
   /// In zh, this message translates to:
@@ -1194,6 +1218,42 @@ abstract class AppLocalizations {
   /// **'，区块「{blockName}」'**
   String contractEditorErrorBlock(Object blockName);
 
+  /// No description provided for @contractEditorConflictTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'⚠ 文件已被外部修改'**
+  String get contractEditorConflictTitle;
+
+  /// No description provided for @contractEditorConflictContent.
+  ///
+  /// In zh, this message translates to:
+  /// **'该文件在编辑期间被其他进程修改（如叙事自动存档或 VSCode 保存）。\n\n选择「覆盖」将用当前编辑内容替换磁盘版本；\n选择「重新加载」将丢弃当前编辑内容并拉取磁盘最新版本。'**
+  String get contractEditorConflictContent;
+
+  /// No description provided for @contractEditorConflictCancel.
+  ///
+  /// In zh, this message translates to:
+  /// **'取消'**
+  String get contractEditorConflictCancel;
+
+  /// No description provided for @contractEditorConflictReload.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新加载'**
+  String get contractEditorConflictReload;
+
+  /// No description provided for @contractEditorConflictOverwrite.
+  ///
+  /// In zh, this message translates to:
+  /// **'覆盖'**
+  String get contractEditorConflictOverwrite;
+
+  /// No description provided for @contractEditorReloaded.
+  ///
+  /// In zh, this message translates to:
+  /// **'已重新加载磁盘最新版本'**
+  String get contractEditorReloaded;
+
   /// No description provided for @textInputDialogConfirm.
   ///
   /// In zh, this message translates to:
@@ -1289,6 +1349,30 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'当前契约文件缺失或损坏，已加载内置模板'**
   String get contractFallbackNotice;
+
+  /// No description provided for @relativeTimeJustNow.
+  ///
+  /// In zh, this message translates to:
+  /// **'刚刚'**
+  String get relativeTimeJustNow;
+
+  /// No description provided for @relativeTimeMinutesAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{minutes} 分钟前'**
+  String relativeTimeMinutesAgo(Object minutes);
+
+  /// No description provided for @relativeTimeHoursAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{hours} 小时前'**
+  String relativeTimeHoursAgo(Object hours);
+
+  /// No description provided for @relativeTimeDaysAgo.
+  ///
+  /// In zh, this message translates to:
+  /// **'{days} 天前'**
+  String relativeTimeDaysAgo(Object days);
 
   /// No description provided for @languageLabel.
   ///

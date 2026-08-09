@@ -28,6 +28,8 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
   static const String _modelKey = 'llm_model';
   static const String _maxTokensKey = 'llm_max_tokens';
   static const String _backendKey = 'llm_backend';
+  static const String _timeoutSecondsKey = 'llm_timeout_seconds';
+  static const String _maxRetriesKey = 'llm_max_retries';
 
   @override
   LlmConfig? get defaultValue => null;
@@ -83,12 +85,16 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
     final model = prefs.getString(_modelKey);
     final maxTokens = prefs.getInt(_maxTokensKey);
     final backendName = prefs.getString(_backendKey);
+    final timeoutSeconds = prefs.getInt(_timeoutSecondsKey);
+    final maxRetries = prefs.getInt(_maxRetriesKey);
 
     if (apiKey == null &&
         baseUrl == null &&
         model == null &&
         maxTokens == null &&
-        backendName == null) {
+        backendName == null &&
+        timeoutSeconds == null &&
+        maxRetries == null) {
       return null;
     }
 
@@ -103,6 +109,8 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
       baseUrl: baseUrl ?? '',
       model: model ?? '',
       maxTokens: maxTokens ?? 4096,
+      timeoutSeconds: timeoutSeconds ?? LlmConfig.defaultTimeoutSeconds,
+      maxRetries: maxRetries ?? LlmConfig.defaultMaxRetries,
     );
   }
 
@@ -146,6 +154,8 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
     await prefs.setString(_modelKey, config.model);
     await prefs.setInt(_maxTokensKey, config.maxTokens);
     await prefs.setString(_backendKey, config.backend.name);
+    await prefs.setInt(_timeoutSecondsKey, config.timeoutSeconds);
+    await prefs.setInt(_maxRetriesKey, config.maxRetries);
     state = config;
   }
 
@@ -164,6 +174,8 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
     await prefs.remove(_modelKey);
     await prefs.remove(_maxTokensKey);
     await prefs.remove(_backendKey);
+    await prefs.remove(_timeoutSecondsKey);
+    await prefs.remove(_maxRetriesKey);
     state = defaultValue;
   }
 }

@@ -210,13 +210,13 @@ that automatically runs on Linux / Windows / macOS:
 
 ### System Version Requirements
 
-| Platform    | Minimum                                                                   | Recommended                                |
-| ----------- | ------------------------------------------------------------------------- | ------------------------------------------ |
-| **Windows** | Windows 10 (Flutter desktop minimum)                                      | Windows 11                                 |
+| Platform    | Minimum                                                                               | Recommended                                |
+| ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **Windows** | Windows 10 (Flutter desktop minimum)                                                  | Windows 11                                 |
 | **Linux**   | GTK 3 + libsecret required (`libsecret-1-dev` for build, `libsecret-1-0` for runtime) | Recent distributions (e.g., Ubuntu 22.04+) |
-| **Android** | Android 6.0 (API 23, `minSdk = 23`, required by `flutter_secure_storage`) | Android 10+ (API 29)                       |
-| **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`)                | iOS 16+                                    |
-| **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`)      | macOS 12 Monterey+                         |
+| **Android** | Android 6.0 (API 23, `minSdk = 23`, required by `flutter_secure_storage`)             | Android 10+ (API 29)                       |
+| **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`)                            | iOS 16+                                    |
+| **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`)                  | macOS 12 Monterey+                         |
 
 > **Notes**:
 >
@@ -224,7 +224,7 @@ that automatically runs on Linux / Windows / macOS:
 > - "Recommended" reflects **maintainer suggestions**, estimated from modern system features and stability; not fully tested across all platforms
 > - Aligned with the platform statement: iOS/macOS version compatibility has not been fully verified on real devices; if issues arise, first check whether the system version is below the recommended value
 
-### Confirmed Risk Points (Code-Level Audit)
+### Platform Risks & Notes
 
 1. **iOS ATS plaintext HTTP** (preventively fixed): iOS blocks plaintext HTTP by default. Users configuring local
    Ollama `http://localhost:11434/v1` would be blocked by ATS. Added
@@ -233,6 +233,29 @@ that automatically runs on Linux / Windows / macOS:
 2. **macOS window centering**: `MainFlutterWindow.swift` dynamically centers based on `NSScreen.main.visibleFrame`;
    Swift API usage is correct, but not compiled on real macOS—signature/timing risks exist.
 3. **iOS contract import**: `file_selector` (UIDocumentPicker) actual interaction on iOS is unverified.
+4. **Android production signing (in-place upgrades supported)**:
+   - The project has **production release signing configured**: when `android/key.properties` exists (local, not committed),
+     builds automatically use the production signature; when missing, they gracefully fall back to the debug signature,
+     so development / CI builds never break.
+   - **Production signature + same signature → in-place upgrade**: subsequent versions signed with the same keystore
+     can upgrade directly over the installed app, with no need to uninstall first.
+   - ⚠️ **Keep the keystore and passwords safe** (`~/keystores/mephisto.jks`): losing them is irreversible, and switching
+     signatures will force users to uninstall and reinstall; always keep signing every release with the **same keystore**.
+     See the comments at the top of `android/app/build.gradle.kts` for how to generate the keystore and configure `key.properties`.
+
+   > ⚠️ **If an uninstall-reinstall becomes necessary** (e.g., a debug-signed build was released earlier, or the signature changes):
+   > uninstalling the app **wipes all contracts and saves** (master `.meph`, child saves `*.child.meph`, custom branches)
+   > with **no way to recover them**. Back up first:
+   >
+   > 1. Switch the contract directory to **"External Storage"** mode on the settings page
+   >    (the internal-storage path is not directly accessible via file managers)
+   > 2. Open `/storage/emulated/0/Android/data/yuelinghuashu.mephisto/files/Mephisto/contracts`
+   >    via a phone file manager or **USB connection to a computer (MTP mode)**
+   > 3. Copy **all `.meph` files** to your Downloads folder, computer, or cloud drive
+   > 4. After installing the new version, use the **"Import"** button on the home page to re-import the backed-up `.meph` files
+   >
+   > Saves (child versions) are the same `.meph` files as contracts, so importing restores them completely,
+   > including their branch labels (`@命运`).
 
 ### Guide for Filing Issues
 

@@ -110,7 +110,7 @@ class MemoryManager {
 2. 不要只提取最后一句话或结尾内容，要回顾整段对话中的完整事件链
 3. 每条摘要 20-60 个字，保留关键人物、地点、动作和信息
 4. 忽略日常寒暄和无意义对话
-5. 如果事件已经存在于现有记忆中，不要重复提取
+5. 如果事件已经存在于现有记忆中，不要重复提取——即使措辞不同但语义相同（如同一事件的另一种说法），也不应再提取
 6. 禁止修改或重复角色的核心设定（如角色名、锚点内容、状态值等）
 7. 输出格式：每行一条，以 "- [权重] 内容" 开头
    - 权重为 1-5 的整数，表示这条记忆对角色塑造的重要性：
@@ -288,8 +288,16 @@ $compressText
     final reply = await llmClient.generateStream(
       messages: [LlmMessage(role: 'user', content: prompt)],
       onChunk: (_) {}, // 记忆管理不需要实时输出
-      // 显式超时：比主叙事短，快速失败避免后台任务阻塞
-      timeout: llmTimeout,
+      // 后台任务超时保护：取「用户配置超时」与「后台任务上限」中较小者，
+      // 确保记忆提取/压缩在服务端挂起时快速失败，不阻塞主叙事流程。
+      // 重试次数沿用用户配置（默认 1 次）。
+      timeout: Duration(
+        seconds:
+            config.timeoutSeconds > llmTimeout.inSeconds
+            ? llmTimeout.inSeconds
+            : config.timeoutSeconds,
+      ),
+      maxRetries: config.maxRetries,
     );
 
     return reply

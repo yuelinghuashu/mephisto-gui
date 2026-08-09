@@ -210,13 +210,13 @@ flutter test
 
 ### 系统版本要求
 
-| 平台        | 最低版本                                                               | 推荐版本                               |
-| ----------- | ---------------------------------------------------------------------- | -------------------------------------- |
-| **Windows** | Windows 10（Flutter 桌面最低要求）                                     | Windows 11                             |
+| 平台        | 最低版本                                                                 | 推荐版本                               |
+| ----------- | ------------------------------------------------------------------------ | -------------------------------------- |
+| **Windows** | Windows 10（Flutter 桌面最低要求）                                       | Windows 11                             |
 | **Linux**   | 需 GTK 3 + libsecret（构建需 `libsecret-1-dev`，运行需 `libsecret-1-0`） | 近两年发布的发行版（如 Ubuntu 22.04+） |
-| **Android** | Android 6.0（API 23，`minSdk = 23`，受 `flutter_secure_storage` 限制） | Android 10+（API 29）                  |
-| **iOS**     | iOS 13.0（项目配置 `IPHONEOS_DEPLOYMENT_TARGET`）                      | iOS 16+                                |
-| **macOS**   | macOS 10.15 Catalina（项目配置 `MACOSX_DEPLOYMENT_TARGET`）            | macOS 12 Monterey+                     |
+| **Android** | Android 6.0（API 23，`minSdk = 23`，受 `flutter_secure_storage` 限制）   | Android 10+（API 29）                  |
+| **iOS**     | iOS 13.0（项目配置 `IPHONEOS_DEPLOYMENT_TARGET`）                        | iOS 16+                                |
+| **macOS**   | macOS 10.15 Catalina（项目配置 `MACOSX_DEPLOYMENT_TARGET`）              | macOS 12 Monterey+                     |
 
 > **说明**：
 >
@@ -224,7 +224,7 @@ flutter test
 > - 「推荐版本」为**维护者建议**，基于现代系统特性与稳定性推定，并未经全平台实测
 > - 与平台声明一致：iOS / macOS 的版本兼容性未经过真机全量验证；若遇问题，先确认系统版本是否低于推荐值
 
-### 已确认的隐患点（代码层面排查）
+### 平台风险与注意事项
 
 1. **iOS ATS 明文 HTTP**（已预防性修复）：iOS 默认禁明文 HTTP。用户配置本地
    Ollama `http://localhost:11434/v1` 时会被 ATS 拦截。已在 `Info.plist` 添加
@@ -233,6 +233,23 @@ flutter test
 2. **macOS 窗口居中**：`MainFlutterWindow.swift` 中按 `NSScreen.main.visibleFrame` 动态居中，
    Swift API 用法正确，但未在真实 macOS 编译，存在签名/时序风险。
 3. **iOS 契约导入**：`file_selector`（UIDocumentPicker）在 iOS 的实际交互未验证。
+4. **Android 正式签名（升级可覆盖安装）**：
+   - 项目已配置 **release 正式签名**：存在 `android/key.properties`（本地、不入库）时自动使用正式签名；
+     缺失时优雅降级到 debug 签名，保证开发 / CI 构建不中断。
+   - **正式签名 + 相同签名 → 覆盖安装**：同一把密钥签名的后续版本可直接覆盖升级，无需卸载重装。
+   - ⚠️ **请妥善保管密钥库与密码**（`~/keystores/mephisto.jks`）：丢失将无法找回，更换签名会导致用户需要卸载重装；
+     后续所有版本务必使用**同一把密钥**持续签名。密钥生成与 `key.properties` 配置方法见 `android/app/build.gradle.kts` 顶部注释。
+
+   > ⚠️ **万一需要卸载重装（如曾用 debug 签名发布过，或更换签名）**：卸载应用会**一并清除**所有契约与存档
+   > （母版 `.meph`、子版 `*.child.meph`、自定义分支），且**无法恢复**。卸载前请先备份：
+   >
+   > 1. 在设置页将契约目录切换到**「外部存储」**模式（内部存储路径无法通过文件管理器直接访问）
+   > 2. 通过手机文件管理器或 **USB 连接电脑（MTP 模式）**打开
+   >    `/storage/emulated/0/Android/data/yuelinghuashu.mephisto/files/Mephisto/contracts`
+   > 3. 将其中**所有 `.meph` 文件**复制到下载目录、电脑或云盘
+   > 4. 安装新版本后，使用首页**「导入」**功能重新导入备份的 `.meph` 文件
+   >
+   > 存档（子版）与契约同为 `.meph` 文件，导入即可完整恢复，分支标签（`@命运`）也会保留。
 
 ### 提出 Issue 的指南
 

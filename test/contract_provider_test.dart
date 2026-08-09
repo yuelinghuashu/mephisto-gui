@@ -105,9 +105,85 @@ void main() {
       // 正常加载：不显示兜底提示
       expect(container.read(contractFallbackNoticeProvider), isNull);
     });
-    // 注：不为「非内置名缺失 → 抛异常」写独立用例——
-    //   `expectLater(future)` 等待 Riverpod 异步 error state 与 provider dispose
-    //   存在固有竞态（dispose 先于 error state 触发时抛 Bad state），测试天然不稳定。
-    //   该行为已由 _builtinFallback「仅同名内置模板兜底」的实现保证。
+  });
+
+  group('contractProvider - 自定义契约缺失时最终兜底', () {
+    test('用户自定义契约（非内置名）缺失 → 返回空契约 + 兜底提示', () async {
+      // 当前契约名指向用户自定义契约（非内置模板名），但文件不存在
+      await seedPrefs(contractName: 'my_story.meph');
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      // 不再抛异常：contractProvider 保证始终成功返回
+      final contract = await container.read(contractProvider.future);
+      // 空契约兜底（roleName: '角色'），叙事页不崩溃
+      expect(contract.roleName, '角色');
+      expect(contract.opening, isEmpty);
+      expect(contract.rules, isEmpty);
+      // 兜底提示已置位：叙事页顶部警告条可见
+      expect(
+        container.read(contractFallbackNoticeProvider),
+        narrativeErrorContractFallback,
+      );
+    });
+  });
+
+  group('contractGroupListProvider - 最近编辑排序', () {
+    test('顶层母版树按「子树最近编辑」降序排列', () async {
+      await seedPrefs();
+      // 创建两个母版 + 手动写入 mtime（旧 faust / 新 dantes）
+      await File('${tempDir.path}/faust.meph').writeAsString('【角色名】\n浮士德\n');
+      await File('${tempDir.path}/dantes.meph').writeAsString('【角色名】\n唐泰斯\n');
+      // 调整 mtime：dantes 最新，faust 较旧
+      final now = DateTime.now();
+      await File('${tempDir.path}/faust.meph').setLastModified(
+        now.subtract(const Duration(days: 2)),
+      );
+      await File('${tempDir.path}/dantes.meph').setLastModified(
+        now.subtract(const Duration(hours: 1)),
+      );
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final groups = await container.read(contractGroupListProvider.future);
+      expect(groups, hasLength(2));
+      // 最近编辑的 dantes 排在最前
+      expect(groups.first.master.fileName, 'dantes.meph');
+      expect(groups.last.master.fileName, 'faust.meph');
+    });
+
+    test('子版最新编辑时间反映到母版树排序（自动保存子版后母版树靠前）', () async {
+      await seedPrefs();
+      // 两个母版：faust（有子版），dantes（无子版）
+      await File('${tempDir.path}/faust.meph').writeAsString('【角色名】\n浮士德\n');
+      await File('${tempDir.path}/dantes.meph').writeAsString('【角色名】\n唐泰斯\n');
+      // dantes 母版最近编辑（更"新"）
+      final now = DateTime.now();
+      await File('${tempDir.path}/dantes.meph').setLastModified(
+        now.subtract(const Duration(hours: 2)),
+      );
+      await File('${tempDir.path}/faust.meph').setLastModified(
+        now.subtract(const Duration(days: 2)),
+      );
+      // faust 的子版在 1 小时前被编辑（自动保存）→ 整棵 faust 树比 dantes 新
+      await File('${tempDir.path}/faust.child.meph').writeAsString('【角色名】\n浮士德\n【历史】\n');
+      await File('${tempDir.path}/faust.child.meph').setLastModified(
+        now.subtract(const Duration(hours: 1)),
+      );
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final groups = await container.read(contractGroupListProvider.future);
+      expect(groups, hasLength(2));
+      // faust 树整体比 dantes 新（因为子版刚被自动保存过）→ faust 排前
+      expect(groups.first.master.fileName, 'faust.meph');
+      expect(
+        groups.first.latestModified,
+        isNotNull,
+      );
+    });
   });
 }

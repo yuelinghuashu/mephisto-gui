@@ -163,6 +163,10 @@
   "settingsModelLabel": "Model",
   "settingsModelHint": "deepseek-v4-flash / qwen2.5:7b",
   "settingsMaxTokensLabel": "Max Tokens",
+  "settingsTimeoutLabel": "超时（秒）",
+  "settingsTimeoutHint": "60",
+  "settingsRetriesLabel": "最大重试",
+  "settingsRetriesHint": "1",
   "settingsMaxTokensHint": "4096",
   "settingsTestConnection": "测试连接",
   "settingsTesting": "测试中...",
@@ -196,6 +200,12 @@
   "contractEditorInfoLine4": "• 需要更专业的编辑体验（行号、语法高亮、自动补全）等等可在 VSCode 安装 Mephisto 插件编辑 .meph 文件",
   "contractEditorErrorLine": "第 {line} 行{blockName}：{message}",
   "contractEditorErrorBlock": "，区块「{blockName}」",
+  "contractEditorConflictTitle": "⚠ 文件已被外部修改",
+  "contractEditorConflictContent": "该文件在编辑期间被其他进程修改（如叙事自动存档或 VSCode 保存）。\n\n选择「覆盖」将用当前编辑内容替换磁盘版本；\n选择「重新加载」将丢弃当前编辑内容并拉取磁盘最新版本。",
+  "contractEditorConflictCancel": "取消",
+  "contractEditorConflictReload": "重新加载",
+  "contractEditorConflictOverwrite": "覆盖",
+  "contractEditorReloaded": "已重新加载磁盘最新版本",
 
   "textInputDialogConfirm": "确定",
   "textInputDialogCancel": "取消",
@@ -217,6 +227,11 @@
   "narrativeProviderHotReloadFail": "契约热重载失败，已保留原设定",
 
   "contractFallbackNotice": "当前契约文件缺失或损坏，已加载内置模板",
+
+  "relativeTimeJustNow": "刚刚",
+  "relativeTimeMinutesAgo": "{minutes} 分钟前",
+  "relativeTimeHoursAgo": "{hours} 小时前",
+  "relativeTimeDaysAgo": "{days} 天前",
 
   "languageLabel": "语言",
   "languageChinese": "简体中文",

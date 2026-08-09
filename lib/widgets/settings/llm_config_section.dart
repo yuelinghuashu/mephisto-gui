@@ -30,6 +30,8 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
   final _baseUrlController = TextEditingController();
   final _modelController = TextEditingController();
   final _maxTokensController = TextEditingController();
+  final _timeoutController = TextEditingController();
+  final _retriesController = TextEditingController();
 
   /// 当前后端类型（默认 OpenAI 兼容）
   LlmBackend _backend = LlmBackend.openaiCompatible;
@@ -45,6 +47,8 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     _baseUrlController.dispose();
     _modelController.dispose();
     _maxTokensController.dispose();
+    _timeoutController.dispose();
+    _retriesController.dispose();
     super.dispose();
   }
 
@@ -58,12 +62,16 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
       _baseUrlController.text = config.baseUrl;
       _modelController.text = config.model;
       _maxTokensController.text = config.maxTokens.toString();
+      _timeoutController.text = config.timeoutSeconds.toString();
+      _retriesController.text = config.maxRetries.toString();
     } else {
       const defaults = LlmConfig();
       _backend = defaults.backend;
       _baseUrlController.text = defaults.baseUrl;
       _modelController.text = defaults.model;
       _maxTokensController.text = defaults.maxTokens.toString();
+      _timeoutController.text = defaults.timeoutSeconds.toString();
+      _retriesController.text = defaults.maxRetries.toString();
     }
     if (mounted) setState(() => _llmLoaded = true);
   }
@@ -117,6 +125,10 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
       baseUrl: _baseUrlController.text.trim(),
       model: _modelController.text.trim(),
       maxTokens: int.tryParse(_maxTokensController.text.trim()) ?? 4096,
+      timeoutSeconds: int.tryParse(_timeoutController.text.trim()) ??
+          LlmConfig.defaultTimeoutSeconds,
+      maxRetries: int.tryParse(_retriesController.text.trim()) ??
+          LlmConfig.defaultMaxRetries,
     );
 
     if (config.baseUrl.isEmpty || config.model.isEmpty) {
@@ -167,6 +179,10 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
       baseUrl: _baseUrlController.text.trim(),
       model: _modelController.text.trim(),
       maxTokens: int.tryParse(_maxTokensController.text.trim()) ?? 16,
+      timeoutSeconds: int.tryParse(_timeoutController.text.trim()) ??
+          LlmConfig.defaultTimeoutSeconds,
+      maxRetries: int.tryParse(_retriesController.text.trim()) ??
+          LlmConfig.defaultMaxRetries,
     );
 
     if (config.baseUrl.isEmpty || config.model.isEmpty) {
@@ -229,6 +245,8 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     _baseUrlController.text = defaults.baseUrl;
     _modelController.text = defaults.model;
     _maxTokensController.text = defaults.maxTokens.toString();
+    _timeoutController.text = defaults.timeoutSeconds.toString();
+    _retriesController.text = defaults.maxRetries.toString();
     messenger.showSnackBar(
       SnackBar(content: Text(l10n.settingsConfigReset)),
     );
@@ -307,6 +325,30 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
               decoration: InputDecoration(
                 labelText: l10n.settingsMaxTokensLabel,
                 hintText: l10n.settingsMaxTokensHint,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 超时秒数（保护响应头到达 + 流式读取）
+            TextField(
+              controller: _timeoutController,
+              onTap: _ensureLlmLoaded,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: l10n.settingsTimeoutLabel,
+                hintText: l10n.settingsTimeoutHint,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 最大重试次数（网络层瞬时故障时）
+            TextField(
+              controller: _retriesController,
+              onTap: _ensureLlmLoaded,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: l10n.settingsRetriesLabel,
+                hintText: l10n.settingsRetriesHint,
               ),
             ),
             const SizedBox(height: 16),

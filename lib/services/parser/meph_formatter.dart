@@ -160,9 +160,9 @@ String _normalizeRuleLine(String line) {
   //   `状 态` → `状态`、`roll (` → `roll(`
   // （此时引号内容已被占位符保护，不会误伤字符串内部文字；
   //   关键词 → 正则模式统一定义在 dslKeywordFixPatterns，与 parser 共享）
-  for (final entry in dslKeywordFixPatterns.entries) {
+  for (final entry in dslKeywordFixRegExps.entries) {
     placeholder = placeholder.replaceAllMapped(
-      RegExp(entry.value),
+      entry.value,
       (_) => entry.key,
     );
   }

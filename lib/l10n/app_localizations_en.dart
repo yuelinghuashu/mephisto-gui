@@ -521,6 +521,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsMaxTokensLabel => 'Max Tokens';
 
   @override
+  String get settingsTimeoutLabel => 'Timeout (seconds)';
+
+  @override
+  String get settingsTimeoutHint => '60';
+
+  @override
+  String get settingsRetriesLabel => 'Max Retries';
+
+  @override
+  String get settingsRetriesHint => '1';
+
+  @override
   String get settingsMaxTokensHint => '4096';
 
   @override
@@ -646,6 +658,25 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get contractEditorConflictTitle => '⚠ File changed externally';
+
+  @override
+  String get contractEditorConflictContent =>
+      'This file was modified by another process while editing (e.g. narrative auto-save or VSCode save).\n\n\"Overwrite\" replaces the on-disk version with your current edit;\n\"Reload\" discards your edit and pulls the latest on-disk version.';
+
+  @override
+  String get contractEditorConflictCancel => 'Cancel';
+
+  @override
+  String get contractEditorConflictReload => 'Reload';
+
+  @override
+  String get contractEditorConflictOverwrite => 'Overwrite';
+
+  @override
+  String get contractEditorReloaded => 'Reloaded the latest on-disk version';
+
+  @override
   String get textInputDialogConfirm => 'OK';
 
   @override
@@ -699,6 +730,24 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get contractFallbackNotice =>
       'The current contract file is missing or corrupted; built-in template loaded';
+
+  @override
+  String get relativeTimeJustNow => 'Just now';
+
+  @override
+  String relativeTimeMinutesAgo(Object minutes) {
+    return '$minutes min ago';
+  }
+
+  @override
+  String relativeTimeHoursAgo(Object hours) {
+    return '$hours hr ago';
+  }
+
+  @override
+  String relativeTimeDaysAgo(Object days) {
+    return '$days days ago';
+  }
 
   @override
   String get languageLabel => 'Language';

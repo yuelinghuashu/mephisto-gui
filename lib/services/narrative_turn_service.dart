@@ -99,8 +99,8 @@ class NarrativeTurnService {
     final effectivePrior = maxHistoryMessages == null
         ? priorMessages
         : priorMessages.length > maxHistoryMessages
-              ? priorMessages.sublist(priorMessages.length - maxHistoryMessages)
-              : priorMessages;
+        ? priorMessages.sublist(priorMessages.length - maxHistoryMessages)
+        : priorMessages;
     // 1. 规则引擎（主动/被动规则、骰子判定、状态变更、记忆注入）
     final ruleResult = RuleEngine(
       rules: contract.rules,
@@ -127,13 +127,15 @@ class NarrativeTurnService {
     );
 
     // 4. 调用 LLM（流式）；空响应或异常时回退本地回复
-    final llmClient = _clientFactory?.call(config) ?? LlmClient(
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
-      model: config.model,
-      maxTokens: config.maxTokens,
-      client: client,
-    );
+    final llmClient =
+        _clientFactory?.call(config) ??
+        LlmClient(
+          apiKey: config.apiKey,
+          baseUrl: config.baseUrl,
+          model: config.model,
+          maxTokens: config.maxTokens,
+          client: client,
+        );
 
     var reply = '';
     var lastError = '';
@@ -142,6 +144,9 @@ class NarrativeTurnService {
         messages: messages,
         onChunk: onChunk,
         cancelSignal: cancelSignal,
+        // 超时/重试来自用户配置（LlmConfig），默认 60s / 1 次重试
+        timeout: Duration(seconds: config.timeoutSeconds),
+        maxRetries: config.maxRetries,
       );
       reply = streamed.trim().isEmpty
           ? localReply(userInput, contract: contract)

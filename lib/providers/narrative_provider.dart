@@ -13,7 +13,7 @@ import '../services/narrative_turn_service.dart';
 import '../services/parser/meph_parser.dart';
 import '../services/session/child_save_store.dart';
 import '../services/session/session_saver.dart';
-import '../services/storage/contract_repo.dart';
+import '../services/storage/meph_file_name.dart';
 import 'contract_provider.dart';
 import 'llm_settings_provider.dart';
 import 'narrative_memory_provider.dart';
@@ -38,7 +38,14 @@ import 'narrative_window_provider.dart';
 ///   - 未来多角色舞台，调度器可对每个角色各自调用 [NarrativeTurnService.generate]
 ///     并与 `Future.wait` 并发执行，角色上下文天然隔离。
 class NarrativeNotifier extends Notifier<NarrativeState> {
-  /// 流式输出节流合并缓冲（50ms 窗口内累积 chunk 后一次性提交）
+  /// 流式输出节流合并缓冲的累积窗口。
+  ///
+  /// LLM SSE 以 chunk 高频到达，若每 chunk 都触发 Riverpod 通知，
+  /// 会导致 UI 频繁重建（尤其在 50ms 内几十个 chunk 的场景）。
+  /// 在窗口内累积所有 chunk，窗口结束时统一提交一次，显著减少通知次数。
+  static const Duration streamFlushInterval = Duration(milliseconds: 50);
+
+  /// 流式输出节流合并缓冲（[streamFlushInterval] 窗口内累积后一次性提交）
   final StringBuffer _streamBuffer = StringBuffer();
 
   /// 流式输出节流定时器
@@ -63,7 +70,10 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   void _appendStreamChunk(String chunk) {
     _streamBuffer.write(chunk);
     // 定时器语义是「最后一片 chunk 后 50ms 提交」
-    _streamTimer ??= Timer(const Duration(milliseconds: 50), _flushStreamBuffer);
+    _streamTimer ??= Timer(
+      streamFlushInterval,
+      _flushStreamBuffer,
+    );
   }
 
   /// 提交缓冲中的流式内容到状态。
@@ -95,17 +105,20 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     // 读取当前母版文件名（用于子版命名）
     final sourceName =
         ref.watch(currentContractNameProvider).value ?? defaultContractName;
-    // 契约加载失败时回退到空契约（避免崩溃）。
-    //
-    // 注意：`ref.watch(contractProvider).value` 在 provider 处于 error 状态时
-    // 会**重新抛出异常**导致整个 Notifier 崩溃，因此不能直接用 `.value`。
-    // 使用 `when` 显式处理 error：用户契约与内置模板都缺失的极端情况下，
-    // 至少保证叙事页不崩溃，以空契约兜底（与 [Contract.empty] 语义一致）。
-    final contract = ref.watch(contractProvider).when(
-      data: (c) => c,
-      loading: Contract.empty,
-      error: (_, _) => Contract.empty(),
-    );
+    // 契约加载兜底：`contractProvider` 自身已保证始终返回成功——
+    //   用户文件正常加载 / 内置模板兜底（含 notice）/
+    //   空契约兜底（含 notice），因此本 Notifier 的 error 分支实际
+    //   不会被触发。这里仍保留 `when` 显式处理 loading/error 作为
+    //   极端防御：`ref.watch(contractProvider).value` 在 error 状态会
+    //   重新抛出异常导致整个 Notifier 崩溃，因此用 `.when` 保证叙事页
+    //   永不因 provider 异常而崩溃。
+    final contract = ref
+        .watch(contractProvider)
+        .when(
+          data: (c) => c,
+          loading: Contract.empty,
+          error: (_, _) => Contract.empty(),
+        );
     return NarrativeState(
       contract: contract,
       sourceFileName: sourceName,
@@ -197,14 +210,16 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
 
     // 聚合本轮所有变化（状态/记忆/骰子/回复/错误），一次性批量提交：
     // 状态迁移统一走 reducer（narrativeReducer），减少 Riverpod 通知与 UI 重建。
-    _dispatch(ReplySucceeded(
-      reply: result.reply,
-      newState: result.newState,
-      injectedMemories: result.injectedMemories,
-      rollInfo: result.rollInfo,
-      diceResults: result.diceResults,
-      lastError: result.lastError,
-    ));
+    _dispatch(
+      ReplySucceeded(
+        reply: result.reply,
+        newState: result.newState,
+        injectedMemories: result.injectedMemories,
+        rollInfo: result.rollInfo,
+        diceResults: result.diceResults,
+        lastError: result.lastError,
+      ),
+    );
 
     // 先自动保存子版：优先保证进度持久化，不依赖 LLM 的慢速记忆提取。
     // 记忆提取（MemoryManager）内部有 try-catch + 超时保护，异步执行不阻塞
@@ -315,9 +330,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     }
 
     // 默认保存：复用「子版覆盖 / 母版 .child 递增」的共享路径
-    return _saveDefault(
-      errorMessage: narrativeErrorSaveFail,
-    );
+    return _saveDefault(errorMessage: narrativeErrorSaveFail);
   }
 
   /// 从指定子版文件恢复会话；成功返回 true。
@@ -338,14 +351,39 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   Future<bool> deleteChild(String fileName) => ChildSaveStore.delete(fileName);
 
   /// 删除默认子版。
-  Future<bool> deleteSave() => deleteChild(defaultChildFileName(state.sourceFileName));
+  Future<bool> deleteSave() =>
+      deleteChild(defaultChildFileName(state.sourceFileName));
 
   /// 列出当前母版的所有子版文件。
   Future<List<String>> listChildFiles() =>
       ChildSaveStore.listChildFiles(state.sourceFileName);
 
   /// 记忆提取（委托 MemoryManager；LLM 配置由调用方传入）。
+  ///
+  /// 提取是异步后台任务，期间用户可能继续发消息（新对话产生新记忆/规则
+  /// 注入新记忆）。因此写回时必须**安全合并**而非直接覆盖：
+  ///   - 若提取期间无新对话（history 长度未变），直接采用提取结果
+  ///   - 若期间有新对话（history 长度变化），则以「当前 memories」为准，
+  ///     仅将新提取结果中**当前不存在**的新条目追加到末尾——
+  ///     保证提取期间新产生的记忆不会被旧提取结果覆盖（记忆是角色不崩
+  ///     人设的根基，丢失即人设崩塌风险）
+  ///
+  /// **权重制取舍**：合并后若超过 [MemoryManager.maxLimit]，触发
+  /// [MemoryManager.compress] 压缩——低权重（1-3 星）记忆优先被 LLM
+  /// 压缩为摘要/舍弃以节省 token 与上下文，高权重（≥4 星）默认永不
+  /// 丢弃（保护人设核心）。本方法不新增重复的取舍规则，完全复用
+  /// MemoryManager 已有的权重制压缩逻辑。
+  ///
+  /// **立即持久化**：记忆写回成功后触发一次静默自动存档（[_autoSaveChild]）。
+  /// 原因：`_generateCore` 中 `await _autoSaveChild()` 发生在记忆提取**之前**，
+  /// 若提取在最后一轮对话后异步完成，新记忆不会立即写盘——用户此时关闭
+  /// 应用即丢失。这里的二次保存确保新记忆立即持久化。文件监听 mtime 抑制
+  /// 已避免自触发死循环；保存失败时 [_performSave] 内部设置 `lastError` 由
+  /// UI 提示（数据安全值得告知）。
   Future<void> _maybeExtractMemories({LlmConfig? config}) async {
+    // 提取时快照 history 长度，用于检测提取期间是否发生了新对话
+    final historyLengthAtStart = state.history.length;
+
     // 复用全局 [MemoryManager] 单例（轻量无状态，共享 HTTP 连接池）
     final manager = ref.read(memoryManagerProvider);
     final updated = await manager.maybeExtract(
@@ -353,9 +391,34 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       memories: state.memories,
       config: config,
     );
-    if (updated != null) {
+    if (updated == null) return;
+
+    // 提取期间没有新对话 → 直接采用提取结果（无覆盖风险）
+    if (state.history.length == historyLengthAtStart) {
       state = state.copyWith(memories: updated);
+    } else {
+      // 提取期间有新对话 → 安全合并：
+      // 以当前 memories 为基底，仅追加「新提取结果中当前不存在」的条目。
+      // 利用 Memory 的 Equatable props（按 content 比较）判断是否已存在。
+      final currentContents = state.memories.map((m) => m.content).toSet();
+      final fresh = updated
+          .where((m) => !currentContents.contains(m.content))
+          .toList();
+      if (fresh.isEmpty) return; // 无新增条目，保持现状
+
+      var combined = [...state.memories, ...fresh];
+      // 遵循权重制取舍：合并后超限触发 compress（低权重优先压缩/舍弃，
+      // 高权重保护不丢）——而非无脑追加导致列表膨胀失控
+      if (combined.length > MemoryManager.maxLimit) {
+        combined = await manager.compress(combined, config: config);
+      }
+      state = state.copyWith(memories: combined);
     }
+
+    // 记忆写回后静默触发自动存档，确保新提取的记忆立即持久化
+    // （saveCurrent 保存的是当前 state 最新快照，含提取期间的新对话，
+    //   无覆盖风险；mtime 抑制防文件监听死循环）
+    await _autoSaveChild();
   }
 
   /// 构造默认子版文件名（`faust.meph` → `faust.child.meph`）。

@@ -42,7 +42,12 @@ String buildSystemPrompt({
   // 仅当 maxMemories 非空且记忆数量超出上限时才裁剪；
   // 使「每轮只带最重要的记忆」成为现实，同时保证放不下的仍在存档里。
   // 高权重排序复用 [MemoryManager.sortByImportance]（消除重复排序逻辑）
+  //
+  // 裁剪后 [effectiveMemories] 天然有序（高权重在前、低权重降序在后），
+  // 因此下方第 5 层输出时**不再重复排序**（已由 `memoriesPreSorted` 标记），
+  // 避免每轮多一次 O(n log n)。
   List<Memory> effectiveMemories = memories;
+  var memoriesPreSorted = false;
   if (maxMemories != null && memories.length > maxMemories) {
     // 高权重记忆（人设核心）全部保留
     final high = MemoryManager.sortByImportance(
@@ -58,6 +63,7 @@ String buildSystemPrompt({
     );
     final remainingSlots = (maxMemories - high.length).clamp(0, maxMemories);
     effectiveMemories = [...high, ...rest.take(remainingSlots)];
+    memoriesPreSorted = true;
   }
 
   final buffer = StringBuffer();
@@ -123,8 +129,11 @@ String buildSystemPrompt({
   // ============================================================
   if (effectiveMemories.isNotEmpty) {
     buffer.writeln('【你记得的过往】');
-    // 复用共享排序工具（与 MemoryManager 保持一致）
-    final sorted = MemoryManager.sortByImportance(effectiveMemories);
+    // 若经过灌窗裁剪 → [effectiveMemories] 已按权重有序，直接输出；
+    // 否则（未裁剪）需要按重要性降序排序（复用共享排序工具）。
+    final sorted = memoriesPreSorted
+        ? effectiveMemories
+        : MemoryManager.sortByImportance(effectiveMemories);
     for (final memory in sorted) {
       buffer.writeln('- ${memory.content}');
     }
@@ -154,7 +163,7 @@ String buildSystemPrompt({
   }
 
   // ============================================================
-  // 第七层：此刻（命运指引 + 行动引导）
+  // 第六层：此刻（命运指引 + 行动引导）
   // ============================================================
   buffer.writeln('【此刻】');
   buffer.writeln('命运指引：');
@@ -165,7 +174,7 @@ String buildSystemPrompt({
   buffer.writeln();
 
   // ============================================================
-  // 第八层：要求（末尾再强调一次约束）
+  // 第七层：要求（末尾再强调一次约束）
   // ============================================================
   buffer.writeln('【要求】');
   buffer.writeln(constraints);

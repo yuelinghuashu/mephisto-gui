@@ -5,7 +5,55 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.2.0] - 上下文窗口 · 记忆权重体系 · 编辑器健壮性 · API Key加密
+## [1.3.0] - Android 正式签名 · 覆盖安装支持（未发布）
+
+### ✨ 新特性
+
+- **Android 正式签名**：配置 release 签名密钥库（`~/keystores/mephisto.jks`）+ `android/key.properties`，同一把密钥签名的后续版本可直接**覆盖安装**，无需先卸载旧版
+- **签名优雅降级**：`android/app/build.gradle.kts` 检测到 `key.properties` 即用正式签名，缺失时自动回落 debug 签名，开发 / CI 构建不中断
+- **记忆写回即存档**：记忆提取完成后立即持久化，关闭应用不再丢失新记忆
+- **首页「最近编辑」快捷入口**：品牌标题右侧金色胶囊显示最近修改的契约（角色名 + 相对时间），点击直接进入叙事——列表再深也一眼可达
+- **首页最近编辑排序**：顶层契约树按「子树最近编辑时间」降序排列，自动保存子版后母版树自动靠前
+- **LLM 超时/重试可配置**：设置页新增「超时（秒）」「最大重试」输入，适配慢网络/长文本场景
+- **非流式 JSON 响应兜底**：OpenAI 兼容代理返回标准 JSON（非 SSE）时自动提取 `choices[0].message.content`
+
+### 🐛 修复
+
+- 记忆提取竞态：提取期间新产生的记忆不再被旧结果覆盖，超限按权重取舍（低权重优先压缩以节省 token）
+- 文件监听阻塞：内容校验改为异步读取，不再因磁盘 IO 卡顿界面
+- 自定义契约缺失/损坏时叙事页无提示：`contractProvider` 兜底为空契约 + 同步设置 fallback notice，顶部警告条不再静默缺失
+- narrative_provider 测试时序竞态：测试容器销毁前先 flush 微任务，消除偶发的「ProviderContainer already disposed」30 秒超时
+
+### 🚀 性能与健壮性
+
+- 流式输出优化：仅更新实际变化的流式气泡，未变化消息无需重绘，长对话滚动更流畅
+- 提示词构建加速：记忆排序去重 + DSL 关键字正则预编译
+- 编辑器冲突提示国际化：英文界面不再中英混杂
+- 流式打字机光标：约 1.2 秒周期方波闪烁，替代静态竖线，输出节奏更直观
+- 记忆提取提示词强化「语义相同不要重复提取」：措辞不同但同事件不再反复积累
+- 空内容诊断日志增加 `Content-Type` 字段，排查更高效
+- **同步文件 IO 改异步**：首页契约列表 mtime 读取、文件监听基线刷新改用异步 API（`exists` / `lastModified` / `readAsString`），消除磁盘 IO 在 UI 事件循环上的阻塞隐患
+
+### 🧹 重构
+
+- 文件名解析抽为共享工具，消除多处重复逻辑
+- 魔法值清理：`DiceResult` 阈值系数 / 流式节流窗口 / 滚动容差抽为命名常量
+- 新增 `relative_time.dart` 相对时间格式化工具（刚刚 / N 分钟前 / N 小时前 / N 天前 / 具体日期）
+
+### 🔧 工程化
+
+- 新增 GitHub Actions CI：push / PR 自动执行 `flutter analyze` + `flutter test`
+- CI 增加 Linux 桌面构建验证（`flutter build linux --debug`），不再只在推送后才发现打包问题
+- 安全存储升级：`flutter_secure_storage` 从 9.2.4 升级到 **11.0.0**（Android AES/GCM 加密等安全改进，平台子包同步升级；313 个测试全量回归通过）
+- 测试总数：**313 个**
+
+### 📚 文档
+
+- README / README.en：「平台风险与注意事项」章节更新——Android 正式签名状态说明、密钥保管警告、`key.properties` 配置指引指向 `build.gradle.kts` 顶部注释
+- docs/platform-storage：新增「卸载风险与备份指引」——卸载会清除全部契约与存档（母版/子版/分支），提供外部存储 + USB/MTP 备份、首页「导入」恢复的完整流程
+
+<details>
+<summary>## [1.2.0] - 上下文窗口 · 记忆权重体系 · 编辑器健壮性 · API Key加密</summary>
 
 ### ✨ 新特性
 
@@ -64,7 +112,10 @@
 - 构建配置断言扩至 15 项：`validate_build_config.py` 增加 macOS/iOS 构建步骤存在性校验
 - README 平台声明同步：macOS / iOS 从「从未编译运行」更新为「CI 编译通过，未真机运行」
 
-## [1.1.0] - 规则热重载 · 国际化 · 文档
+</details>
+
+<details>
+<summary>## [1.1.0] - 规则热重载 · 国际化 · 文档</summary>
 
 ### ✨ 新特性
 
@@ -110,6 +161,8 @@
 ### 📚 文档
 
 - README 补充中英文赞助区块，修复收款码路径
+
+</details>
 
 <details>
 <summary>## [1.0.0] - 首个正式发布</summary>

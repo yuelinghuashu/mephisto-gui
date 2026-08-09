@@ -24,6 +24,16 @@ import 'enums.dart';
 ///   - [displayString] 提供预格式化文本，直接用于 UI 展示和 LLM 提示词
 @immutable
 class DiceResult extends Equatable {
+  /// 命运反馈三分层阈值系数。
+  ///
+  /// 使用 0-1 系数 × [maxValue] 自适应骰子面数而非硬编码绝对值：
+  ///   - 高分档：≥ maxValue × 0.75
+  ///   - 中分档：≥ maxValue × 0.5
+  ///   - 低分档：< maxValue × 0.25
+  static const double highBarRatio = 0.75;
+  static const double midBarRatio = 0.5;
+  static const double lowBarRatio = 0.25;
+
   /// 规则名称
   final String ruleName;
 
@@ -89,8 +99,8 @@ class DiceResult extends Equatable {
     }
 
     // ---- 1d100 高精度判定：三分层 ----
-    final highBar = maxValue * 0.75; // 高分档
-    final midBar = maxValue * 0.5; // 中分档
+    final highBar = maxValue * highBarRatio; // 高分档
+    final midBar = maxValue * midBarRatio; // 中分档
 
     // 成功判定
     if (success) {
@@ -105,7 +115,7 @@ class DiceResult extends Equatable {
     // 失败判定
     if (value >= midBar) {
       return '星子偏移，你擦过了荣光的衣角';
-    } else if (value >= maxValue * 0.25) {
+    } else if (value >= maxValue * lowBarRatio) {
       return '线轴空转，编织声渐渐远去';
     } else {
       return '星象错乱，诸神移开注视';
@@ -146,6 +156,12 @@ class LlmConfig extends Equatable {
   /// 默认模型（OpenAI 兼容：DeepSeek）
   static const String defaultModel = 'deepseek-v4-flash';
 
+  /// 默认超时秒数（响应头到达 + 流式读取）
+  static const int defaultTimeoutSeconds = 60;
+
+  /// 默认最大重试次数（网络层瞬时故障时）
+  static const int defaultMaxRetries = 1;
+
   /// 后端类型
   final LlmBackend backend;
 
@@ -164,6 +180,16 @@ class LlmConfig extends Equatable {
   /// 最大生成 Token 数
   final int maxTokens;
 
+  /// 请求超时秒数（保护「响应头到达」与「流式数据读取」）。
+  ///
+  /// 慢网络/长文本生成场景可调大；快速失败场景可调小。
+  final int timeoutSeconds;
+
+  /// 网络层瞬时故障的最大重试次数（仅连接超时/连接拒绝等）。
+  ///
+  /// 业务错误（4xx/5xx）不重试；默认 1 次（首次失败后重试 1 次 = 总 2 次尝试）。
+  final int maxRetries;
+
   /// 构造函数
   const LlmConfig({
     this.backend = LlmBackend.openaiCompatible,
@@ -171,8 +197,18 @@ class LlmConfig extends Equatable {
     this.apiKey = '',
     this.baseUrl = defaultBaseUrl,
     this.maxTokens = 4096,
+    this.timeoutSeconds = defaultTimeoutSeconds,
+    this.maxRetries = defaultMaxRetries,
   });
 
   @override
-  List<Object?> get props => [backend, model, apiKey, baseUrl, maxTokens];
+  List<Object?> get props => [
+    backend,
+    model,
+    apiKey,
+    baseUrl,
+    maxTokens,
+    timeoutSeconds,
+    maxRetries,
+  ];
 }

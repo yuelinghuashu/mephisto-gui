@@ -163,6 +163,10 @@
   "settingsModelLabel": "Model",
   "settingsModelHint": "deepseek-v4-flash / qwen2.5:7b",
   "settingsMaxTokensLabel": "Max Tokens",
+  "settingsTimeoutLabel": "Timeout (seconds)",
+  "settingsTimeoutHint": "60",
+  "settingsRetriesLabel": "Max Retries",
+  "settingsRetriesHint": "1",
   "settingsMaxTokensHint": "4096",
   "settingsTestConnection": "Test Connection",
   "settingsTesting": "Testing...",
@@ -196,6 +200,12 @@
   "contractEditorInfoLine4": "• For a more professional editing experience (line numbers, syntax highlighting, auto-completion), install the Mephisto plugin in VSCode to edit .meph files",
   "contractEditorErrorLine": "Line {line}{blockName}: {message}",
   "contractEditorErrorBlock": ", section「{blockName}」",
+  "contractEditorConflictTitle": "⚠ File changed externally",
+  "contractEditorConflictContent": "This file was modified by another process while editing (e.g. narrative auto-save or VSCode save).\n\n\"Overwrite\" replaces the on-disk version with your current edit;\n\"Reload\" discards your edit and pulls the latest on-disk version.",
+  "contractEditorConflictCancel": "Cancel",
+  "contractEditorConflictReload": "Reload",
+  "contractEditorConflictOverwrite": "Overwrite",
+  "contractEditorReloaded": "Reloaded the latest on-disk version",
 
   "textInputDialogConfirm": "OK",
   "textInputDialogCancel": "Cancel",
@@ -217,6 +227,11 @@
   "narrativeProviderHotReloadFail": "Contract hot-reload failed, original settings preserved",
 
   "contractFallbackNotice": "The current contract file is missing or corrupted; built-in template loaded",
+
+  "relativeTimeJustNow": "Just now",
+  "relativeTimeMinutesAgo": "{minutes} min ago",
+  "relativeTimeHoursAgo": "{hours} hr ago",
+  "relativeTimeDaysAgo": "{days} days ago",
 
   "languageLabel": "Language",
   "languageChinese": "简体中文",

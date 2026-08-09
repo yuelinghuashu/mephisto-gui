@@ -46,6 +46,18 @@ class MessageList extends StatefulWidget {
 /// 通过 `GlobalKey<MessageListState>` 从外部（如 AppBar 按钮、快捷键）控制
 /// 消息列表跳转至第一条 / 最后一条历史。
 class MessageListState extends State<MessageList> {
+  /// 滚动到底部判定容差（px）。
+  ///
+  /// 用户滚动位置距离真正底部在此范围内视为「在底部」，
+  /// 恢复自动跟随；超出此范围视为离开底部，暂停自动跟随。
+  static const double bottomTolerancePx = 8;
+
+  /// 离开底部判定阈值偏移（px）。
+  ///
+  /// 从底部向上滚动超过此偏移才判定为「离开底部」——
+  /// 避免用户在底部附近的微小滚动误触发暂停自动跟随。
+  static const double leaveBottomThresholdPx = 24;
+
   /// 滚动控制器（管理消息流的滚动位置）
   final ScrollController _scrollController = ScrollController();
 
@@ -80,11 +92,12 @@ class MessageListState extends State<MessageList> {
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    final atBottom =
-        position.pixels >= position.maxScrollExtent - 8; // 8px 容差
+    final atBottom = position.pixels >=
+        position.maxScrollExtent - bottomTolerancePx;
     if (atBottom) {
       _autoFollowBottom = true;
-    } else if (position.pixels < position.maxScrollExtent - 24) {
+    } else if (position.pixels <
+        position.maxScrollExtent - leaveBottomThresholdPx) {
       // 明显离开底部才暂停（避免微小偏移误触发）
       _autoFollowBottom = false;
     }
@@ -145,13 +158,14 @@ class MessageListState extends State<MessageList> {
         itemBuilder: (context, index) {
           // ---- 如果正在生成，最后一条显示流式内容 ----
           if (widget.isGenerating && index == widget.messages.length) {
-            final content = widget.streamingContent.isEmpty
-                ? AppLocalizations.of(context).messageBubbleThinking
-                : widget.streamingContent;
+            // 独立 StatefulWidget：流式 chunk 高频到达时，仅在内容实际
+            // 变化时重建 Message 对象——避免每次 chunk 都执行
+            // `Message.assistant()` 的 `_generateUniqueId()` + `DateTime.now()`
+            // 与 `AppLocalizations.of(context)` 查找
             return _wrapBubble(
-              MessageBubble(
-                message: Message.assistant(content),
-                isStreaming: true,
+              _StreamingBubble(
+                content: widget.streamingContent,
+                showPlaceholder: widget.streamingContent.isEmpty,
               ),
             );
           }
@@ -164,14 +178,80 @@ class MessageListState extends State<MessageList> {
   }
 
   /// 包裹消息气泡：在存在内容宽度限制时居中约束（null 时原样返回 = 满屏）。
+  ///
+  /// 每个气泡外层包 [RepaintBoundary]：流式输出时 [streamingContent] 频繁
+  /// 变化触发列表重建，但**未变化的气泡**被隔离在独立图层中无需重绘，
+  /// 显著降低流式输出时的 UI 开销。
   Widget _wrapBubble(Widget bubble) {
     final maxWidth = widget.contentMaxWidth;
-    if (maxWidth == null) return bubble;
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        child: bubble,
+    if (maxWidth == null) {
+      return RepaintBoundary(child: bubble);
+    }
+    return RepaintBoundary(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: maxWidth),
+          child: bubble,
+        ),
       ),
     );
+  }
+}
+
+/// 流式输出气泡（独立 StatefulWidget）
+///
+/// 优化核心：LLM 流式 chunk 以 50ms 节流窗口高频到达，[MessageList.build]
+/// 每次重建都会调用 itemBuilder。若在此处直接 `Message.assistant(content)`，
+/// 每次都会触发 `_generateUniqueId()`（全局计数器 + DateTime.now()）与
+/// `AppLocalizations.of(context)` 查找——大量无意义对象分配。
+///
+/// 本组件将 Message 对象的构造交给 [didUpdateWidget]：仅当内容**实际变化**
+/// 时才更新内部缓存的 [Message]；内容相同时（发生 rebuild 但 content 未变）
+/// 直接复用缓存对象，避免每轮 builder 都构造新 Message。
+class _StreamingBubble extends StatefulWidget {
+  /// 当前流式内容（空时由 showPlaceholder 决定是否显示占位文案）
+  final String content;
+
+  /// 内容为空时是否显示「思考中...」占位
+  final bool showPlaceholder;
+
+  const _StreamingBubble({
+    required this.content,
+    required this.showPlaceholder,
+  });
+
+  @override
+  State<_StreamingBubble> createState() => _StreamingBubbleState();
+}
+
+class _StreamingBubbleState extends State<_StreamingBubble> {
+  /// 缓存的 Message 对象（仅在内容变化时重建）
+  late Message _message = _buildMessage(widget.content);
+
+  /// 构造流式 Message（仅承载内容，Message.assistant 无 isStreaming 参数；
+  /// 流式状态由外部 MessageBubble 的 isStreaming 决定）
+  static Message _buildMessage(String content) {
+    return Message.assistant(content);
+  }
+
+  @override
+  void didUpdateWidget(_StreamingBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 仅在内容实际变化时重建 Message 对象
+    if (oldWidget.content != widget.content) {
+      _message = _buildMessage(widget.content);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 内容为空且需占位时显示「思考中...」本地化文案
+    // （仅有此状态才做 l10n 查找；流式内容非空时直接使用缓存 Message）
+    final displayMessage = widget.content.isEmpty && widget.showPlaceholder
+        ? Message.assistant(
+            AppLocalizations.of(context).messageBubbleThinking,
+          )
+        : _message;
+    return MessageBubble(message: displayMessage, isStreaming: true);
   }
 }

@@ -260,7 +260,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
             _contentController.text = latest;
           }
           messenger.showSnackBar(
-            const SnackBar(content: Text('已重新加载磁盘最新版本')),
+            SnackBar(content: Text(l10n.contractEditorReloaded)),
           );
           return;
         } else {
@@ -288,23 +288,20 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
   ///   - 'reload'：丢弃编辑内容，拉取磁盘最新版
   ///   - null：取消保存
   Future<String?> _showConflictDialog() {
+    final l10n = AppLocalizations.of(context);
     return showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('⚠ 文件已被外部修改'),
-        content: const Text(
-          '该文件在编辑期间被其他进程修改（如叙事自动存档或 VSCode 保存）。\n\n'
-          '选择「覆盖」将用当前编辑内容替换磁盘版本；\n'
-          '选择「重新加载」将丢弃当前编辑内容并拉取磁盘最新版本。',
-        ),
+        title: Text(l10n.contractEditorConflictTitle),
+        content: Text(l10n.contractEditorConflictContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('取消'),
+            child: Text(l10n.contractEditorConflictCancel),
           ),
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, 'reload'),
-            child: const Text('重新加载'),
+            child: Text(l10n.contractEditorConflictReload),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -312,7 +309,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.pop(dialogContext, 'overwrite'),
-            child: const Text('覆盖'),
+            child: Text(l10n.contractEditorConflictOverwrite),
           ),
         ],
       ),

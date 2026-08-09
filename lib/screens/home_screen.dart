@@ -338,13 +338,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       for (final group in groups) group.master.fileName: group.allInfos,
     };
 
+    // 计算「最近编辑」的契约（具体文件，可能是子版存档）：
+    // 从所有分组递归收集全部 ContractInfo，按 lastModified 取最新。
+    // 用于首页品牌标题右侧的快捷入口——哪怕列表折叠/滚动很远，
+    // 也能一眼看到最近在玩哪个并直接进入。
+    final allInfos = [
+      for (final group in groups) ...group.allInfos,
+    ]..sort((a, b) {
+        final at = a.lastModified;
+        final bt = b.lastModified;
+        if (at == null && bt == null) return 0;
+        if (at == null) return 1;
+        if (bt == null) return -1;
+        return bt.compareTo(at);
+      });
+    final recentInfo = allInfos.isEmpty ? null : allInfos.first;
+    final recentTap = recentInfo == null
+        ? null
+        : () => _openNarrative(recentInfo);
+
     // 垂直列表。深层分支的横向滚动由 [ContractCard] 子节点区按需内嵌
     // （仅展开的子节点区有深层后代时出现），不在此全局加宽/滚动。
     return ListView(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
       children: [
         // ---- 品牌展示区（多选模式下隐藏，聚焦操作） ----
-        if (!_selection.isSelectMode) const HomeBrandHeader(),
+        // 「最近编辑」快捷入口：显示最近修改的契约，点击直接进入叙事页
+        if (!_selection.isSelectMode)
+          HomeBrandHeader(
+            recentInfo: recentInfo,
+            onRecentTap: recentTap,
+          ),
 
         // ---- 每棵命运树（母版为根，递归渲染子节点） ----
         for (final group in groups) ...[

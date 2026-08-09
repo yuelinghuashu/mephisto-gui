@@ -27,6 +27,16 @@ const Map<String, String> dslKeywordFixPatterns = {
   '状态.': r'状态\s+\.',
 };
 
+/// DSL 关键字 → 预编译正则映射。
+///
+/// 与 [dslKeywordFixPatterns] 同构，但 value 已编译为 [RegExp] 实例。
+/// Parser / Formatter 每次校验/格式化时都曾对相同模式反复 `RegExp(...)` 构造；
+/// 预编译后消除重复编译开销（尤其是契约编辑器 400ms 防抖实时校验场景）。
+final Map<String, RegExp> dslKeywordFixRegExps = {
+  for (final entry in dslKeywordFixPatterns.entries)
+    entry.key: RegExp(entry.value),
+};
+
 /// 括号内双引号内容正则（用于屏蔽引号内容，避免误报）。
 ///
 /// 被 parser 的 `_validateKeywordSpacing` / `_validateCompoundSeparator` 与

@@ -44,7 +44,7 @@ android {
         applicationId = "yuelinghuashu.mephisto"
         // minSdk 23（Android 6.0）：flutter_secure_storage 9.x 要求 API ≥ 23；
         // 2026 年 Android 5.0（API 21）已完全停产，放弃兼容无实际影响。
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

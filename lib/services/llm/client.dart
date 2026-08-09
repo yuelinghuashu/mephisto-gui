@@ -185,6 +185,11 @@ class LlmClient {
     // 取消信号是否已触发（用于 SSE 循环内提前 break）
     bool isCancelled() => cancelCompleter.isCompleted;
 
+    // 非 SSE 行的 JSON 累积缓冲：如果服务端以标准 JSON 而非 SSE 返回
+    // （如某些 OpenAI 兼容代理不支持 stream），则尝试从 JSON 的
+    // `choices[0].message.content` 中提取完整内容作为兜底。
+    final nonStreamJson = StringBuffer();
+
     // 流式读取：每行数据也应用 [timeout]，防止服务端建立连接后长时间
     // 不发数据（心跳间隔过长/挂起）导致 UI 永久卡在「生成中」
     await for (final line in response.stream
@@ -192,26 +197,61 @@ class LlmClient {
         .transform(const LineSplitter())
         .timeout(timeout)) {
       if (isCancelled()) break;
-      if (!line.startsWith('data:')) continue;
 
-      final data = line.substring(5).trim();
-      if (data == '[DONE]') break;
+      // ---- SSE 格式：以 `data:` 前缀的一行 ----
+      if (line.startsWith('data:')) {
+        final data = line.substring(5).trim();
+        if (data == '[DONE]') break;
 
+        try {
+          final json = jsonDecode(data) as Map<String, dynamic>;
+          final choices = json['choices'] as List<dynamic>?;
+          final first = choices == null || choices.isEmpty ? null : choices[0];
+          final firstMap = first is Map<String, dynamic> ? first : null;
+          final deltaMap = firstMap?['delta'];
+          final deltaMapTyped =
+              deltaMap is Map<String, dynamic> ? deltaMap : null;
+          final delta = deltaMapTyped?['content'] as String?;
+          if (delta != null && delta.isNotEmpty) {
+            fullContent.write(delta);
+            onChunk(delta);
+          }
+        } catch (e) {
+          debugPrint('SSE 解析失败: $data\n$e');
+        }
+        continue;
+      }
+
+      // ---- 非 SSE 行：累积到 JSON 缓冲（可能是标准 JSON 响应被拆成多行）----
+      final stripped = line.trim();
+      if (stripped.isEmpty) continue;
+      // 忽略纯注释/心跳行（SSE 规范允许以 `:` 开头的事件）
+      if (stripped.startsWith(':')) continue;
+      nonStreamJson.write(stripped);
+    }
+
+    // ---- 流式内容为空时，尝试从非流式 JSON 中提取完整内容 ----
+    // 兼容不支持 SSE 的 OpenAI 兼容代理：它们可能返回标准 Chat Completion JSON。
+    if (fullContent.isEmpty && nonStreamJson.isNotEmpty) {
       try {
-        final json = jsonDecode(data) as Map<String, dynamic>;
+        final json = jsonDecode(nonStreamJson.toString()) as Map<String, dynamic>;
         final choices = json['choices'] as List<dynamic>?;
         final first = choices == null || choices.isEmpty ? null : choices[0];
         final firstMap = first is Map<String, dynamic> ? first : null;
-        final deltaMap = firstMap?['delta'];
-        final deltaMapTyped =
-            deltaMap is Map<String, dynamic> ? deltaMap : null;
-        final delta = deltaMapTyped?['content'] as String?;
-        if (delta != null && delta.isNotEmpty) {
-          fullContent.write(delta);
-          onChunk(delta);
+        final messageMap = firstMap?['message'];
+        final messageTyped =
+            messageMap is Map<String, dynamic> ? messageMap : null;
+        final messageContent = messageTyped?['content'] as String?;
+        if (messageContent != null && messageContent.isNotEmpty) {
+          fullContent.write(messageContent);
+          debugPrint(
+            '⚠️ LLM 返回非流式 JSON 响应（不是 OpenAI SSE 格式）。'
+            '已从 choices[0].message.content 提取内容作为兜底。'
+            'Base URL: $baseUrl, Model: $model',
+          );
         }
       } catch (e) {
-        debugPrint('SSE 解析失败: $data\n$e');
+        debugPrint('非流式 JSON 解析失败: ${nonStreamJson.toString()}\n$e');
       }
     }
 
@@ -220,10 +260,15 @@ class LlmClient {
       debugPrint(
         '⚠️ LLM 返回空内容。'
         'Base URL: $baseUrl, Model: $model, '
-        '状态码: ${response.statusCode}',
+        '状态码: ${response.statusCode}, '
+        'Content-Type: ${response.headers['content-type'] ?? '未知'}',
       );
       // 无法在流结束后重新读取，但至少输出已知信息供排查
-      debugPrint('提示：如果 API 正常但未返回内容，请检查响应格式是否符合 OpenAI SSE 规范。');
+      debugPrint(
+        '提示：如果 API 正常但未返回内容，请检查响应格式是否符合 OpenAI SSE 规范。'
+        '若非标准 SSE（如某些代理返回普通 JSON），客户端已尝试从 JSON 提取，'
+        '但仍无内容时可能是模型输出为空或 API 配置错误。',
+      );
     }
 
     return fullContent.toString();

@@ -28,6 +28,7 @@ import 'package:flutter/foundation.dart';
 
 import 'storage/contract_dir.dart';
 import 'storage/contract_repo.dart';
+import 'storage/meph_file_name.dart';
 
 /// 契约文件变更监听器
 ///
@@ -125,18 +126,18 @@ class ContractFileWatcher {
     try {
       final dir = await getContractsDirectory();
       _contractsDir = dir;
-      if (!dir.existsSync()) return;
+      if (!await dir.exists()) return;
 
       // 初始化监听目标的内容基线（用于 macOS fsevents 目录级事件过滤）。
       //
       // 背景：macOS fsevents 是目录级事件流，可能把「目录内其他文件的写入」
       // 报告为监听目标文件的 modify 事件（路径精度不如 Linux inotify）。
-      // 建立内容基线后，_onDirEvent 中可通过「内容未变化」识别误报并忽略。
+      // 建立内容基线后，_processChangedFile 中可通过「内容未变化」识别误报并忽略。
       // 使用内容而非 mtime 作为基线依据：mtime 在快速连续写入下精度不足，
       // 内容比较则精确无误（真实修改必然导致内容变化）。
       for (final name in watchedTargets) {
         final file = _targetFile(name);
-        if (file != null && file.existsSync()) {
+        if (file != null && await file.exists()) {
           try {
             _lastProcessedContents[name] = await file.readAsString();
           } catch (e) {
@@ -201,43 +202,59 @@ class ContractFileWatcher {
   ///     监听目标文件（如 faust.meph）的 modify 事件
   ///   - 此时监听目标文件的内容**未发生变化** → 与 [start] 时记录的内容
   ///     比对即可识别并忽略（真实修改必然导致内容变化）
-  ///   - 注意：此过滤发生在**防抖前**，即使 mtime 精度不足也不会误抑制
-  ///     真实修改（内容比较精确无误）
+  ///   - 内容比较推迟到 [_processChangedFile] 中**异步**执行：
+  ///     避免在 UI 事件循环上做同步文件 IO（[readAsStringSync] 可能因文件
+  ///     大/IO 慢而卡顿界面）
   void _onDirEvent(FileSystemEvent event) {
     final changedName = _eventFileName(event);
     if (changedName == null || !_isWatchedTarget(changedName)) return;
 
-    // 内容基线过滤（防 macOS fsevents 误报）：
-    // 如果事件报告的目标文件内容与基线相同 → 其他文件写入的误报
-    final file = _targetFile(changedName);
-    if (file != null && file.existsSync()) {
-      try {
-        final currentContent = file.readAsStringSync();
-        final baselineContent = _lastProcessedContents[changedName];
-        if (baselineContent != null && currentContent == baselineContent) {
-          return;
-        }
-      } catch (e) {
-        // 读取失败（文件被占用/权限）时跳过内容检查，继续走防抖处理
-        debugPrint('读取契约内容失败: $changedName ($e)');
-      }
-    }
-
     // 防抖：短时间内多次写入只触发一次（500ms）；
-    // 记录实际变化的文件名，防抖结束后按它读取最新内容
+    // 记录实际变化的文件名，防抖结束后在 _processChangedFile 中异步
+    // 读取内容并与基线比较（过滤 fsevents 误报），随后回调
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       await _processChangedFile(changedName);
     });
   }
 
-  /// 处理实际变化的文件：mtime 抑制 → 回调 → 更新 mtime 记录。
+  /// 处理实际变化的文件：内容基线过滤 → mtime 抑制 → 回调 → 更新记录。
   Future<void> _processChangedFile(String fileName) async {
     final file = _targetFile(fileName);
-    if (file == null || !file.existsSync()) return;
+    if (file == null) return;
     if (!_isWatchedTarget(fileName)) return;
+    // 异步检查文件是否存在（避免 existsSync 阻塞事件循环）
+    bool fileExists;
+    try {
+      fileExists = await file.exists();
+    } catch (_) {
+      fileExists = false; // 读取失败（权限/IO 异常）视为不存在
+    }
+    if (!fileExists) return;
 
-    final mtime = file.lastModifiedSync();
+    // ---- 异步内容基线过滤（防 macOS fsevents 目录级误报）----
+    // 若事件报告的目标文件内容与缓存基线相同 → 其他文件写入的误报。
+    // 用异步 readAsString 替代原事件回调中的 readAsStringSync，
+    // 不阻塞 UI 事件循环。
+    final String currentContent;
+    try {
+      currentContent = await file.readAsString();
+    } catch (e) {
+      // 读取失败（文件被占用/权限）时跳过内容检查，继续走 mtime 抑制
+      debugPrint('读取契约内容失败: $fileName ($e)');
+      return;
+    }
+    final baselineContent = _lastProcessedContents[fileName];
+    if (baselineContent != null && currentContent == baselineContent) {
+      return;
+    }
+
+    final DateTime mtime;
+    try {
+      mtime = await file.lastModified();
+    } catch (_) {
+      return; // 读取 mtime 失败（权限/IO 异常）时跳过
+    }
     // mtime 抑制（按文件名独立记录）：saveChild 自己写文件也会触发事件，
     // 但 mtime 与上次处理后记录的一致 → 忽略，避免死循环
     if (mtime == _lastProcessedMtimes[fileName]) return;
@@ -252,21 +269,37 @@ class ContractFileWatcher {
     } finally {
       // 无论回调成功/失败，都更新 mtime 并恢复监听，
       // 防止异常导致的死循环（失败后不再重复触发同一文件）
-      final updated = _targetFile(fileName);
-      _lastProcessedMtimes[fileName] =
-          updated != null && updated.existsSync()
-              ? updated.lastModifiedSync()
-              : DateTime.fromMillisecondsSinceEpoch(0);
-      // 同步更新内容缓存：后续 macOS fsevents 误报（内容未变）时，
-      // 与最新内容比较可正确识别并忽略（真实修改后的新内容作为新基线）
-      if (updated != null && updated.existsSync()) {
-        try {
-          _lastProcessedContents[fileName] = updated.readAsStringSync();
-        } catch (e) {
-          debugPrint('更新契约内容缓存失败: $fileName ($e)');
-        }
-      }
+      // 注意：这里不调用同步 existsSync/lastModifiedSync/readAsStringSync，
+      // 而是在恢复监听后通过异步 API 更新缓存，避免阻塞 UI 事件循环。
       _sub?.resume();
+      // 异步更新 mtime 与内容基线（不阻塞事件循环）
+      unawaited(_refreshBaselines(fileName));
+    }
+  }
+
+  /// 异步刷新指定文件的 mtime 与内容基线。
+  ///
+  /// 在 [_processChangedFile] 的 finally 块中调用，替代原先的同步
+  /// `existsSync/lastModifiedSync/readAsStringSync`，避免在大文件或
+  /// 网络文件系统上阻塞 UI 事件循环。
+  Future<void> _refreshBaselines(String fileName) async {
+    try {
+      final updated = _targetFile(fileName);
+      if (updated == null) {
+        _lastProcessedMtimes[fileName] = DateTime.fromMillisecondsSinceEpoch(0);
+        return;
+      }
+      final exists = await updated.exists();
+      if (!exists) {
+        _lastProcessedMtimes[fileName] = DateTime.fromMillisecondsSinceEpoch(0);
+        _lastProcessedContents.remove(fileName);
+        return;
+      }
+      _lastProcessedMtimes[fileName] = await updated.lastModified();
+      _lastProcessedContents[fileName] = await updated.readAsString();
+    } catch (e) {
+      // 更新失败（文件被占用/权限）时保留旧基线，下次事件继续尝试
+      debugPrint('更新契约内容缓存失败: $fileName ($e)');
     }
   }
 

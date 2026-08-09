@@ -91,6 +91,36 @@ void main() {
       expect(prefs.getString('llm_api_key'), isNull);
     });
 
+    test('超时/重试配置持久化：保存后读取正确值', () async {
+      final container = makeContainer();
+
+      // 保存自定义超时/重试
+      const userConfig = LlmConfig(
+        baseUrl: 'https://custom.example.com/v1',
+        model: 'custom-model',
+        timeoutSeconds: 120,
+        maxRetries: 3,
+      );
+      await container
+          .read(llmSettingsProvider.notifier)
+          .save(userConfig);
+
+      final config = await container.read(llmConfigProvider.future);
+      expect(config.timeoutSeconds, 120);
+      expect(config.maxRetries, 3);
+
+      // SharedPreferences 持久化了新字段
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt('llm_timeout_seconds'), 120);
+      expect(prefs.getInt('llm_max_retries'), 3);
+
+      // 清除配置后回退默认值
+      await container.read(llmSettingsProvider.notifier).clear();
+      final cleared = await container.read(llmConfigProvider.future);
+      expect(cleared.timeoutSeconds, LlmConfig.defaultTimeoutSeconds);
+      expect(cleared.maxRetries, LlmConfig.defaultMaxRetries);
+    });
+
     test('清除用户配置后回退到默认值，且安全存储中的 Key 被清除', () async {
       final container = makeContainer();
 

@@ -110,7 +110,9 @@ class MessageBubble extends StatelessWidget {
                 message.content,
                 style: theme.textTheme.bodyMedium,
               ),
-              if (isStreaming) _buildCursor(),
+              // 流式打字机光标：静态竖线 + 独立 StatefulWidget 实现
+              // 周期性闪烁（仅流式输出中显示；完成时随 [MessageBubble] 重建消失）
+              if (isStreaming) const _BlinkingCursor(),
             ],
           ),
         ),
@@ -118,12 +120,66 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
-  /// 流式输出光标（闪烁效果）
-  Widget _buildCursor() {
-    return const SizedBox(
-      width: 2,
-      height: 16,
-      child: ColoredBox(color: AppTheme.gold),
+}
+
+/// 流式打字机光标（闪烁动画）。
+///
+/// 独立 [StatefulWidget]：
+///   - `MessageBubble` 是 StatelessWidget，无法持有周期性的 [AnimationController]
+///   - 光标只在流式输出中显示，完成时随 [MessageBubble] 重建自动消失
+///   - 闪烁：约 1.2 秒周期内保持可见 0.7s / 隐藏 0.5s，
+///     符合中文阅读习惯的"纸带打字机"节奏（太快会干扰阅读）
+class _BlinkingCursor extends StatefulWidget {
+  const _BlinkingCursor();
+
+  @override
+  State<_BlinkingCursor> createState() => _BlinkingCursorState();
+}
+
+class _BlinkingCursorState extends State<_BlinkingCursor>
+    with SingleTickerProviderStateMixin {
+  /// 光标可见持续时间
+  static const Duration _visibleDuration = Duration(milliseconds: 700);
+
+  /// 光标隐藏持续时间
+  static const Duration _hiddenDuration = Duration(milliseconds: 500);
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: _visibleDuration + _hiddenDuration,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    // 周期性重复闪烁（循环播放）
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 前半周期（可见持续期内）opacity = 1，后半周期 = 0，
+    // 形成「亮起 → 熄灭」的方波闪烁（而非平滑淡入淡出，更接近打字机）
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final isVisible =
+            _controller.value <
+            (_visibleDuration.inMilliseconds /
+                (_visibleDuration + _hiddenDuration).inMilliseconds);
+        return Opacity(opacity: isVisible ? 1.0 : 0.0, child: child);
+      },
+      child: const SizedBox(
+        width: 2,
+        height: 16,
+        child: ColoredBox(color: AppTheme.gold),
+      ),
     );
   }
 }

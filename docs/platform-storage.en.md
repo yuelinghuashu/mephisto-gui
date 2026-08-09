@@ -65,6 +65,21 @@ Default directory (platform-adaptive default location)
 - After switching, all contract CRUD (import/load/save) automatically points to the new location
 - Old contract files are **not auto-migrated** (back up before switching)
 
+### Uninstall Risk & Backup Guide
+
+> ⚠️ **Uninstalling the app on Android wipes all contracts and saves with no way to recover them**
+> (master `.meph`, child saves `*.child.meph`, custom branches).
+> While production signing is not configured and upgrades require "uninstall then install", please back up first:
+
+1. **Switch to external storage**: switch the contract directory to **"External Storage"** mode on the settings page
+   (the internal-storage path `/data/user/0/...` requires root to access; the external-storage path is accessible via file managers)
+2. **Back up the files**: via a phone file manager or **USB connection to a computer (MTP mode)**, open
+   `/storage/emulated/0/Android/data/yuelinghuashu.mephisto/files/Mephisto/contracts`
+   and copy **all `.meph` files** to a safe location (Downloads folder, computer, cloud drive)
+3. **Restore the data**: after installing the new version, use the **"Import"** button on the home page to re-import the backed-up `.meph` files
+   - Child saves (`*.child.meph` / custom branches) are the same `.meph` files as contracts, so importing restores them completely
+   - Branch labels (the `@命运` system section) are preserved as well
+
 ## 5. iOS
 
 - **System sandbox restriction**: contracts are only stored in the app documents directory

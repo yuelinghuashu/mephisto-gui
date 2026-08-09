@@ -198,6 +198,69 @@ void main() {
       expect(callCount, 2); // 1 次尝试 + 1 次重试
     });
 
+    test('非流式 JSON 响应（不支持 SSE 的代理）→ 从 message.content 提取内容', () async {
+      // 某些 OpenAI 兼容代理忽略 stream:true，返回标准 Chat Completion JSON
+      final mock = MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'role': 'assistant',
+                  'content': '这是模拟的非流式响应内容。',
+                },
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      });
+
+      final client = LlmClient(
+        apiKey: 'test-key',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-v4-flash',
+        client: mock,
+      );
+
+      final chunks = <String>[];
+      final result = await client.generateStream(
+        messages: [LlmMessage(role: 'user', content: 'hi')],
+        onChunk: chunks.add,
+      );
+
+      // 非流式 JSON 兜底提取内容；onChunk 无增量回调（一次性内容）
+      expect(result, '这是模拟的非流式响应内容。');
+      expect(chunks, isEmpty);
+    });
+
+    test('非流式 JSON 格式错误 → 返回空字符串且不抛异常（容忍解析失败）', () async {
+      // 服务端返回无法解析的非 SSE/非 JSON 内容
+      final mock = MockClient((request) async {
+        return http.Response(
+          'not-json-or-sse',
+          200,
+          headers: {'content-type': 'text/plain; charset=utf-8'},
+        );
+      });
+
+      final client = LlmClient(
+        apiKey: 'test-key',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-v4-flash',
+        client: mock,
+      );
+
+      final result = await client.generateStream(
+        messages: [LlmMessage(role: 'user', content: 'hi')],
+        onChunk: (_) {},
+      );
+
+      // 无可用内容：返回空字符串，不抛异常（调用方按空响应回退本地回复）
+      expect(result, isEmpty);
+    });
+
     test('SSE data 行被 chunk 拆成两半时仍正确重组解析', () async {
       // 模拟 TCP 分片：一条完整的 data 行被拆到两个 chunk 中发送。
       // LineSplitter 流式解析应跨 chunk 累积并重组完整行，避免丢内容。

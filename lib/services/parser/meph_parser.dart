@@ -371,8 +371,9 @@ void _validateKeywordSpacing(
   // 屏蔽引号内容后的字符串（引号内的"不 包含"等文字不误报）
   final masked = _maskQuotedStrings('$condition $action');
 
-  for (final entry in dslKeywordFixPatterns.entries) {
-    if (RegExp(entry.value).hasMatch(masked)) {
+  // 复用预编译正则（dslKeywordFixRegExps），避免每轮校验反复构造 RegExp
+  for (final entry in dslKeywordFixRegExps.entries) {
+    if (entry.value.hasMatch(masked)) {
       throw MephParseError(
         line: lineNumber,
         blockName: blockName,

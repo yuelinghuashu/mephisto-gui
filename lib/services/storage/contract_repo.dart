@@ -9,6 +9,7 @@ library;
 import 'dart:io';
 
 import 'contract_dir.dart';
+import 'meph_file_name.dart';
 
 // ============================================================
 // 契约 CRUD
@@ -163,49 +164,8 @@ Future<int> deleteContractCascade(String masterFileName) async {
 // 文件名校验与角色名提取
 // ============================================================
 
-/// 解析文件名为「基础名（去 `.meph` 后缀）的路径段列表」。
-///
-/// 多级树模型：文件名中的 `.` 分段即层级。
-///   - `faust.meph`                 → [faust]
-///   - `faust.dark.meph`            → [faust, dark]
-///   - `faust.dark.light.meph`      → [faust, dark, light]
-/// 各文件名校验函数共用此解析，消除重复的 `replaceAll + indexOf` 样板。
-List<String> _splitBaseName(String fileName) {
-  return fileName.replaceAll('.meph', '').split('.');
-}
-
-/// 判断文件名是否为子版文件（母版根 后还有路径段）。
-///
-/// 例如：
-///   - `faust.meph` -> false（母版）
-///   - `faust.child.meph` / `faust.dark.meph` -> true（一级子版）
-///   - `faust.dark.light.meph` -> true（二级子版）
-bool isChildFileName(String fileName) => _splitBaseName(fileName).length >= 2;
-
-/// 提取母版基础名（如 `faust.child.meph` -> `faust`，`faust.dark.light.meph` -> `faust`）。
-String extractMasterPrefix(String fileName) => _splitBaseName(fileName).first;
-
-/// 提取子版分支名（取路径最后一段；如 `faust.dark.meph` -> `dark`，
-/// `faust.dark.light.meph` -> `light`）。
-///
-/// 仅子版文件有分支名；母版（`faust.meph`）返回 null。
-String? extractBranchName(String fileName) {
-  final segments = _splitBaseName(fileName);
-  return segments.length >= 2 ? segments.last : null;
-}
-
-/// 提取子版「分支路径」（去掉最后一段分支名后的完整前缀）。
-///
-/// 用于多级树中确定父节点路径：
-///   - `faust.dark.meph`            -> `faust`（父即母版）
-///   - `faust.dark.light.meph`      -> `faust.dark`（父为一级分支）
-///   - `faust.meph`（母版）         -> null（无父）
-String? extractBranchPath(String fileName) {
-  final segments = _splitBaseName(fileName);
-  if (segments.length < 2) return null;
-  return segments.take(segments.length - 1).join('.');
-}
-
+// 文件名解析（isChildFileName / extractMasterPrefix / extractBranchName /
+// extractBranchPath）已抽取至 meph_file_name.dart 共享工具类。
 /// 从 .meph 内容中提取【角色名】。
 ///
 /// 解析规则：

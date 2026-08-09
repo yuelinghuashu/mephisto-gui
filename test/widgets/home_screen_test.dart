@@ -34,7 +34,12 @@ void main() {
     }
   });
 
-  ContractInfo info(String name, {String? branch, String? branchTitle}) {
+  ContractInfo info(
+    String name, {
+    String? branch,
+    String? branchTitle,
+    DateTime? lastModified,
+  }) {
     final base = name.replaceAll('.meph', '').split('.').first;
     return ContractInfo(
       fileName: name,
@@ -42,6 +47,7 @@ void main() {
       isChild: branch != null,
       branchName: branch,
       branchTitle: branchTitle,
+      lastModified: lastModified,
     );
   }
 
@@ -91,6 +97,45 @@ void main() {
       child: localizedApp(home: const HomeScreen()),
     );
   }
+
+  testWidgets('品牌标题右侧显示「最近编辑」快捷入口（角色名 + 相对时间）', (tester) async {
+    // 带 mtime 的契约：dantes 最近编辑，faust 较旧
+    final now = DateTime.now();
+    final groups = [
+      ContractGroup(
+        master: info(
+          'faust.meph',
+          lastModified: now.subtract(const Duration(days: 3)),
+        ),
+        children: [],
+      ),
+      ContractGroup(
+        master: info(
+          'dantes.meph',
+          lastModified: now.subtract(const Duration(hours: 2)),
+        ),
+        children: [],
+      ),
+    ];
+    await tester.pumpWidget(buildHome(groups: groups));
+    await tester.pumpAndSettle();
+
+    // 品牌标题存在
+    expect(find.text('Mephisto 叙事引擎'), findsOneWidget);
+    // 最近编辑胶囊存在（history 图标）；胶囊文本包含 dantes + 相对时间
+    expect(find.byIcon(Icons.history), findsOneWidget);
+    expect(find.textContaining('dantes · 2 小时前'), findsOneWidget);
+  });
+
+  testWidgets('无 mtime 的契约列表 → 不显示最近编辑快捷入口', (tester) async {
+    // sampleGroups 中所有 info 均无 lastModified → 快捷入口不显示
+    await tester.pumpWidget(buildHome());
+    await tester.pumpAndSettle();
+
+    // 品牌标题存在，但没有历史图标胶囊
+    expect(find.text('Mephisto 叙事引擎'), findsOneWidget);
+    expect(find.byIcon(Icons.history), findsNothing);
+  });
 
   testWidgets('多级树：逐级展开可见二级分支，收起后隐藏', (tester) async {
     await tester.pumpWidget(buildHome(groups: nestedGroups()));
