@@ -34,10 +34,14 @@ class ContractEditorScreen extends StatefulWidget {
   /// 初始内容（编辑现有契约时预填；新建时自动加载 faust.meph 模板）
   final String? initialContent;
 
+  /// 目标目录（null = 全局契约目录；传舞台目录可编辑舞台内角色卡）
+  final String? targetDir;
+
   const ContractEditorScreen({
     super.key,
     this.fileName,
     this.initialContent,
+    this.targetDir,
   });
 
   @override
@@ -93,10 +97,12 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
   /// 记录打开编辑区时磁盘文件的 mtime。
   ///
   /// 文件不存在（新建 / 被外部删除）时记录 null，表示「无冲突检测基线」。
+  /// [targetDir] 非空时（舞台角色卡编辑）直接使用目标目录定位文件。
   Future<void> _recordOpenMtime() async {
     try {
-      final dir = await getContractsDirectory();
-      final file = File('${dir.path}/${widget.fileName}');
+      final dirPath =
+          widget.targetDir ?? (await getContractsDirectory()).path;
+      final file = File('$dirPath/${widget.fileName}');
       _openMtime = file.existsSync() ? file.lastModifiedSync() : null;
     } catch (_) {
       // 目录不可用时不阻塞编辑；冲突检测退化为跳过
@@ -242,8 +248,9 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
     // 3. 保存冲突检测：若打开期间磁盘文件被外部修改（mtime 变化），
     //    提示用户选择「覆盖」或「重新加载」，避免静默丢失外部更改
     if (!_isNew && _openMtime != null) {
-      final dir = await getContractsDirectory();
-      final file = File('${dir.path}/$fileName');
+      final dirPath =
+          widget.targetDir ?? (await getContractsDirectory()).path;
+      final file = File('$dirPath/$fileName');
       final currentMtime = file.existsSync() ? file.lastModifiedSync() : null;
       final conflictDetected =
           currentMtime != null && currentMtime != _openMtime;
@@ -255,7 +262,9 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
           _openMtime = currentMtime;
         } else if (action == 'reload') {
           // 用户选择重新加载：丢弃当前编辑内容，拉取磁盘最新版
-          final latest = await readContract(fileName);
+          final latest = widget.targetDir != null
+              ? await File('${widget.targetDir}/$fileName').readAsString()
+              : await readContract(fileName);
           if (latest != null) {
             _contentController.text = latest;
           }
@@ -269,9 +278,14 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
       }
     }
 
-    // 4. 写入文件
+    // 4. 写入文件（targetDir 非空时写入舞台目录，否则写入全局契约目录）
     try {
-      await saveContract(fileName, content);
+      if (widget.targetDir != null) {
+        final file = File('${widget.targetDir}/$fileName');
+        await file.writeAsString(content);
+      } else {
+        await saveContract(fileName, content);
+      }
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.contractEditorSaveFail('$e'))),

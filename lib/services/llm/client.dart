@@ -113,32 +113,13 @@ class LlmClient {
           );
         } on TimeoutException catch (e) {
           lastNetworkError = e;
-          if (attempt == maxRetries) rethrow;
-          // 指数退避：500ms → 1000ms → 2000ms …
-          final delayMs = retryBaseDelayMs * (1 << attempt);
-          debugPrint(
-            'LLM 请求超时，${maxRetries - attempt} 次后重试 '
-            '(延迟 ${delayMs}ms): $e',
-          );
-          await Future<void>.delayed(Duration(milliseconds: delayMs));
+          await _maybeRetry(attempt, maxRetries, 'LLM 请求超时', e);
         } on SocketException catch (e) {
           lastNetworkError = e;
-          if (attempt == maxRetries) rethrow;
-          final delayMs = retryBaseDelayMs * (1 << attempt);
-          debugPrint(
-            'LLM 网络连接异常，${maxRetries - attempt} 次后重试 '
-            '(延迟 ${delayMs}ms): $e',
-          );
-          await Future<void>.delayed(Duration(milliseconds: delayMs));
+          await _maybeRetry(attempt, maxRetries, 'LLM 网络连接异常', e);
         } on http.ClientException catch (e) {
           lastNetworkError = e;
-          if (attempt == maxRetries) rethrow;
-          final delayMs = retryBaseDelayMs * (1 << attempt);
-          debugPrint(
-            'LLM HTTP 客户端异常，${maxRetries - attempt} 次后重试 '
-            '(延迟 ${delayMs}ms): $e',
-          );
-          await Future<void>.delayed(Duration(milliseconds: delayMs));
+          await _maybeRetry(attempt, maxRetries, 'LLM HTTP 客户端异常', e);
         }
       }
       // 理论不可达（循环内 rethrow 或 return），但需要满足编译器
@@ -149,6 +130,54 @@ class LlmClient {
         httpClient.close();
       }
     }
+  }
+
+  /// 网络层瞬时故障的指数退避重试。
+  ///
+  /// 在 [attempt] 达到 [maxRetries] 时重新抛出原始异常（保留运行时类型，
+  /// 使调用方的 `rethrow` 语义不变——三种网络异常类型均兼容）；
+  /// 否则等待指数退避后返回（循环继续下次尝试）。
+  ///
+  /// 使用 [Object] 统一接收三种异常（[TimeoutException] / [SocketException] /
+  /// [http.ClientException]），消除此前三段几乎相同的退避样板代码。
+  Future<void> _maybeRetry(
+    int attempt,
+    int maxRetries,
+    String reason,
+    Object error,
+  ) async {
+    if (attempt == maxRetries) {
+      // 保留原始异常类型，避免吞掉具体网络错误信息
+      throw error;
+    }
+    // 指数退避：500ms → 1000ms → 2000ms …
+    final delayMs = retryBaseDelayMs * (1 << attempt);
+    debugPrint(
+      '$reason，${maxRetries - attempt} 次后重试 (延迟 ${delayMs}ms): $error',
+    );
+    await Future<void>.delayed(Duration(milliseconds: delayMs));
+  }
+
+  /// 从 OpenAI 兼容响应的 `choices[0][innerKey][content]` 中提取字符串字段。
+  ///
+  /// 消除了此前 SSE 与非流式 JSON 两处几乎相同的嵌套类型检查样板：
+  ///   - `choices` 可能为 null / 空列表 → 返回 null
+  ///   - `choices[0]` 可能不是 Map → 返回 null
+  ///   - `innerKey`（`delta` / `message`）可能不是 Map → 返回 null
+  ///   - 目标 `content` 字段可能缺失 / 非字符串 → 返回 null
+  String? _extractNestedString(
+    Map<String, dynamic> json,
+    String innerKey,
+    String contentKey,
+  ) {
+    final choices = json['choices'];
+    if (choices is! List || choices.isEmpty) return null;
+    final first = choices.first;
+    if (first is! Map<String, dynamic>) return null;
+    final inner = first[innerKey];
+    if (inner is! Map<String, dynamic>) return null;
+    final content = inner[contentKey];
+    return content is String ? content : null;
   }
 
   /// 发送单个请求并读取完整流式响应。
@@ -204,14 +233,11 @@ class LlmClient {
         if (data == '[DONE]') break;
 
         try {
-          final json = jsonDecode(data) as Map<String, dynamic>;
-          final choices = json['choices'] as List<dynamic>?;
-          final first = choices == null || choices.isEmpty ? null : choices[0];
-          final firstMap = first is Map<String, dynamic> ? first : null;
-          final deltaMap = firstMap?['delta'];
-          final deltaMapTyped =
-              deltaMap is Map<String, dynamic> ? deltaMap : null;
-          final delta = deltaMapTyped?['content'] as String?;
+          final delta = _extractNestedString(
+            jsonDecode(data) as Map<String, dynamic>,
+            'delta',
+            'content',
+          );
           if (delta != null && delta.isNotEmpty) {
             fullContent.write(delta);
             onChunk(delta);
@@ -234,14 +260,11 @@ class LlmClient {
     // 兼容不支持 SSE 的 OpenAI 兼容代理：它们可能返回标准 Chat Completion JSON。
     if (fullContent.isEmpty && nonStreamJson.isNotEmpty) {
       try {
-        final json = jsonDecode(nonStreamJson.toString()) as Map<String, dynamic>;
-        final choices = json['choices'] as List<dynamic>?;
-        final first = choices == null || choices.isEmpty ? null : choices[0];
-        final firstMap = first is Map<String, dynamic> ? first : null;
-        final messageMap = firstMap?['message'];
-        final messageTyped =
-            messageMap is Map<String, dynamic> ? messageMap : null;
-        final messageContent = messageTyped?['content'] as String?;
+        final messageContent = _extractNestedString(
+          jsonDecode(nonStreamJson.toString()) as Map<String, dynamic>,
+          'message',
+          'content',
+        );
         if (messageContent != null && messageContent.isNotEmpty) {
           fullContent.write(messageContent);
           debugPrint(

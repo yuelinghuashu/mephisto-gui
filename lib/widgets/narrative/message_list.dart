@@ -29,12 +29,19 @@ class MessageList extends StatefulWidget {
   /// 同时消息仍保持用户选择的叙事内容宽度档位居中显示。
   final double? contentMaxWidth;
 
+  /// 自定义气泡构建器（null 时使用标准 [MessageBubble]）
+  ///
+  /// 多角色舞台传入 [StageMessageBubble] 实现按角色着色；
+  /// 单角色叙事不传 → 保持默认行为。
+  final Widget Function(Message message, bool isStreaming)? messageBuilder;
+
   const MessageList({
     super.key,
     required this.messages,
     required this.streamingContent,
     required this.isGenerating,
     this.contentMaxWidth,
+    this.messageBuilder,
   });
 
   @override
@@ -57,6 +64,18 @@ class MessageListState extends State<MessageList> {
   /// 从底部向上滚动超过此偏移才判定为「离开底部」——
   /// 避免用户在底部附近的微小滚动误触发暂停自动跟随。
   static const double leaveBottomThresholdPx = 24;
+
+  /// 顶部附近判定阈值（px）。
+  ///
+  /// 滚动位置在此范围内视为「在顶部」——用于智能跳转按钮
+  /// 决定点击时应跳到顶部还是底部。
+  static const double nearTopThresholdPx = 100;
+
+  /// 当前是否在消息列表顶部附近（智能跳转按钮的图标/方向依据）。
+  ///
+  /// 由 [_onScroll] 在滚动事件中维护，外部通过 [ValueListenable]
+  /// 监听变化即可实时切换图标方向。
+  final ValueNotifier<bool> isNearTop = ValueNotifier<bool>(true);
 
   /// 滚动控制器（管理消息流的滚动位置）
   final ScrollController _scrollController = ScrollController();
@@ -85,21 +104,30 @@ class MessageListState extends State<MessageList> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    isNearTop.dispose();
     super.dispose();
   }
 
   /// 监听滚动位置：顶部以下视为"离开底部"暂停跟随；滚回底部恢复跟随。
+  ///
+  /// 同时维护 [isNearTop]（顶部附近判定，驱动智能跳转按钮的图标方向）。
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    final atBottom = position.pixels >=
-        position.maxScrollExtent - bottomTolerancePx;
+    final atBottom =
+        position.pixels >= position.maxScrollExtent - bottomTolerancePx;
     if (atBottom) {
       _autoFollowBottom = true;
     } else if (position.pixels <
         position.maxScrollExtent - leaveBottomThresholdPx) {
       // 明显离开底部才暂停（避免微小偏移误触发）
       _autoFollowBottom = false;
+    }
+
+    // 顶部附近判定（智能跳转按钮图标切换依据）
+    final nearTop = position.pixels <= nearTopThresholdPx;
+    if (isNearTop.value != nearTop) {
+      isNearTop.value = nearTop;
     }
   }
 
@@ -148,6 +176,31 @@ class MessageListState extends State<MessageList> {
     );
   }
 
+  /// 按滚轮增量滚动，位置 clamped 在 `[0, maxScrollExtent]` 内。
+  ///
+  /// 供外部区域（如 [RoleStatusBar] 的垂直滚轮委托）将滚轮事件路由到
+  /// 消息流，实现「鼠标在状态条上滚动也能带动消息流」的桌面端体验。
+  void scrollBy(double deltaY) {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final target = (position.pixels + deltaY)
+        .clamp(0.0, position.maxScrollExtent);
+    _scrollController.jumpTo(target);
+  }
+
+  /// 智能跳转：在顶部附近 → 跳到最底部；否则 → 跳到最顶部。
+  ///
+  /// 替代原来的「跳顶 + 跳底」双按钮，合并为单一按钮按位置智能决定方向，
+  /// 移动端仍保留一键滚动能力（不依赖键盘快捷键）。
+  void scrollTopOrBottom() {
+    if (!_scrollController.hasClients) return;
+    if (isNearTop.value) {
+      scrollToBottom();
+    } else {
+      scrollToTop();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SelectionArea(
@@ -166,12 +219,19 @@ class MessageListState extends State<MessageList> {
               _StreamingBubble(
                 content: widget.streamingContent,
                 showPlaceholder: widget.streamingContent.isEmpty,
+                // 透传 messageBuilder：使舞台页流式输出也能走
+                // [StageMessageBubble]（角色着色），而非绕回标准气泡
+                messageBuilder: widget.messageBuilder,
               ),
             );
           }
 
           // ---- 普通消息 ----
-          return _wrapBubble(MessageBubble(message: widget.messages[index]));
+          final message = widget.messages[index];
+          final bubble =
+              widget.messageBuilder?.call(message, false) ??
+              MessageBubble(message: message);
+          return _wrapBubble(bubble);
         },
       ),
     );
@@ -215,9 +275,14 @@ class _StreamingBubble extends StatefulWidget {
   /// 内容为空时是否显示「思考中...」占位
   final bool showPlaceholder;
 
+  /// 自定义气泡构建器（与 [MessageList.messageBuilder] 一致；
+  /// null 时使用标准 [MessageBubble]）
+  final Widget Function(Message message, bool isStreaming)? messageBuilder;
+
   const _StreamingBubble({
     required this.content,
     required this.showPlaceholder,
+    this.messageBuilder,
   });
 
   @override
@@ -248,10 +313,12 @@ class _StreamingBubbleState extends State<_StreamingBubble> {
     // 内容为空且需占位时显示「思考中...」本地化文案
     // （仅有此状态才做 l10n 查找；流式内容非空时直接使用缓存 Message）
     final displayMessage = widget.content.isEmpty && widget.showPlaceholder
-        ? Message.assistant(
-            AppLocalizations.of(context).messageBubbleThinking,
-          )
+        ? Message.assistant(AppLocalizations.of(context).messageBubbleThinking)
         : _message;
-    return MessageBubble(message: displayMessage, isStreaming: true);
+    // 优先走 messageBuilder（舞台页角色着色）；null 时退回标准气泡
+    final bubble =
+        widget.messageBuilder?.call(displayMessage, true) ??
+        MessageBubble(message: displayMessage, isStreaming: true);
+    return bubble;
   }
 }

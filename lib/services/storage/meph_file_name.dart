@@ -9,9 +9,15 @@
 ///   - `faust.child.meph`         → [faust, child]（默认存档）
 ///
 /// 各调用方（contract_repo / child_save_store / session_saver / narrative_state /
-/// contract_provider）此前存在分散的 `replaceAll + split + indexOf` 字符串样板，
-/// 统一收敛至此消除重复。
+/// contract_provider / narrative_provider / stage_narrative_provider）此前存在
+/// 分散的 `replaceAll + split + indexOf` 字符串样板，统一收敛至此消除重复。
 library;
+
+/// 默认子版后缀（母版名 + `.child`）。
+///
+/// 被 [defaultChildFileName] / [stripChildSuffix] 与 [ChildSaveStore]
+/// 共同引用，是存档命名规则的核心常量。
+const String defaultChildSuffix = '.child';
 
 /// 解析文件名为「基础名（去 `.meph` 后缀）的路径段列表」。
 List<String> splitBaseName(String fileName) {
@@ -38,13 +44,29 @@ String? extractBranchPath(String fileName) {
 }
 
 /// 计算「当前分支路径」：去掉 `.child` 存档尾段后，提取层级前缀。
+///
+/// - `faust.meph`            → `faust`
+/// - `faust.dark.meph`       → `faust.dark`
+/// - `faust.dark.child.meph` → `faust.dark`（.child 是存档后缀，非分支）
+/// - `faust.dark.light.meph` → `faust.dark.light`
 String stripChildSuffix(String fileName) {
   final base = fileName.replaceAll('.meph', '');
-  final trimmed = base.endsWith('.child')
-      ? base.substring(0, base.length - '.child'.length)
+  final trimmed = base.endsWith(defaultChildSuffix)
+      ? base.substring(0, base.length - defaultChildSuffix.length)
       : base;
   return trimmed;
 }
+
+/// 构造默认子版文件名（`faust.meph` → `faust.child.meph`；
+/// `faust.dark.meph` → `faust.dark.child.meph`）。
+///
+/// 与 [SessionSaver.saveCurrent] 的存档命名规则保持一致：
+/// 默认存档属于「当前分支路径 + `.child`」，而非仅母版根。
+/// 被 [NarrativeNotifier] / [StageNarrativeNotifier] 共享调用，
+/// 统一此前两个 Notifier 间不一致的实现（旧单角色版仅取母版根，
+/// 导致多级分支下无法正确定位/恢复存档）。
+String defaultChildFileName(String masterFileName) =>
+    '${stripChildSuffix(masterFileName)}$defaultChildSuffix.meph';
 
 /// 计算文件名对应的层级深度（母版根为 0，一级子版为 1，二级为 2 …）。
 int fileNameDepth(String fileName) => splitBaseName(fileName).length - 1;

@@ -46,17 +46,18 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
 - **Memory System**: Automatically extracts key event summaries, auto-compresses when over the limit, shaping long-term narrative consistency
 - **Context Window**: Choose a history message tier (20 / 40 / 60 / All) on the settings page to control LLM token consumption and prevent long conversations from diluting response quality
 - **Child Save System**: Master contracts are read-only; runtime dialogues generate child snapshots, supporting branches and restoration
+- **Contract Export/Import (ZIP)**: A single-character fate tree (master + all child versions) or an entire multi-character stage directory can be exported as standard `.zip` with one click; import supports auto-extracting `.zip` files (with automatic duplicate-name serial numbering), so sharing / backup / migration no longer requires manually hunting through directories
 - **Rule Hot-Reload**: Edit in the narrative page ✏️ or save the `.meph` in VSCode → **only rules take effect instantly**, with dialogue/state/memory/history all preserved
 - **Customizable Style**: Freely set narrative rules to precisely control output literary style (poetic dialogue / stark realism, etc.)
 - **Cross-Platform**: Windows / macOS / Linux / Android / iOS
   - Desktop: Windows / macOS / Linux, contracts stored in user home `~/Mephisto/contracts`, customizable directory
-  - Android: contracts can switch between "app internal storage ↔ app external storage", supports importing `.meph` files
-  - iOS: contracts stored in app sandbox documents (system restriction, cleared on uninstall), supports importing `.meph` files
+  - Android: contracts can switch between "app internal storage ↔ app external storage", supports importing `.meph` / `.zip` files
+  - iOS: contracts stored in app sandbox documents (system restriction, cleared on uninstall), supports importing `.meph` / `.zip` files
 
 ## 📖 Quick Start
 
 1. **Configure LLM**: Go to "Settings → LLM Configuration", fill in API Key / Base URL / Model (compatible with OpenAI / DeepSeek / Ollama)
-2. **Select a Contract**: On the home page, choose a built-in contract (Faust / Edmond Dantès) or import your own `.meph` file
+2. **Select a Contract**: On the home page, choose a built-in contract (Faust / Edmond Dantès / Joan of Arc / Young Arthur / Gilgamesh) or import your own `.meph` file / `.zip` archive (for a whole fate tree or stage)
    - Desktop: You can customize the contract directory on the settings page; Android: switch between internal/external storage on the settings page; iOS: uses the app sandbox directory
 3. **Enter Fate Guidance**: On the narrative page, enter scene progressions, and the AI will unfold the narrative in third-person literary prose
 4. **Adjust Context Window (optional)**: On the settings page, "History Message Window" offers 20 / 40 / 60 / Send All tiers,
@@ -247,12 +248,15 @@ that automatically runs on Linux / Windows / macOS:
    > uninstalling the app **wipes all contracts and saves** (master `.meph`, child saves `*.child.meph`, custom branches)
    > with **no way to recover them**. Back up first:
    >
-   > 1. Switch the contract directory to **"External Storage"** mode on the settings page
-   >    (the internal-storage path is not directly accessible via file managers)
-   > 2. Open `/storage/emulated/0/Android/data/yuelinghuashu.mephisto/files/Mephisto/contracts`
+   > **Easiest way: use the "Export (ZIP)" option in the ⋮ menu of a contract/stage card on the home page** —
+   > pack a fate tree (master + all child versions) or an entire multi-character stage into a `.zip` and save it
+   > to Downloads / computer / cloud drive; after reinstalling, just use the "Import" button on the home page to restore it.
+   >
+   > Manual backup (for Android external storage mode):
+   > 1. Open `/storage/emulated/0/Android/data/yuelinghuashu.mephisto/files/Mephisto/contracts`
    >    via a phone file manager or **USB connection to a computer (MTP mode)**
-   > 3. Copy **all `.meph` files** to your Downloads folder, computer, or cloud drive
-   > 4. After installing the new version, use the **"Import"** button on the home page to re-import the backed-up `.meph` files
+   > 2. Copy **all `.meph` files** to your Downloads folder, computer, or cloud drive
+   > 3. After installing the new version, use the **"Import"** button on the home page to re-import the backed-up `.meph` files
    >
    > Saves (child versions) are the same `.meph` files as contracts, so importing restores them completely,
    > including their branch labels (`@命运`).

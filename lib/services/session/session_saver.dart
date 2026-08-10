@@ -5,7 +5,10 @@
 /// 且可脱离框架直接单元测试。
 library;
 
+import 'dart:io';
+
 import '../../domain/models.dart';
+import '../storage/meph_file_name.dart';
 import 'child_save_store.dart';
 
 /// 会话存档服务
@@ -15,6 +18,8 @@ class SessionSaver {
   /// - [branchName]：null 时使用默认 `.child`
   /// - [branchTitle]：以 `@命运:` 标记注入子版【角色背景】
   /// - [overwriteFileName]：直接覆盖的文件名（已存在子版时传入）
+  /// - [targetDir]：目标目录（舞台场景下为舞台目录 `舞台/`）；
+  ///   null 时使用全局契约目录（向后兼容）
   static Future<String> save({
     required String masterFileName,
     required Contract contract,
@@ -24,6 +29,7 @@ class SessionSaver {
     String? branchName,
     String? branchTitle,
     String? overwriteFileName,
+    Directory? targetDir,
   }) {
     return ChildSaveStore.save(
       masterFileName,
@@ -34,6 +40,7 @@ class SessionSaver {
       branchName: branchName,
       branchTitle: branchTitle,
       overwriteFileName: overwriteFileName,
+      targetDir: targetDir,
     );
   }
 
@@ -108,19 +115,8 @@ class SessionSaver {
 
   /// 计算「当前分支路径」：去掉 `.child` 存档尾段后，提取层级前缀。
   ///
-  /// - `faust.meph`            → `faust`
-  /// - `faust.dark.meph`       → `faust.dark`
-  /// - `faust.dark.child.meph` → `faust.dark`（.child 是存档后缀，非分支）
-  /// - `faust.dark.light.meph` → `faust.dark.light`
-  static String _stripChildSuffix(String sourceFileName) {
-    final base = sourceFileName.replaceAll('.meph', '');
-    // 丢弃末尾的 .child 存档段
-    final trimmed = base.endsWith(ChildSaveStore.defaultChildSuffix)
-        ? base.substring(
-            0,
-            base.length - ChildSaveStore.defaultChildSuffix.length,
-          )
-        : base;
-    return trimmed;
-  }
+  /// 委托共享工具 [stripChildSuffix]，消除同名重复实现
+  /// （此前两处逻辑完全一致但各自维护）。
+  static String _stripChildSuffix(String sourceFileName) =>
+      stripChildSuffix(sourceFileName);
 }

@@ -5,6 +5,8 @@
 /// 使逻辑可独立单元测试，State 只负责桥接。
 library;
 
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +14,7 @@ import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../providers/contract_provider.dart';
 import '../../providers/home_selection_controller.dart';
+import '../../services/contract_pack.dart';
 import '../../services/storage/contract_dir.dart';
 import '../../services/storage/contract_repo.dart';
 import '../../widgets/dialogs/confirm_delete_dialog.dart';
@@ -57,9 +60,11 @@ Future<void> deleteSelectedContract(
   }
 }
 
-/// 从本地文件系统导入 .meph 契约文件到用户契约目录。
+/// 从本地文件系统导入契约文件到用户契约目录。
 ///
-/// 支持多选：文件选择器允许同时选择多个 .meph 文件，逐个导入。
+/// 支持两类文件（可混合多选）：
+///   - `.meph` 契约文件：直接复制
+///   - `.zip` 压缩包：解压后提取其中全部 .meph 文件
 Future<void> importContractFiles(
   BuildContext context, {
   required VoidCallback onRefreshLists,
@@ -67,10 +72,10 @@ Future<void> importContractFiles(
   final messenger = ScaffoldMessenger.of(context);
   final l10n = AppLocalizations.of(context);
 
-  // 打开系统文件选择器（过滤 .meph 文件，支持多选）
+  // 打开系统文件选择器（支持 .meph + .zip，多选）
   const typeGroup = XTypeGroup(
     label: 'Mephisto 契约',
-    extensions: ['meph'],
+    extensions: ['meph', 'zip'],
   );
   final files = await openFiles(acceptedTypeGroups: [typeGroup]);
 
@@ -80,11 +85,17 @@ Future<void> importContractFiles(
   var failCount = 0;
   var lastError = '';
 
-  // 逐个导入（重名自动加序号）
+  // 逐个导入（.meph 直接复制；.zip 解压还原）
   for (final file in files) {
     try {
-      await importContract(file.path, file.name);
-      successCount++;
+      if (file.name.toLowerCase().endsWith('.zip')) {
+        final bytes = await file.readAsBytes();
+        final imported = await unpackMeph(bytes);
+        successCount += imported;
+      } else {
+        await importContract(file.path, file.name);
+        successCount++;
+      }
     } catch (e) {
       failCount++;
       lastError = '$e';
@@ -108,6 +119,69 @@ Future<void> importContractFiles(
       SnackBar(
         content: Text(l10n.homeImportPartial(successCount, failCount)),
       ),
+    );
+  }
+}
+
+/// 导出单棵命运树（母版 + 全部子版）为 .zip 文件。
+///
+/// 通过系统保存对话框让用户选择保存位置；取消时静默返回。
+Future<void> exportContractTree(
+  BuildContext context, {
+  required String masterFileName,
+}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final l10n = AppLocalizations.of(context);
+
+  final bytes = await packContractTree(masterFileName);
+
+  final destination = await getSaveLocation(
+    suggestedName: '$masterFileName.zip'.replaceAll('.meph', ''),
+    acceptedTypeGroups: const [
+      XTypeGroup(label: 'ZIP 压缩包', extensions: ['zip']),
+    ],
+  );
+  if (destination == null) return; // 用户取消
+
+  try {
+    await File(destination.path).writeAsBytes(bytes);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.homeExportSuccess(destination.path))),
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.homeExportFail('$e'))),
+    );
+  }
+}
+
+/// 导出整个舞台目录为 .zip 文件。
+Future<void> exportStage(
+  BuildContext context, {
+  required String stageDirPath,
+}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final l10n = AppLocalizations.of(context);
+
+  final bytes = await packStage(stageDirPath);
+
+  final stageName = stageDirPath.split(Platform.pathSeparator).last;
+  final destination = await getSaveLocation(
+    suggestedName: '$stageName.zip',
+    acceptedTypeGroups: const [
+      XTypeGroup(label: 'ZIP 压缩包', extensions: ['zip']),
+    ],
+  );
+  if (destination == null) return; // 用户取消
+
+  try {
+    await File(destination.path).writeAsBytes(bytes);
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.homeExportSuccess(destination.path))),
+    );
+  } catch (e) {
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.homeExportFail('$e'))),
     );
   }
 }

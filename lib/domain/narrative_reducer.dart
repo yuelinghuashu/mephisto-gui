@@ -10,21 +10,7 @@ library;
 import 'models.dart';
 import 'narrative_event.dart';
 import 'narrative_state.dart';
-
-/// 将历史条目列表转换为 UI 消息列表（共享纯函数，供 Reducer 与状态管理器复用）。
-///
-/// 历史条目只含命运 / 角色两类（系统消息不参与存档）；
-/// 转换后生成对应的 [Message.fate] / [Message.assistant] / [Message.system]。
-List<Message> historyToMessages(List<HistoryEntry> history) {
-  return [
-    for (final h in history)
-      switch (h.role) {
-        MessageRole.fate => Message.fate(h.content),
-        MessageRole.assistant => Message.assistant(h.content),
-        MessageRole.system => Message.system(h.content),
-      },
-  ];
-}
+import 'reducer_utils.dart';
 
 /// 在历史末尾追加一条条目（共享辅助，消除多处同步复制列表的样板）。
 List<HistoryEntry> _appendHistoryEntry(
@@ -179,18 +165,30 @@ NarrativeState _onContextAttached(
   String fileName,
   String content,
 ) {
+  final (fileNames, contexts) = appendAttachment(
+    state.attachedFileNames,
+    state.attachedContexts,
+    fileName,
+    content,
+  );
   return state.copyWith(
-    attachedFileNames: [...state.attachedFileNames, fileName],
-    attachedContexts: [...state.attachedContexts, content],
+    attachedFileNames: fileNames,
+    attachedContexts: contexts,
   );
 }
 
 /// 移除指定索引的附加上下文（越界忽略）。
 NarrativeState _onContextRemoved(NarrativeState state, int index) {
-  if (index < 0 || index >= state.attachedFileNames.length) return state;
+  final removed = removeAttachmentAt(
+    state.attachedFileNames,
+    state.attachedContexts,
+    index,
+  );
+  if (removed == null) return state;
+  final (fileNames, contexts) = removed;
   return state.copyWith(
-    attachedFileNames: [...state.attachedFileNames]..removeAt(index),
-    attachedContexts: [...state.attachedContexts]..removeAt(index),
+    attachedFileNames: fileNames,
+    attachedContexts: contexts,
   );
 }
 

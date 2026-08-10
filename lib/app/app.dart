@@ -22,13 +22,6 @@ class MyApp extends ConsumerStatefulWidget {
 
 class _MyAppState extends ConsumerState<MyApp> {
   @override
-  void initState() {
-    super.initState();
-    // 各 Notifier 已在 build() 中自动从 SharedPreferences 恢复持久化偏好
-    // （主题 / LLM 配置 / 叙事宽度 / 叙事规则），此处无需手动逐项 load。
-  }
-
-  @override
   Widget build(BuildContext context) {
     // 从持久化设置读取主题模式（默认跟随系统）
     final themeMode = ref.watch(themeModeProvider);

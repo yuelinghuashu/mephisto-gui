@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
+import '../app/theme.dart';
 import '../widgets/settings/contracts_dir_section.dart';
 import '../widgets/settings/language_section.dart';
 import '../widgets/settings/llm_config_section.dart';
@@ -32,9 +33,6 @@ import 'settings_section_page.dart';
 /// 本页只负责「响应式组装 + 导航」。
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
-
-  /// 窄屏阈值：低于此宽度时切换为分区导航模式（与叙事页移动端判定一致）
-  static const double mobileBreakpoint = 600;
 
   /// 设置分区配置（icon + 标题 + 区块 builder）
   ///
@@ -93,7 +91,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final isNarrow = MediaQuery.sizeOf(context).width < mobileBreakpoint;
+    final isNarrow = MediaQuery.sizeOf(context).width < AppTheme.mobileBreakpoint;
 
     return Scaffold(
       appBar: AppBar(title: Text('📜 ${l10n.homeSettings}'), centerTitle: false),

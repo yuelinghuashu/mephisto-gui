@@ -21,6 +21,7 @@ import '../widgets/narrative/dashboard_drawer.dart';
 import '../widgets/narrative/empty_state.dart';
 import '../widgets/narrative/input_bar.dart';
 import '../widgets/narrative/message_list.dart';
+import '../widgets/narrative/smart_jump_button.dart';
 import '../widgets/narrative/status_bar.dart';
 import '../widgets/narrative/width_constrained_center.dart';
 
@@ -34,7 +35,7 @@ import '../widgets/narrative/width_constrained_center.dart';
 ///
 /// 存档机制（母版/子版）：
 ///   - 进入页面时自动恢复最近存档；每轮对话自动覆盖保存子版文件（`faust.child.meph`）
-///   - AppBar 存档菜单支持：保存、另存为分支、删除
+///   - AppBar 存档菜单支持：另存为分支、删除（当前进度由自动存档覆盖）
 ///
 /// 规则热重载：
 ///   - 通过 [FileSystemEntity.watch] 监听当前打开的 .meph 文件，
@@ -210,7 +211,8 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final narrativeWidth = ref.watch(narrativeWidthProvider);
     final contentMaxWidth = narrativeWidth.maxWidth;
     // 移动端检测（宽度 < 600 时仪表盘改为底部弹出，而非右侧抽屉）
-    final isMobile = MediaQuery.sizeOf(context).width < 600;
+    final isMobile =
+        MediaQuery.sizeOf(context).width < AppTheme.mobileBreakpoint;
 
     // ---- 构建界面 ----
     return CallbackShortcuts(
@@ -233,9 +235,10 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
             builder: (context, constraints) {
               // 可用宽度不足以容纳「▸ 分支名」时整体隐藏箭头，
               // 避免出现文本已消失但箭头孤立的窄屏问题。
-              // 120 为「 ▸ 」+ 两侧间距 + 最小分支名宽度的估算值。
+              // 阈值为「 ▸ 」+ 两侧间距 + 最小分支名宽度的估算值。
               final showBranch =
-                  state.branchName.isNotEmpty && constraints.maxWidth > 120;
+                  state.branchName.isNotEmpty &&
+                  constraints.maxWidth > AppTheme.minWidthForBranchDisplay;
 
               return Row(
                 children: [
@@ -268,7 +271,8 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
             },
           ),
           actions: [
-            // 存档菜单（保存/另存为/删除）
+            // 存档菜单（另存为分支 / 删除存档）
+            // 「保存当前进度」已由每轮自动存档覆盖，无需手动重复保存
             PopupMenuButton<String>(
               icon: const Icon(Icons.save_outlined),
               tooltip: AppLocalizations.of(context).narrativeSaveMenu,
@@ -276,7 +280,6 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
               // 缩短动画时长，菜单弹出更快更流畅（共享样式见 AppTheme.popupAnimationStyle）
               popUpAnimationStyle: AppTheme.popupAnimationStyle,
               itemBuilder: (context) => [
-                ContractMenuItem('save', Icons.save_outlined, l10n.narrativeSaveCurrent),
                 ContractMenuItem(
                   'save_branch',
                   Icons.account_tree_outlined,
@@ -286,18 +289,10 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                 ContractMenuItem('delete', Icons.delete_outline, l10n.narrativeDeleteSave),
               ],
             ),
-            // 跳至第一条历史（消息流垂直滚动 → 用垂直双箭头表达「跳到顶」）
-            IconButton(
-              icon: const Icon(Icons.keyboard_double_arrow_up),
-              tooltip: l10n.narrativeScrollTop,
-              onPressed: () => _messageListKey.currentState?.scrollToTop(),
-            ),
-            // 跳至最后一条历史（消息流垂直滚动 → 用垂直双箭头表达「跳到底」）
-            IconButton(
-              icon: const Icon(Icons.keyboard_double_arrow_down),
-              tooltip: l10n.narrativeScrollBottom,
-              onPressed: () => _messageListKey.currentState?.scrollToBottom(),
-            ),
+            // 智能跳转：顶部附近 → 跳到底部；其余 → 跳到顶部。
+            // 合并「跳顶 + 跳底」双按钮，图标随位置自动切换，
+            // 移动端保留一键滚动（不依赖 Ctrl+Home/End）。
+            SmartJumpButton(messageListKey: _messageListKey),
             // 编辑当前契约（打开应用内编辑器；保存由文件监听自动热更新）
             IconButton(
               icon: const Icon(Icons.edit_outlined),
@@ -377,7 +372,27 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
             // 输入区（StatefulWidget 管理 Controller 生命周期）—— 居中受限
             WidthConstrainedCenter(
               contentMaxWidth: contentMaxWidth,
-              child: InputBar(isGenerating: isGenerating),
+              child: InputBar(
+                isGenerating: isGenerating,
+                onSend: (text) {
+                  ref.read(narrativeProvider.notifier).sendMessage(text);
+                },
+                onStop: () {
+                  ref.read(narrativeProvider.notifier).stopGenerating();
+                },
+                showAttachment: true,
+                attachedFileNames: state.attachedFileNames,
+                onAttach: (fileName, content) {
+                  ref
+                      .read(narrativeProvider.notifier)
+                      .attachContext(fileName, content);
+                },
+                onRemoveAttach: (index) {
+                  ref
+                      .read(narrativeProvider.notifier)
+                      .removeAttachedContext(index);
+                },
+              ),
             ),
 
             // 状态条 —— 居中受限
@@ -402,19 +417,6 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final l10n = AppLocalizations.of(context);
 
     switch (value) {
-      case 'save':
-        final fileName = await notifier.saveChild();
-        if (!mounted) return;
-        if (fileName != null) {
-          messenger.showSnackBar(
-            SnackBar(content: Text(l10n.narrativeSaveSuccess(fileName))),
-          );
-        } else {
-          messenger.showSnackBar(
-            SnackBar(content: Text(l10n.narrativeSaveFail)),
-          );
-        }
-        break;
       case 'save_branch':
         await _showSaveBranchDialog();
         break;

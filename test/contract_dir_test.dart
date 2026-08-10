@@ -33,7 +33,7 @@ void main() {
     });
   }
 
-  test('目录未种子 → 首次调用复制内置模板（含官方示范子版）', () async {
+  test('目录未种子 → 首次调用复制内置模板（含官方示范子版 + 内置舞台）', () async {
     seedDir(tempDir.path);
 
     await ensureContracts();
@@ -41,6 +41,9 @@ void main() {
     // 母版契约
     expect(File('${tempDir.path}/faust.meph').existsSync(), isTrue);
     expect(File('${tempDir.path}/dantes.meph').existsSync(), isTrue);
+    expect(File('${tempDir.path}/joan_of_arc.meph').existsSync(), isTrue);
+    expect(File('${tempDir.path}/arthur_sword.meph').existsSync(), isTrue);
+    expect(File('${tempDir.path}/gilgamesh.meph').existsSync(), isTrue);
     // 官方示范子版（命运支流枝叶）
     expect(File('${tempDir.path}/dantes.bonapart.meph').existsSync(), isTrue);
     expect(File('${tempDir.path}/faust.utopia.meph').existsSync(), isTrue);
@@ -48,6 +51,62 @@ void main() {
     final faust = File('${tempDir.path}/faust.meph').readAsStringSync();
     expect(faust, contains('【角色名】'));
     expect(faust, contains('浮士德'));
+
+    // 新内置单角色契约：贞德·达尔克 / 少年亚瑟
+    final joan = File('${tempDir.path}/joan_of_arc.meph').readAsStringSync();
+    expect(joan, contains('【角色名】'));
+    expect(joan, contains('贞德'));
+    final arthur = File('${tempDir.path}/arthur_sword.meph').readAsStringSync();
+    expect(arthur, contains('【角色名】'));
+    expect(arthur, contains('亚瑟'));
+
+    // 内置舞台（多角色）：Kurukshetra 目录 + 两个角色卡
+    final kurukshetraDir = Directory('${tempDir.path}/Kurukshetra');
+    expect(kurukshetraDir.existsSync(), isTrue);
+    expect(File('${kurukshetraDir.path}/Arjuna.meph').existsSync(), isTrue);
+    expect(File('${kurukshetraDir.path}/Karna.meph').existsSync(), isTrue);
+    final arjuna = File('${kurukshetraDir.path}/Arjuna.meph').readAsStringSync();
+    expect(arjuna, contains('【角色名】'));
+    expect(arjuna, contains('阿周那'));
+
+    // 新内置舞台（多角色）：Camlann 目录 + 两角色卡
+    final camlannDir = Directory('${tempDir.path}/Camlann');
+    expect(camlannDir.existsSync(), isTrue);
+    expect(File('${camlannDir.path}/Arthur.meph').existsSync(), isTrue);
+    expect(File('${camlannDir.path}/Mordred.meph').existsSync(), isTrue);
+    final camlannArthur = File('${camlannDir.path}/Arthur.meph').readAsStringSync();
+    expect(camlannArthur, contains('【角色名】'));
+    expect(camlannArthur, contains('亚瑟'));
+    final mordred = File('${camlannDir.path}/Mordred.meph').readAsStringSync();
+    expect(mordred, contains('【角色名】'));
+    expect(mordred, contains('莫德雷德'));
+  });
+
+  test('force: true → 恢复缺失的内置舞台', () async {
+    seedDir(tempDir.path);
+    await ensureContracts();
+
+    // 用户删除整个 Kurukshetra 和 Camlann 舞台
+    Directory('${tempDir.path}/Kurukshetra').deleteSync(recursive: true);
+    Directory('${tempDir.path}/Camlann').deleteSync(recursive: true);
+    expect(Directory('${tempDir.path}/Kurukshetra').existsSync(), isFalse);
+    expect(Directory('${tempDir.path}/Camlann').existsSync(), isFalse);
+
+    // 正常调用不恢复（种子已置位）
+    await ensureContracts();
+    expect(Directory('${tempDir.path}/Kurukshetra').existsSync(), isFalse);
+    expect(Directory('${tempDir.path}/Camlann').existsSync(), isFalse);
+
+    // force: true 强制恢复缺失的内置舞台
+    await ensureContracts(force: true);
+    final kurukshetraDir = Directory('${tempDir.path}/Kurukshetra');
+    expect(kurukshetraDir.existsSync(), isTrue);
+    expect(File('${kurukshetraDir.path}/Arjuna.meph').existsSync(), isTrue);
+    expect(File('${kurukshetraDir.path}/Karna.meph').existsSync(), isTrue);
+    final camlannDir = Directory('${tempDir.path}/Camlann');
+    expect(camlannDir.existsSync(), isTrue);
+    expect(File('${camlannDir.path}/Arthur.meph').existsSync(), isTrue);
+    expect(File('${camlannDir.path}/Mordred.meph').existsSync(), isTrue);
   });
 
   test('目录已种子 → 不自动恢复被删除的模板', () async {

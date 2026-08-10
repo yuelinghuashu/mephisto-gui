@@ -19,16 +19,27 @@ import 'values.dart';
 // 消息模型
 // ============================================================
 
-/// 全局自增 ID 计数器。
+/// 唯一 ID 生成器
 ///
 /// 与时间戳组合生成唯一 ID（`<毫秒时间戳>-<自增序号>`），
 /// 避免同一毫秒内创建多个对象时 ID 冲突（仅时间戳不足以保证唯一）。
-int _idCounter = 0;
+///
+/// 计数器封装为「类级静态字段」而非文件级全局变量：
+///   - 文件级 `int _idCounter` 在库加载时即初始化，多个测试库并行
+///     加载时共享同一全局状态，可能导致跨库 ID 冲突/非确定性
+///   - 类级静态字段 + 私有构造函数使生成逻辑完全封闭在 domain 层，
+///     不向外暴露任何可变状态访问点
+class _UniqueIdGenerator {
+  _UniqueIdGenerator._();
 
-/// 生成全局唯一的对象 ID（时间戳 + 自增序号组合）。
-String _generateUniqueId() {
-  final ms = DateTime.now().millisecondsSinceEpoch;
-  return '$ms-${_idCounter++}';
+  /// 自增序号计数器（类级静态，进程内唯一）
+  static int _counter = 0;
+
+  /// 生成全局唯一的对象 ID（时间戳 + 自增序号组合）。
+  static String generate() {
+    final ms = DateTime.now().millisecondsSinceEpoch;
+    return '$ms-${_counter++}';
+  }
 }
 
 /// 单条对话消息
@@ -58,13 +69,22 @@ class Message extends Equatable {
   /// 而非普通纯文本消息。
   final List<DiceResult>? diceResults;
 
+  /// 发言者角色名（仅多角色舞台的 assistant 消息非空）
+  ///
+  /// 由舞台 Reducer 在创建角色消息时附加（`roleTag: roleName`），
+  /// UI 据此查询角色色板并着色气泡（左边框 + 角色名标签）。
+  ///
+  /// 单角色叙事 / 命运 / 系统消息恒为 null（向后兼容，零行为改变）。
+  final String? roleTag;
+
   Message({
     String? id,
     required this.role,
     required this.content,
     DateTime? timestamp,
     this.diceResults,
-  }) : id = id ?? _generateUniqueId(),
+    this.roleTag,
+  }) : id = id ?? _UniqueIdGenerator.generate(),
        timestamp = timestamp ?? DateTime.now();
 
   /// 创建一条命运（用户）消息
@@ -77,12 +97,17 @@ class Message extends Equatable {
       );
 
   /// 创建一条角色（AI）消息
-  Message.assistant(String content, {String? id, DateTime? timestamp})
-    : this(
+  Message.assistant(
+    String content, {
+    String? id,
+    DateTime? timestamp,
+    String? roleTag,
+  }) : this(
         id: id,
         role: MessageRole.assistant,
         content: content,
         timestamp: timestamp,
+        roleTag: roleTag,
       );
 
   /// 创建一条系统消息（可选承载骰子判定结果）
@@ -106,7 +131,7 @@ class Message extends Equatable {
   // 含 id/timestamp 时，相同内容的消息在 Equatable 比较中永远不相等，
   // 且全局自增 ID 计数器在各测试/实例间持续递增，导致非确定性行为。
   @override
-  List<Object?> get props => [role, content, diceResults];
+  List<Object?> get props => [role, content, diceResults, roleTag];
 }
 
 // ============================================================
@@ -206,7 +231,7 @@ class Memory extends Equatable {
     required this.content,
     DateTime? createdAt,
     this.importance = defaultImportance,
-  }) : id = id ?? _generateUniqueId(),
+  }) : id = id ?? _UniqueIdGenerator.generate(),
        createdAt = createdAt ?? DateTime.now();
 
   /// 默认权重（中等）

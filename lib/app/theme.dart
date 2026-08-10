@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 ///   - 圆角：8pt（输入框）/ 12pt（卡片）
 ///
 /// 内部实现：
-///   亮/暗主题共用 [_buildTheme] 工厂方法，仅传入不同的 [_Palette] 色板差异，
+///   亮/暗主题共用 [_buildTheme] 工厂方法，根据 [Brightness] 选取对应色板，
 ///   消除两个主题之间的大量重复代码。
 class AppTheme {
   /// 私有构造函数，禁止实例化
@@ -82,7 +82,7 @@ class AppTheme {
 
   /// 金色暗色变体（古铜色）
   ///
-  /// 用途：次要强调、装饰边框
+  /// 用途：次要强调、装饰边框（colorScheme.secondary）
   static const Color goldDark = Color(0xFF8B5A2B);
 
   /// 深红色
@@ -99,25 +99,23 @@ class AppTheme {
   static const double radiusSmall = 8.0;
   static const double radiusLarge = 12.0;
 
-  /// 成功色（绿色）
+  /// 移动端断点（逻辑像素）
   ///
-  /// 用途：骰子成功、状态正向变化
-  static const Color success = Color(0xFF4CAF50);
+  /// 宽度低于此值时界面切换为移动端布局（更紧凑/底部弹出面板/分区导航）。
+  /// 被叙事页、首页、设置页、契约卡等多处共享，此前各处以裸数字 `600`
+  /// 分散定义，统一收敛至此消除漂移。
+  static const double mobileBreakpoint = 600;
+
+  /// 叙事页 AppBar 中「▸ 分支名」所需的最小宽度（逻辑像素）。
+  ///
+  /// 可用宽度低于此值时隐藏分支名显示（避免文本消失但箭头孤立的窄屏问题）。
+  /// 估算值：分「 ▸ 」+ 两侧间距 + 最小分支名宽度。
+  static const double minWidthForBranchDisplay = 120;
 
   /// 错误色（红色）
   ///
   /// 用途：骰子失败、错误提示
   static const Color error = Color(0xFFE53935);
-
-  /// 警告色（橙色）
-  ///
-  /// 用途：状态变更、需要注意的信息
-  static const Color warning = Color(0xFFFFB74D);
-
-  /// 遮罩色
-  ///
-  /// 用途：仪表盘展开时，主舞台的背景暗化
-  static const Color overlay = Color(0x66000000);
 
   // ============================================================
   // 主题构建
@@ -135,19 +133,7 @@ class AppTheme {
   ///   - 夜间阅读
   ///   - 沉浸式叙事
   ///   - 追求神秘氛围
-  static ThemeData dark() {
-    return _buildTheme(
-      const _Palette(
-        brightness: Brightness.dark,
-        background: darkBackground,
-        surface: darkSurface,
-        surfaceVariant: darkSurfaceVariant,
-        divider: darkDivider,
-        textPrimary: darkTextPrimary,
-        textSecondary: darkTextSecondary,
-      ),
-    );
-  }
+  static ThemeData dark() => _buildTheme(Brightness.dark);
 
   /// 创建亮色主题
   ///
@@ -161,33 +147,29 @@ class AppTheme {
   ///   - 日间阅读
   ///   - 清晰度优先
   ///   - 追求干净、明亮的阅读体验
-  static ThemeData light() {
-    return _buildTheme(
-      const _Palette(
-        brightness: Brightness.light,
-        background: lightBackground,
-        surface: lightSurface,
-        surfaceVariant: lightSurfaceVariant,
-        divider: lightDivider,
-        textPrimary: lightTextPrimary,
-        textSecondary: lightTextSecondary,
-      ),
-    );
-  }
+  static ThemeData light() => _buildTheme(Brightness.light);
 
   /// 统一的主题构建工厂方法
   ///
   /// 亮/暗主题仅色板不同，组件样式（AppBar、TextField、卡片、SnackBar）
-  /// 完全一致。通过传入 [_Palette] 差异值，消除重复代码。
-  static ThemeData _buildTheme(_Palette p) {
-    final isDark = p.brightness == Brightness.dark;
+  /// 完全一致。根据 [Brightness] 在亮/暗色板中选取色值，消除重复代码。
+  static ThemeData _buildTheme(Brightness brightness) {
+    final isDark = brightness == Brightness.dark;
+
+    // 从亮/暗色板中选取当前主题色值
+    final background = isDark ? darkBackground : lightBackground;
+    final surface = isDark ? darkSurface : lightSurface;
+    final surfaceVariant = isDark ? darkSurfaceVariant : lightSurfaceVariant;
+    final divider = isDark ? darkDivider : lightDivider;
+    final textPrimary = isDark ? darkTextPrimary : lightTextPrimary;
+    final textSecondary = isDark ? darkTextSecondary : lightTextSecondary;
 
     // 基础主题（亮/暗）
     final base = isDark ? ThemeData.dark() : ThemeData.light();
 
     return base.copyWith(
       // ---- 基础色 ----
-      scaffoldBackgroundColor: p.background,
+      scaffoldBackgroundColor: background,
       primaryColor: gold,
 
       // ---- 颜色方案 ----
@@ -196,22 +178,22 @@ class AppTheme {
               .copyWith(
         primary: gold,
         secondary: goldDark,
-        surface: p.surface,
+        surface: surface,
         error: error,
       ),
 
       // ---- 应用栏 ----
       appBarTheme: AppBarTheme(
-        backgroundColor: p.surface,
+        backgroundColor: surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          color: p.textPrimary,
+          color: textPrimary,
           fontSize: 16,
           fontWeight: FontWeight.bold,
         ),
-        iconTheme: IconThemeData(color: p.textPrimary, size: 22),
+        iconTheme: IconThemeData(color: textPrimary, size: 22),
       ),
 
       // ---- 文字主题 ----
@@ -220,17 +202,17 @@ class AppTheme {
         ///
         /// 用于：世界观、叙事文本、角色对话
         /// 特点：大字号、宽行高、衬线体（由外部字体提供）
-        bodyLarge: TextStyle(color: p.textPrimary, fontSize: 16, height: 1.8),
+        bodyLarge: TextStyle(color: textPrimary, fontSize: 16, height: 1.8),
 
         /// 通用正文（bodyMedium）
         ///
         /// 用于：状态描述、辅助信息
-        bodyMedium: TextStyle(color: p.textPrimary, fontSize: 16, height: 1.6),
+        bodyMedium: TextStyle(color: textPrimary, fontSize: 16, height: 1.6),
 
         /// 标签文字（labelLarge）
         ///
         /// 用于：按钮文字、标签、次要标题
-        labelLarge: TextStyle(color: p.textSecondary, fontSize: 13),
+        labelLarge: TextStyle(color: textSecondary, fontSize: 13),
 
         /// 辅助文字（labelMedium）
         ///
@@ -242,12 +224,12 @@ class AppTheme {
       ),
 
       // ---- 分割线 ----
-      dividerColor: p.divider,
+      dividerColor: divider,
 
       // ---- SnackBar 提示条 ----
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: p.surfaceVariant,
-        contentTextStyle: TextStyle(color: p.textPrimary, fontSize: 14),
+        backgroundColor: surfaceVariant,
+        contentTextStyle: TextStyle(color: textPrimary, fontSize: 14),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLarge),
@@ -256,7 +238,7 @@ class AppTheme {
 
       // ---- 卡片主题 ----
       cardTheme: CardThemeData(
-        color: p.surfaceVariant,
+        color: surfaceVariant,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLarge),
@@ -265,9 +247,9 @@ class AppTheme {
 
       // ---- 弹窗菜单主题（统一 ⋮ 菜单 / 存档菜单，契合羊皮纸+金色风格）----
       popupMenuTheme: PopupMenuThemeData(
-        color: p.surfaceVariant,
+        color: surfaceVariant,
         // 实色背景，无需透明 tint（避免额外合成层）
-        textStyle: TextStyle(color: p.textPrimary, fontSize: 14),
+        textStyle: TextStyle(color: textPrimary, fontSize: 14),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(radiusLarge),
           side: BorderSide(color: gold.withValues(alpha: 0.3)),
@@ -279,7 +261,7 @@ class AppTheme {
       // ---- 输入框主题 ----
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: p.surfaceVariant,
+        fillColor: surfaceVariant,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(radiusSmall),
           borderSide: BorderSide.none,
@@ -350,29 +332,4 @@ class AppTheme {
     curve: Curves.easeOut,
     reverseCurve: Curves.easeIn,
   );
-}
-
-/// 主题色板：封装亮/暗主题之间的差异值
-///
-/// 由 [AppTheme.dark] 和 [AppTheme.light] 分别提供，供 [AppTheme._buildTheme]
-/// 统一构建 ThemeData。
-@immutable
-class _Palette {
-  final Brightness brightness;
-  final Color background;
-  final Color surface;
-  final Color surfaceVariant;
-  final Color divider;
-  final Color textPrimary;
-  final Color textSecondary;
-
-  const _Palette({
-    required this.brightness,
-    required this.background,
-    required this.surface,
-    required this.surfaceVariant,
-    required this.divider,
-    required this.textPrimary,
-    required this.textSecondary,
-  });
 }

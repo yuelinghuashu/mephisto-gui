@@ -65,61 +65,76 @@ class MessageBubble extends StatelessWidget {
       );
     }
 
-    // ---- 命运消息（用户）：右对齐 ----
-    // 使用 Align（宽松约束）而非 Row，让文本能根据可用宽度自动 softWrap 换行
+    // ---- 命运消息（用户）：右对齐金色气泡 ----
     if (isFate) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Align(
-          alignment: Alignment.centerRight,
-          child: Container(
-            // 宽度继承外层用户选择的叙事内容宽度档位，自动换行
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppTheme.gold.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: ParagraphText(
-              message.content,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
+      return _MessageContainer(
+        alignment: Alignment.centerRight,
+        color: AppTheme.gold.withValues(alpha: 0.15),
+        child: ParagraphText(
+          message.content,
+          style: theme.textTheme.bodyMedium,
         ),
       );
     }
 
-    // ---- 角色消息（AI）：左对齐 ----
-    // 使用 Align（宽松约束）而非 Row，让文本能根据可用宽度自动 softWrap 换行
+    // ---- 角色消息（AI）：左对齐卡片色气泡 ----
+    return _MessageContainer(
+      alignment: Alignment.centerLeft,
+      color: theme.cardColor.withValues(alpha: 0.3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 流式输出与完成后的文本使用相同正体样式，
+          // 生成中状态由末尾金色光标标识，避免斜体影响实时阅读。
+          ParagraphText(
+            message.content,
+            style: theme.textTheme.bodyMedium,
+          ),
+          // 流式打字机光标：静态竖线 + 独立 StatefulWidget 实现
+          // 周期性闪烁（仅流式输出中显示；完成时随 [MessageBubble] 重建消失）
+          if (isStreaming) const _BlinkingCursor(),
+        ],
+      ),
+    );
+  }
+}
+
+/// 消息气泡容器（命运/角色共用）。
+///
+/// 统一「Padding + Align + Container」三段结构：
+///   - [alignment]：右对齐（命运）或左对齐（角色）
+///   - [color]：气泡背景色（金色半透明 / 卡片色半透明）
+///   - [child]：气泡内容（纯文本 / 文本 + 流式光标）
+class _MessageContainer extends StatelessWidget {
+  final Alignment alignment;
+  final Color color;
+  final Widget child;
+
+  const _MessageContainer({
+    required this.alignment,
+    required this.color,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Align(
-        alignment: Alignment.centerLeft,
+        // 使用 Align（宽松约束）而非 Row，让文本能根据可用宽度自动 softWrap 换行
+        alignment: alignment,
         child: Container(
           // 宽度继承外层用户选择的叙事内容宽度档位，自动换行
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           decoration: BoxDecoration(
-            color: theme.cardColor.withValues(alpha: 0.3),
+            color: color,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 流式输出与完成后的文本使用相同正体样式，
-              // 生成中状态由末尾金色光标标识，避免斜体影响实时阅读。
-              ParagraphText(
-                message.content,
-                style: theme.textTheme.bodyMedium,
-              ),
-              // 流式打字机光标：静态竖线 + 独立 StatefulWidget 实现
-              // 周期性闪烁（仅流式输出中显示；完成时随 [MessageBubble] 重建消失）
-              if (isStreaming) const _BlinkingCursor(),
-            ],
-          ),
+          child: child,
         ),
       ),
     );
   }
-
 }
 
 /// 流式打字机光标（闪烁动画）。

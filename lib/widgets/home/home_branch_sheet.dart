@@ -49,10 +49,9 @@ class HomeBranchSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
     final master = group.master;
-    // 递归收集所有子树节点（含自身）
-    final allInfos = group.allInfos;
-    final branches =
-        allInfos.where((i) => i.fileName != master.fileName).toList();
+    final branches = group.allInfos
+        .where((i) => i.fileName != master.fileName)
+        .toList();
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -66,12 +65,35 @@ class HomeBranchSheet extends StatelessWidget {
             shrinkWrap: true,
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
-              _masterTile(context, theme, master),
-              const Divider(height: 1),
+              _BranchTile(
+                title: master.roleName,
+                subtitle: master.fileName,
+                isMaster: true,
+                onTap: () {
+                  Navigator.pop(context);
+                  onEnter(master);
+                },
+              ),
               if (branches.isEmpty)
-                _emptyHint(theme, l10n)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    l10n.homeNoBranches,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.hintColor),
+                    textAlign: TextAlign.center,
+                  ),
+                )
               else
-                for (final info in branches) _branchTile(context, theme, info),
+                for (final info in branches)
+                  _BranchTile(
+                    title: info.branchTitle ?? info.branchName ?? info.fileName,
+                    subtitle: info.fileName,
+                    onTap: () {
+                      Navigator.pop(context);
+                      onEnter(info);
+                    },
+                  ),
             ],
           ),
         ),
@@ -130,57 +152,16 @@ class HomeBranchSheet extends StatelessWidget {
       ),
     );
   }
-
-  /// 母版本体入口
-  Widget _masterTile(BuildContext context, ThemeData theme, ContractInfo master) {
-    return _BranchTile(
-      icon: Icons.graphic_eq,
-      title: master.roleName,
-      subtitle: master.fileName,
-      isMaster: true,
-      onTap: () {
-        Navigator.pop(context);
-        onEnter(master);
-      },
-    );
-  }
-
-  /// 子版分支条目
-  Widget _branchTile(BuildContext context, ThemeData theme, ContractInfo info) {
-    return _BranchTile(
-      icon: Icons.circle,
-      title: info.branchTitle ?? info.branchName ?? info.fileName,
-      subtitle: info.fileName,
-      onTap: () {
-        Navigator.pop(context);
-        onEnter(info);
-      },
-    );
-  }
-
-  /// 无分支时的提示
-  Widget _emptyHint(ThemeData theme, AppLocalizations l10n) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Text(
-        l10n.homeNoBranches,
-        style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
-        textAlign: TextAlign.center,
-      ),
-    );
-  }
 }
 
-/// 分支列表项（母版/子版共用）
+/// 分支列表项（母版/子版共用，紧凑单行）
 class _BranchTile extends StatelessWidget {
-  final IconData icon;
   final String title;
   final String subtitle;
   final bool isMaster;
   final VoidCallback onTap;
 
   const _BranchTile({
-    required this.icon,
     required this.title,
     required this.subtitle,
     this.isMaster = false,
@@ -194,8 +175,9 @@ class _BranchTile extends StatelessWidget {
     return ListTile(
       onTap: onTap,
       dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
       leading: Icon(
-        icon,
+        isMaster ? Icons.graphic_eq : Icons.circle,
         size: isMaster ? 16 : 8,
         color: AppTheme.gold,
       ),
@@ -216,11 +198,6 @@ class _BranchTile extends StatelessWidget {
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        size: 18,
-        color: theme.dividerColor,
       ),
     );
   }

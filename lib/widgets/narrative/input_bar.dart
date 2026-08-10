@@ -1,10 +1,7 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mephisto/l10n/app_localizations.dart';
-
 import '../../app/theme.dart';
-import '../../providers/providers.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 附件内容最大字数（避免撑爆 LLM 上下文窗口）
 const int _maxAttachmentChars = 2000;
@@ -21,26 +18,54 @@ const List<String> _allowedExtensions = [
   'yml',
 ];
 
-/// 命运输入栏：输入框 + 附件按钮 + 发送按钮
+/// 叙事输入栏：输入框 + 可选附件按钮 + 发送按钮
 ///
-/// 作为 [StatefulWidget] 管理 [TextEditingController] 和 [FocusNode] 的生命周期，
-/// 避免每次 build 创建新实例导致的内存泄漏。
+/// 纯 UI 组件（不依赖任何 Provider），业务操作全部通过回调注入，
+/// 使单角色叙事页与多角色舞台页可完全复用同一组件。
 ///
-/// 附件功能说明：
+/// 附件功能说明（[showAttachment] = true 时启用）：
 ///   - 📎 按钮打开系统文件选择器（仅限 .txt / .md 等文本格式）
 ///   - 附件是**会话级**附加上下文，作为「补充上下文」注入 LLM
 ///   - 附件按钮不抢输入框焦点，选择完成后焦点回归，回车发送不受影响
-class InputBar extends ConsumerStatefulWidget {
+class InputBar extends StatefulWidget {
   /// 是否正在生成 AI 回复（此时禁用输入与发送）
   final bool isGenerating;
 
-  const InputBar({super.key, required this.isGenerating});
+  /// 发送消息回调（输入非空且非生成中时触发）
+  final ValueChanged<String> onSend;
+
+  /// 停止当前生成回调（生成中时点击发送按钮变为「停止」按钮）
+  final VoidCallback onStop;
+
+  /// 是否启用附件功能（单角色叙事与多角色舞台均已启用）
+  final bool showAttachment;
+
+  /// 当前附件文件名列表（用于在输入框上方展示附件 chip，可单独移除）
+  final List<String> attachedFileNames;
+
+  /// 附加文件回调：输入框选择并读取文本文件后触发，
+  /// 由调用方写入各自的会话状态。
+  final void Function(String fileName, String content)? onAttach;
+
+  /// 移除指定索引附件回调（由调用方更新各自会话状态）。
+  final ValueChanged<int>? onRemoveAttach;
+
+  const InputBar({
+    super.key,
+    required this.isGenerating,
+    required this.onSend,
+    required this.onStop,
+    this.showAttachment = false,
+    this.attachedFileNames = const [],
+    this.onAttach,
+    this.onRemoveAttach,
+  });
 
   @override
-  ConsumerState<InputBar> createState() => _InputBarState();
+  State<InputBar> createState() => _InputBarState();
 }
 
-class _InputBarState extends ConsumerState<InputBar> {
+class _InputBarState extends State<InputBar> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
 
@@ -56,19 +81,16 @@ class _InputBarState extends ConsumerState<InputBar> {
     if (text.isEmpty || widget.isGenerating) return;
 
     _controller.clear();
-    ref.read(narrativeProvider.notifier).sendMessage(text);
-  }
-
-  /// 停止当前生成（生成中时点击发送按钮变为「停止」按钮）。
-  void _stopGenerating() {
-    ref.read(narrativeProvider.notifier).stopGenerating();
+    widget.onSend(text);
+    _focusNode.requestFocus();
   }
 
   /// 选择并附加多个文本文件（限定文本格式，支持多选）
   Future<void> _attachFiles() async {
     final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(narrativeProvider.notifier);
+    final onAttach = widget.onAttach;
     final l10n = AppLocalizations.of(context);
+    if (onAttach == null) return;
 
     const typeGroup = XTypeGroup(label: '文本文件', extensions: _allowedExtensions);
     final files = await openFiles(acceptedTypeGroups: [typeGroup]);
@@ -83,7 +105,7 @@ class _InputBarState extends ConsumerState<InputBar> {
         final limited = trimmed.length > _maxAttachmentChars
             ? trimmed.substring(0, _maxAttachmentChars)
             : trimmed;
-        notifier.attachContext(file.name, limited);
+        onAttach(file.name, limited);
       } catch (e) {
         // 单个文件非文本则跳过，不影响其他
         messenger.showSnackBar(
@@ -106,30 +128,25 @@ class _InputBarState extends ConsumerState<InputBar> {
     final theme = Theme.of(context);
     final isGenerating = widget.isGenerating;
     final l10n = AppLocalizations.of(context);
-    // 监听当前附件列表（用于显示附加提示，支持多选）
-    final attachedNames = ref.watch(
-      narrativeProvider.select((s) => s.attachedFileNames),
-    );
-    final hasAttachments = attachedNames.isNotEmpty;
+    final hasAttachments = widget.attachedFileNames.isNotEmpty;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         // ---- 附加上下文提示（多附件，每个可单独移除）----
-        if (hasAttachments) ...[
+        if (widget.showAttachment && hasAttachments) ...[
           Container(
             color: AppTheme.gold.withValues(alpha: 0.06),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                for (var i = 0; i < attachedNames.length; i++) ...[
+                for (var i = 0; i < widget.attachedFileNames.length; i++) ...[
                   if (i > 0) const SizedBox(height: 2),
                   _AttachmentChip(
-                    name: attachedNames[i],
-                    onRemove: () => ref
-                        .read(narrativeProvider.notifier)
-                        .removeAttachedContext(i),
+                    name: widget.attachedFileNames[i],
+                    onRemove: () =>
+                        widget.onRemoveAttach?.call(i),
                   ),
                 ],
               ],
@@ -148,14 +165,16 @@ class _InputBarState extends ConsumerState<InputBar> {
           ),
           child: Row(
             children: [
-              // ---- 附件按钮（不抢输入框焦点） ----
-              IconButton(
-                icon: const Icon(Icons.attach_file, color: AppTheme.gold),
-                onPressed: isGenerating ? null : _attachFiles,
-                tooltip: l10n.inputBarAttachTooltip,
-                // 不设置 autofocus，点击后焦点回归 _focusNode
-              ),
-              const SizedBox(width: 4),
+              // ---- 附件按钮（不抢输入框焦点）----
+              if (widget.showAttachment) ...[
+                IconButton(
+                  icon: const Icon(Icons.attach_file, color: AppTheme.gold),
+                  onPressed: isGenerating ? null : _attachFiles,
+                  tooltip: l10n.inputBarAttachTooltip,
+                  // 不设置 autofocus，点击后焦点回归 _focusNode
+                ),
+                const SizedBox(width: 4),
+              ],
 
               // ---- 输入框 ----
               Expanded(
@@ -187,7 +206,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                 icon: isGenerating
                     ? const Icon(Icons.stop_circle_outlined, color: AppTheme.crimson)
                     : const Icon(Icons.send, color: AppTheme.gold),
-                onPressed: isGenerating ? _stopGenerating : _sendMessage,
+                onPressed: isGenerating ? widget.onStop : _sendMessage,
                 tooltip: isGenerating
                     ? l10n.narrativeStopGenerating
                     : l10n.inputBarSendTooltip,

@@ -86,6 +86,9 @@ class Contract extends Equatable {
   ///
   /// 用于状态迁移/保存路径中「保留大部分字段、仅替换部分区块」的场景，
   /// 避免手工复制全部字段导致未来新增字段时漏同步。
+  ///
+  /// 性能优化：所有参数均为 null（无任何字段变化）时直接返回 `this`，
+  /// 与 [NarrativeState.copyWith] 语义一致，避免创建无意义的新对象。
   Contract copyWith({
     String? roleName,
     List<StateItem>? anchor,
@@ -98,6 +101,19 @@ class Contract extends Equatable {
     List<Memory>? memories,
     List<HistoryEntry>? history,
   }) {
+    if (roleName == null &&
+        anchor == null &&
+        worldview == null &&
+        background == null &&
+        opening == null &&
+        state == null &&
+        rules == null &&
+        branchTitle == null &&
+        memories == null &&
+        history == null) {
+      return this;
+    }
+
     return Contract(
       roleName: roleName ?? this.roleName,
       anchor: anchor ?? this.anchor,

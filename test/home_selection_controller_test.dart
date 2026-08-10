@@ -126,6 +126,182 @@ void main() {
     });
   });
 
+  group('舞台角色级多选', () {
+    test('toggleStageRoleSelect 进入多选并选中角色', () {
+      final controller = HomeSelectionController();
+
+      controller.toggleStageRoleSelect(
+        '/stage/Kurukshetra',
+        '阿周那',
+        'Arjuna.meph',
+      );
+
+      expect(controller.isSelectMode, isTrue);
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+        ),
+        isTrue,
+      );
+      expect(controller.selectedStageRoleCount, 1);
+      expect(controller.totalSelectedCount, 1);
+    });
+
+    test('母版/子版独立选中', () {
+      final controller = HomeSelectionController();
+
+      controller.toggleStageRoleSelect(
+        '/stage/Kurukshetra',
+        '阿周那',
+        'Arjuna.meph',
+      );
+      controller.toggleStageRoleSelect(
+        '/stage/Kurukshetra',
+        '阿周那',
+        'Arjuna.meph',
+        isChild: true,
+      );
+
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+        ),
+        isTrue,
+      );
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+          isChild: true,
+        ),
+        isTrue,
+      );
+      expect(controller.selectedStageRoleCount, 2);
+    });
+
+    test('enterStageSelectMode 长按舞台 → 级联选中所有角色 + 自动展开舞台', () {
+      final controller = HomeSelectionController();
+      final roleKeys = [
+        '/stage/Kurukshetra|阿周那|Arjuna.meph|false',
+        '/stage/Kurukshetra|阿周那|Arjuna.meph|true', // 有存档
+        '/stage/Kurukshetra|迦尔纳|Karna.meph|false',
+      ];
+
+      controller.enterStageSelectMode('/stage/Kurukshetra', roleKeys);
+
+      // 舞台目录被选中
+      expect(controller.isStageSelected('/stage/Kurukshetra'), isTrue);
+      // 全部角色被级联选中
+      expect(controller.selectedStageRoleCount, 3);
+      // 母版/子版分别可查
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+        ),
+        isTrue,
+      );
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+          isChild: true,
+        ),
+        isTrue,
+      );
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '迦尔纳',
+          'Karna.meph',
+        ),
+        isTrue,
+      );
+      // 舞台自动展开（级联选中的角色立即可见）
+      expect(controller.expandedStages.contains('/stage/Kurukshetra'), isTrue);
+      // 多选模式开启
+      expect(controller.isSelectMode, isTrue);
+    });
+
+    test('toggleStageExpanded 切换舞台展开/收起', () {
+      final controller = HomeSelectionController();
+
+      controller.toggleStageExpanded('/stage/Kurukshetra');
+      expect(controller.expandedStages.contains('/stage/Kurukshetra'), isTrue);
+
+      controller.toggleStageExpanded('/stage/Kurukshetra');
+      expect(controller.expandedStages.contains('/stage/Kurukshetra'), isFalse);
+    });
+
+    test('取消最后选中自动退出多选', () {
+      final controller = HomeSelectionController();
+      controller.toggleStageRoleSelect(
+        '/stage/Kurukshetra',
+        '阿周那',
+        'Arjuna.meph',
+      );
+
+      controller.toggleStageRoleSelect(
+        '/stage/Kurukshetra',
+        '阿周那',
+        'Arjuna.meph',
+      );
+
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+        ),
+        isFalse,
+      );
+      expect(controller.isSelectMode, isFalse);
+    });
+
+    test('长按角色进入多选并选中', () {
+      final controller = HomeSelectionController();
+
+      controller.enterStageRoleSelectMode(
+        '/stage/Kurukshetra',
+        '阿周那',
+        'Arjuna.meph',
+        isChild: true,
+      );
+
+      expect(controller.isSelectMode, isTrue);
+      expect(
+        controller.isStageRoleSelected(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+          isChild: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('exitSelectMode 清空角色选中', () {
+      final controller = HomeSelectionController();
+      controller.toggleStageRoleSelect(
+        '/stage/Kurukshetra',
+        '阿周那',
+        'Arjuna.meph',
+      );
+
+      controller.exitSelectMode();
+
+      expect(controller.selectedStageRoleCount, 0);
+      expect(controller.isSelectMode, isFalse);
+    });
+  });
+
   group('全选 + 退出', () {
     test('selectAll 全选所有契约（含递归子节点）', () {
       final controller = HomeSelectionController();

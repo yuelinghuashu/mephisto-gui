@@ -49,20 +49,8 @@ String buildSystemPrompt({
   List<Memory> effectiveMemories = memories;
   var memoriesPreSorted = false;
   if (maxMemories != null && memories.length > maxMemories) {
-    // 高权重记忆（人设核心）全部保留
-    final high = MemoryManager.sortByImportance(
-      memories
-          .where((m) => m.importance >= Memory.highImportanceThreshold)
-          .toList(),
-    );
-    // 其余按权重降序，补足剩余名额
-    final rest = MemoryManager.sortByImportance(
-      memories
-          .where((m) => m.importance < Memory.highImportanceThreshold)
-          .toList(),
-    );
-    final remainingSlots = (maxMemories - high.length).clamp(0, maxMemories);
-    effectiveMemories = [...high, ...rest.take(remainingSlots)];
+    // 裁剪逻辑复用 [MemoryManager.clipMemories]（与多角色舞台版共用同一实现）
+    effectiveMemories = MemoryManager.clipMemories(memories, maxMemories);
     memoriesPreSorted = true;
   }
 

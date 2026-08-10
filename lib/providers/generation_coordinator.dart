@@ -1,0 +1,76 @@
+import 'dart:async';
+
+/// 生成编排协调器（单角色 / 多角色 Notifier 共用）
+///
+/// 两个 Notifier（[NarrativeNotifier] 与 [StageNarrativeNotifier]）的
+/// 「生成中编排」逻辑完全一致：
+///   - 同步防重入标志 `_isGeneratingInFlight`（双保险防并发/连点穿透）
+///   - 取消信号 `_generationCancel`（用户点击「停止生成」后完成，
+///     服务端收到后提前终止 SSE 读取）
+///   - [stopGenerating]：立即 flush 流式缓冲 + 触发取消信号
+///   - dispose 清理（Notifier 重建时释放 Timer / 信号 / 标志位）
+///
+/// 通过 `State` 泛型约束：T 是 Notifier 的 state 类型，混入方需实现
+/// `onStopFlush()`（停止前刷出流式缓冲）。将两处约 40 行重复消除为单份。
+mixin GenerationCoordinator<T> {
+  /// 当前生成任务的取消信号（用户点击「停止生成」后完成）
+  ///
+  /// 每次发送新消息时重新创建；[stopGenerating] 触发完成，
+  /// 服务端（LlmClient）收到后提前终止 SSE 读取。
+  Completer<void>? _generationCancel;
+
+  /// 同步生成中标志位（双保险防重入）
+  ///
+  /// 与 state.isGenerating 的区别：
+  ///   - isGenerating 是状态字段，通过 dispatch 后异步生效，
+  ///     在状态更新前的微任务间隙，极端情况下仍可能有第二次 sendMessage 进入
+  ///   - 本标志在 sendMessage 入口立即同步置位，彻底消除竞态窗口，
+  ///     并在生成成功/失败后统一复位
+  bool _isGeneratingInFlight = false;
+
+  /// 二次守卫：生成中禁止再次发送（UI 已禁用输入，极端连点/竞态时兜底）。
+  /// 返回 true 表示可以继续发送（未被拒绝）。
+  bool canSend({required bool isGenerating}) {
+    if (isGenerating || _isGeneratingInFlight) return false;
+    return true;
+  }
+
+  /// 进入生成状态（在 dispatch 之前调用，确保并发/连点无法穿透）。
+  void beginGeneration() {
+    _isGeneratingInFlight = true;
+    // 每次发送创建新的取消信号（覆盖上次生成可能遗留的已取消信号）
+    _generationCancel = Completer<void>();
+  }
+
+  /// 生成结束（成功/失败/异常均须调用，复位同步标志位）。
+  void endGeneration() {
+    _isGeneratingInFlight = false;
+    // 清理已完成/已取消的生成信号引用，避免悬挂引用占用内存
+    _generationCancel = null;
+  }
+
+  /// 当前生成任务的取消信号 Future（传给服务端）。
+  ///
+  /// 命名避免与 `service.generate(cancelSignal: ...)` 的命名参数同名，
+  /// 使调用处 `cancelSignal: generationCancelSignal` 清晰无歧义。
+  Future<void>? get generationCancelSignal => _generationCancel?.future;
+
+  /// 停止当前生成：立即 flush 已到达的流式内容并触发取消信号。
+  ///
+  /// 协作式取消：不会中断底层 http 连接，而是让 LlmClient 在下一个
+  /// SSE 数据行处停止读取并返回已累积内容，随后生成流程正常收尾。
+  void stopGenerating() {
+    // 立即 flush 已到达的流式内容，避免遗留在缓冲中
+    onGenerationStop();
+    _generationCancel?.complete();
+  }
+
+  /// 停止生成时的流式缓冲 flush 钩子（由混入方实现）。
+  void onGenerationStop();
+
+  /// Notifier dispose 清理（防止 Timer / 信号泄漏）。
+  void disposeGeneration() {
+    _generationCancel = null;
+    _isGeneratingInFlight = false;
+  }
+}

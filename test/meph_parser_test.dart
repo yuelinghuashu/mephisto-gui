@@ -99,6 +99,137 @@ void main() {
       expect(agree.group, '抉择');
     });
 
+    test('解析 joan_of_arc.meph（贞德：天启信仰 + 互斥组 + 骰子）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/joan_of_arc.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '贞德 · 达尔克');
+      // 状态（数值 + 字符串）
+      expect(contract.state, hasLength(5));
+      final faith = contract.state.firstWhere((s) => s.key == '信仰');
+      expect(faith.value, const IntValue(90));
+      final morale = contract.state.firstWhere((s) => s.key == '士气');
+      expect(morale.value, const IntValue(85));
+      // 核心规则
+      final revelation = contract.rules.firstWhere((r) => r.name == '天启');
+      expect(revelation.condition, contains('圣米迦勒'));
+      expect(revelation.action, contains('状态.信仰 += 5'));
+      // 互斥组「信仰」：动摇与坚定互斥
+      final doubt = contract.rules.firstWhere((r) => r.name == '动摇');
+      expect(doubt.group, '信仰');
+      // 骰子判定
+      final verdict = contract.rules.firstWhere((r) => r.name == '主之裁决');
+      expect(verdict.condition, contains('roll(1d100)'));
+    });
+
+    test('解析 Camlann/Arthur.meph（终战亚瑟：王权威严 + 互斥组 + 骰子）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/Camlann/Arthur.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '亚瑟 · 潘德拉贡');
+      // 状态
+      expect(contract.state, hasLength(5));
+      final authority = contract.state.firstWhere((s) => s.key == '王权威严');
+      expect(authority.value, const IntValue(80));
+      // 核心规则
+      final excalibur = contract.rules.firstWhere((r) => r.name == '湖中剑');
+      expect(excalibur.condition, contains('Excalibur'));
+      expect(excalibur.action, contains('状态.王权威严 += 5'));
+      // 互斥组「决断」：死战与悲悯互斥
+      final death = contract.rules.firstWhere((r) => r.name == '死战');
+      expect(death.group, '决断');
+      // 骰子判定
+      final fate = contract.rules.firstWhere((r) => r.name == '命运裁决');
+      expect(fate.condition, contains('roll(1d100)'));
+      // 复合动作：注入 + 状态变化
+      final dying = contract.rules.firstWhere((r) => r.name == '临终');
+      expect(dying.action, contains('状态.生命 = 0'));
+    });
+
+    test('解析 Camlann/Mordred.meph（莫德雷德：怨毒 + 互斥组 + 复合动作）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/Camlann/Mordred.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '莫德雷德');
+      // 状态
+      expect(contract.state, hasLength(5));
+      final resentment = contract.state.firstWhere((s) => s.key == '怨毒');
+      expect(resentment.value, const IntValue(40));
+      // 核心规则
+      final patricide = contract.rules.firstWhere((r) => r.name == '弑父');
+      expect(patricide.condition, contains('亚瑟'));
+      expect(patricide.action, contains('状态.怨毒 += 10'));
+      // 互斥组「心病」：阴影与冷笑互斥
+      final shadow = contract.rules.firstWhere((r) => r.name == '阴影');
+      expect(shadow.group, '心病');
+      // 互斥组「心魔」：一瞬犹豫与心魔互斥
+      final hesitation = contract.rules.firstWhere((r) => r.name == '一瞬犹豫');
+      expect(hesitation.group, '心魔');
+      // 骰子判定
+      final arrogance = contract.rules.firstWhere((r) => r.name == '狂傲');
+      expect(arrogance.condition, contains('roll(1d100)'));
+      // 复合动作
+      final obsession = contract.rules.firstWhere((r) => r.name == '王座执念');
+      expect(obsession.action, contains('状态.战意 += 10'));
+    });
+
+    test('解析 gilgamesh.meph（吉尔伽美什：求索 + 互斥组 + 骰子）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/gilgamesh.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '吉尔伽美什');
+      // 状态
+      expect(contract.state, hasLength(5));
+      final sovereignty = contract.state.firstWhere((s) => s.key == '王权');
+      expect(sovereignty.value, const IntValue(90));
+      final pursuit = contract.state.firstWhere((s) => s.key == '求索');
+      expect(pursuit.value, const IntValue(80));
+      // 核心规则
+      final memory = contract.rules.firstWhere((r) => r.name == '追忆');
+      expect(memory.condition, contains('恩奇都'));
+      expect(memory.action, contains('状态.求索 += 5'));
+      // 互斥组「命运」：抗争与接纳互斥
+      final struggle = contract.rules.firstWhere((r) => r.name == '抗争');
+      expect(struggle.group, '命运');
+      // 骰子判定（蛇的谎言）
+      final snake = contract.rules.firstWhere((r) => r.name == '蛇之窃');
+      expect(snake.condition, contains('roll(1d100)'));
+      // 复合动作：注入 + 状态变化
+      final returnRule = contract.rules.firstWhere((r) => r.name == '归来');
+      expect(returnRule.action, contains('状态.王权 += 10'));
+    });
+
+    test('解析 arthur_sword.meph（少年亚瑟：石中剑 + 互斥组 + 复合动作）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/arthur_sword.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '亚瑟 · 潘德拉贡');
+      // 状态
+      expect(contract.state, hasLength(5));
+      final evidence = contract.state.firstWhere((s) => s.key == '王权之证');
+      expect(evidence.value, const IntValue(70));
+      // 核心规则
+      final sword = contract.rules.firstWhere((r) => r.name == '王选之剑');
+      expect(sword.condition, contains('石中剑'));
+      expect(sword.action, contains('状态.王权之证 += 10'));
+      // 互斥组「抉择」：迟疑与担当互斥
+      final hesitate = contract.rules.firstWhere((r) => r.name == '迟疑');
+      expect(hesitate.group, '抉择');
+      // 骰子判定
+      final fate = contract.rules.firstWhere((r) => r.name == '命运抉择');
+      expect(fate.condition, contains('roll(1d100)'));
+    });
+
     test('解析 faust.utopia.meph（官方示范子版：理想国 / 乌托邦线）', () async {
       final text = await rootBundle.loadString(
         'assets/contracts/faust.utopia.meph',

@@ -85,6 +85,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String homeExportSuccess(Object path) {
+    return '✦ 已导出: $path';
+  }
+
+  @override
+  String homeExportFail(Object error) {
+    return '╳ 导出失败: $error';
+  }
+
+  @override
   String get homeRenameFail => '╳ 重命名失败：目标文件名已存在或旧文件不存在';
 
   @override
@@ -116,7 +126,90 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeBrandTitle => 'Mephisto 叙事引擎';
 
   @override
-  String get homeBrandSubtitle => '选择一份命运契约，故事由此展开';
+  String get homeBrandSubtitle => '签下契约，书写命运';
+
+  @override
+  String get homeStageSectionTitle => '🎭 多角色舞台';
+
+  @override
+  String get homeContractSectionTitle => '📜 单角色契约';
+
+  @override
+  String stageCardCharacterCount(Object count) {
+    return '$count 位角色';
+  }
+
+  @override
+  String stageCardLastModified(Object time) {
+    return '最近活动：$time';
+  }
+
+  @override
+  String get stageCardHasSave => '有存档';
+
+  @override
+  String get stageCardRestart => '重新开始（回母版）';
+
+  @override
+  String get stageCardRoleMaster => '母版';
+
+  @override
+  String stageCardRoleChild(Object role) {
+    return '$role · 子版';
+  }
+
+  @override
+  String get stageCardRoleChildSubtitle => '续玩存档';
+
+  @override
+  String get stageCardExport => '导出（舞台 ZIP）';
+
+  @override
+  String get stageCardDeleteRole => '删除母版角色卡';
+
+  @override
+  String get stageCardDeleteChild => '删除存档';
+
+  @override
+  String stageCardDeleteRoleConfirm(Object roleName) {
+    return '确定要删除角色「$roleName」的母版文件及其存档吗？此操作不可恢复。';
+  }
+
+  @override
+  String stageCardDeleteChildConfirm(Object roleName) {
+    return '确定要删除角色「$roleName」的存档吗？此操作不可恢复。';
+  }
+
+  @override
+  String get stageNarrativeReset => '重置会话（回到母版开局）';
+
+  @override
+  String get stageNarrativeResetDone => '⇄ 已重置会话，舞台回到母版开局';
+
+  @override
+  String get stageRenameDialogTitle => '✏️ 重命名舞台';
+
+  @override
+  String get stageRenameDialogLabel => '新舞台名';
+
+  @override
+  String get stageRenameDialogConfirm => '重命名';
+
+  @override
+  String get stageRenameNameExists => '该舞台名已存在，请更换';
+
+  @override
+  String get stageDeleteTitle => '删除舞台';
+
+  @override
+  String stageDeleteConfirm(Object name) {
+    return '确定要删除舞台 $name 及其所有角色吗？此操作不可恢复。';
+  }
+
+  @override
+  String stageDeleteMultipleConfirm(Object count) {
+    return '确定要删除选中的 $count 个舞台吗？此操作不可恢复。';
+  }
 
   @override
   String get contractCardEnter => '进入';
@@ -126,6 +219,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get contractCardEdit => '编辑';
+
+  @override
+  String get contractCardExport => '导出（命运树 ZIP）';
 
   @override
   String get contractCardRename => '重命名';
@@ -144,9 +240,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get narrativeSaveMenu => '存档';
-
-  @override
-  String get narrativeSaveCurrent => '保存当前进度';
 
   @override
   String get narrativeSaveBranch => '另存为分支...';
@@ -171,14 +264,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get narrativeSettings => '设置';
-
-  @override
-  String narrativeSaveSuccess(Object fileName) {
-    return '✦ 契约已镌刻: $fileName';
-  }
-
-  @override
-  String get narrativeSaveFail => '╳ 存档失败：请检查契约目录权限或磁盘空间';
 
   @override
   String narrativeBranchSaved(Object fileName) {

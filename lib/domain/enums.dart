@@ -20,12 +20,6 @@ library;
 ///   - system：📜 契约（血契文书）
 enum MessageRole { fate, assistant, system }
 
-/// 消息角色扩展
-extension MessageRoleExtension on MessageRole {
-  /// 判断是否为命运（用户）消息
-  bool get isFate => this == MessageRole.fate;
-}
-
 // ============================================================
 // LLM 后端类型
 // ============================================================
@@ -38,4 +32,3 @@ extension MessageRoleExtension on MessageRole {
 ///   - [ollama]：本地 Ollama 服务
 ///     不需要 API Key，API 格式与 OpenAI 不兼容
 enum LlmBackend { openaiCompatible, ollama }
-

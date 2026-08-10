@@ -65,6 +65,31 @@ class MemoryManager {
     return sorted;
   }
 
+  /// 按 [maxMemories] 裁剪记忆列表：高权重必带 + 其余按权重降序补足。
+  ///
+  /// 供系统提示词构建（单角色 / 多角色舞台）复用，消除重复实现：
+  ///   - 高权重记忆（≥ [Memory.highImportanceThreshold]）全部保留（人设核心）
+  ///   - 其余按权重降序补足剩余名额
+  ///   - 返回结果已按权重排序（高权重在前、低权重降序在后），调用方无需再排序
+  ///
+  /// 记忆数量未超上限时直接返回原列表**不排序**（保持调用方语义，
+  /// 由调用方决定是否需要 [sortByImportance]）。
+  static List<Memory> clipMemories(List<Memory> memories, int maxMemories) {
+    if (memories.length <= maxMemories) return memories;
+    final high = sortByImportance(
+      memories
+          .where((m) => m.importance >= Memory.highImportanceThreshold)
+          .toList(),
+    );
+    final rest = sortByImportance(
+      memories
+          .where((m) => m.importance < Memory.highImportanceThreshold)
+          .toList(),
+    );
+    final remainingSlots = (maxMemories - high.length).clamp(0, maxMemories);
+    return [...high, ...rest.take(remainingSlots)];
+  }
+
   /// 每 N 轮提取记忆；返回更新后的记忆（null 表示未触发）。
   Future<List<Memory>?> maybeExtract({
     required List<HistoryEntry> history,

@@ -22,6 +22,9 @@ import '../storage/contract_dir.dart';
 /// 子版存档存储
 class ChildSaveStore {
   /// 默认子版后缀（母版名 + `.child`）
+  ///
+  /// 与 [meph_file_name.dart] 中的顶层 [defaultChildSuffix] 保持同值，
+  /// 保留类静态成员以兼容既有调用点（`ChildSaveStore.defaultChildSuffix`）。
   static const String defaultChildSuffix = '.child';
 
   /// 保存当前会话为子版文件。
@@ -35,6 +38,8 @@ class ChildSaveStore {
   ///   - branchName: 可选自定义分支名（如 'dark'）；null 时使用默认 `.child`
   ///   - branchTitle: 可选「命运一句话」（用户另存为分支时填写），
   ///     以 `@命运:` 标记注入【角色背景】区块；null 时不注入
+  ///   - targetDir: 目标目录（舞台场景下为舞台目录）；
+  ///     null 时使用全局契约目录（向后兼容）
   ///
   /// 返回值：保存的子版文件名（如 `faust.child.meph` 或 `faust.dark.meph`）
   static Future<String> save(
@@ -46,16 +51,17 @@ class ChildSaveStore {
     String? branchName,
     String? branchTitle,
     String? overwriteFileName,
+    Directory? targetDir,
   }) async {
-    final dir = await getContractsDirectory();
+    final dir = targetDir ?? await getContractsDirectory();
     final baseName = masterFileName.replaceAll('.meph', '');
 
     // overwriteFileName 提供时直接覆盖（已存在子版时在原文件上修改）；
     // 否则按 .child / 递增 / 分支名 生成新文件。
     // 一次性列出目录中所有 .meph 文件名后在内存中判断，
     // 避免 _resolveFileName 中多次同步磁盘 existsSync() 检查。
-    final fileName = overwriteFileName ??
-        await _resolveFileName(dir, baseName, branchName);
+    final fileName =
+        overwriteFileName ?? await _resolveFileName(dir, baseName, branchName);
 
     // branchTitle 非空时 serializer 输出 @命运 区块
     final effectiveContract =
@@ -81,8 +87,10 @@ class ChildSaveStore {
   ///   - fileName: 子版文件名（如 `faust.child.meph`）
   ///
   /// 返回值：恢复的完整契约（含运行时状态/记忆/历史）；失败返回 null
-  static Future<Contract?> restore(String fileName) async {
-    final dir = await getContractsDirectory();
+  static Future<Contract?> restore(String fileName, {String? dirPath}) async {
+    final dir = dirPath != null
+        ? Directory(dirPath)
+        : await getContractsDirectory();
     final file = File('${dir.path}/$fileName');
     if (!file.existsSync()) return null;
 
@@ -101,8 +109,13 @@ class ChildSaveStore {
   ///   - masterFileName: 母版文件名（如 `faust.meph`）
   ///
   /// 返回值：子版文件名列表（如 `['faust.child.meph', 'faust.dark.meph']`）
-  static Future<List<String>> listChildFiles(String masterFileName) async {
-    final dir = await getContractsDirectory();
+  static Future<List<String>> listChildFiles(
+    String masterFileName, {
+    String? dirPath,
+  }) async {
+    final dir = dirPath != null
+        ? Directory(dirPath)
+        : await getContractsDirectory();
     final baseName = masterFileName.replaceAll('.meph', '');
 
     // 匹配 `baseName.*.meph` 且排除母版本身（复用共享的目录扫描工具）
@@ -114,8 +127,12 @@ class ChildSaveStore {
   }
 
   /// 删除子版文件。
-  static Future<bool> delete(String fileName) async {
-    final dir = await getContractsDirectory();
+  ///
+  /// [dirPath] 指定所在目录（舞台场景下为舞台目录）；null 时使用全局契约目录。
+  static Future<bool> delete(String fileName, {String? dirPath}) async {
+    final dir = dirPath != null
+        ? Directory(dirPath)
+        : await getContractsDirectory();
     final file = File('${dir.path}/$fileName');
     if (!file.existsSync()) return false;
     try {
@@ -127,8 +144,12 @@ class ChildSaveStore {
   }
 
   /// 检查子版文件是否存在。
-  static Future<bool> exists(String fileName) async {
-    final dir = await getContractsDirectory();
+  ///
+  /// [dirPath] 指定所在目录（舞台场景下为舞台目录）；null 时使用全局契约目录。
+  static Future<bool> exists(String fileName, {String? dirPath}) async {
+    final dir = dirPath != null
+        ? Directory(dirPath)
+        : await getContractsDirectory();
     return File('${dir.path}/$fileName').existsSync();
   }
 

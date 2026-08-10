@@ -7,7 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mephisto/domain/models.dart';
-import 'package:mephisto/domain/narrative_reducer.dart';
+import 'package:mephisto/domain/reducer_utils.dart';
 import 'package:mephisto/providers/providers.dart';
 import 'package:mephisto/services/session/session_saver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -417,11 +417,21 @@ void main() {
     });
 
     test('defaultChildFileName 静态方法', () {
-      expect(NarrativeNotifier.defaultChildFileName('faust.meph'), 'faust.child.meph');
-      // 子版作为母版传入时：extractMasterPrefix 取其基础前缀'faust'
+      expect(
+        NarrativeNotifier.defaultChildFileName('faust.meph'),
+        'faust.child.meph',
+      );
+      // 多级分支（如 faust.dark.meph）拥有独立于母版根的默认存档：
+      // 与 SessionSaver.saveCurrent 的存档命名规则一致（faust.dark.child.meph），
+      // 旧实现仅取母版根（faust.child.meph）会导致分支存档无法恢复/删除。
       expect(
         NarrativeNotifier.defaultChildFileName('faust.dark.meph'),
-        'faust.child.meph',
+        'faust.dark.child.meph',
+      );
+      // 存档自身作为来源时：直接返回自己的文件名（faust.dark.child.meph）
+      expect(
+        NarrativeNotifier.defaultChildFileName('faust.dark.child.meph'),
+        'faust.dark.child.meph',
       );
     });
 

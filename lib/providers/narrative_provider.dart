@@ -8,13 +8,17 @@ import '../domain/narrative_error.dart';
 import '../domain/narrative_event.dart';
 import '../domain/narrative_reducer.dart';
 import '../domain/narrative_state.dart';
+import '../domain/reducer_utils.dart';
+import '../services/memory/memory_extraction_service.dart';
 import '../services/memory/memory_manager.dart';
 import '../services/narrative_turn_service.dart';
 import '../services/parser/meph_parser.dart';
 import '../services/session/child_save_store.dart';
 import '../services/session/session_saver.dart';
-import '../services/storage/meph_file_name.dart';
+import '../services/storage/meph_file_name.dart' as meph_file_name;
+import '../services/stream_throttle.dart';
 import 'contract_provider.dart';
+import 'generation_coordinator.dart';
 import 'llm_settings_provider.dart';
 import 'narrative_memory_provider.dart';
 import 'narrative_rule_provider.dart';
@@ -37,52 +41,26 @@ import 'narrative_window_provider.dart';
 ///     本 Notifier 只负责「当前舞台这一角色」的状态编排（消息/历史/状态/记忆/存档）。
 ///   - 未来多角色舞台，调度器可对每个角色各自调用 [NarrativeTurnService.generate]
 ///     并与 `Future.wait` 并发执行，角色上下文天然隔离。
-class NarrativeNotifier extends Notifier<NarrativeState> {
-  /// 流式输出节流合并缓冲的累积窗口。
+class NarrativeNotifier extends Notifier<NarrativeState>
+    with GenerationCoordinator<NarrativeState> {
+  /// 流式输出节流合并缓冲（50ms 窗口内累积后一次性提交）
   ///
-  /// LLM SSE 以 chunk 高频到达，若每 chunk 都触发 Riverpod 通知，
-  /// 会导致 UI 频繁重建（尤其在 50ms 内几十个 chunk 的场景）。
-  /// 在窗口内累积所有 chunk，窗口结束时统一提交一次，显著减少通知次数。
-  static const Duration streamFlushInterval = Duration(milliseconds: 50);
+  /// 复用 [StreamThrottleBuffer]（与多角色 [StageNarrativeNotifier] 共享），
+  /// 避免两处约 50 行的重复实现。
+  final StreamThrottleBuffer _streamBuffer = StreamThrottleBuffer();
 
-  /// 流式输出节流合并缓冲（[streamFlushInterval] 窗口内累积后一次性提交）
-  final StringBuffer _streamBuffer = StringBuffer();
-
-  /// 流式输出节流定时器
-  Timer? _streamTimer;
-
-  /// 当前生成任务的取消信号（用户点击「停止生成」后完成）
-  ///
-  /// 每次发送新消息时重新创建；[stopGenerating] 触发完成，
-  /// [NarrativeTurnService] 和 [LlmClient] 收到后提前终止 SSE 读取。
-  Completer<void>? _generationCancel;
-
-  /// 同步生成中标志位（双保险防重入）
-  ///
-  /// 与 [NarrativeState.isGenerating] 的区别：
-  ///   - `isGenerating` 是状态字段，通过 [MessageSent] dispatch 后异步生效，
-  ///     在状态更新前的微任务间隙，极端情况下仍可能有第二次 `sendMessage` 进入
-  ///   - 本标志在 `sendMessage` 入口立即同步置位，彻底消除竞态窗口，
-  ///     并在 `_generateCore` 成功/失败后统一复位
-  bool _isGeneratingInFlight = false;
-
-  /// 追加流式 chunk：累积到缓冲，按 50ms 节流窗口统一提交（减少 Riverpod 通知）。
+  /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交（减少 Riverpod 通知）。
   void _appendStreamChunk(String chunk) {
-    _streamBuffer.write(chunk);
-    // 定时器语义是「最后一片 chunk 后 50ms 提交」
-    _streamTimer ??= Timer(
-      streamFlushInterval,
-      _flushStreamBuffer,
-    );
+    _streamBuffer.addChunk(chunk, _applyStreamChunk);
   }
 
   /// 提交缓冲中的流式内容到状态。
   void _flushStreamBuffer() {
-    _streamTimer?.cancel();
-    _streamTimer = null;
-    if (_streamBuffer.isEmpty) return;
-    final pending = _streamBuffer.toString();
-    _streamBuffer.clear();
+    _streamBuffer.flush(_applyStreamChunk);
+  }
+
+  /// 将累积的流式内容追加到状态。
+  void _applyStreamChunk(String pending) {
     state = state.copyWith(streamingContent: state.streamingContent + pending);
   }
 
@@ -95,11 +73,8 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   NarrativeState build() {
     // Notifier 重建（契约切换/Provider 失效）时清理流式定时器，避免泄漏
     ref.onDispose(() {
-      _streamTimer?.cancel();
-      _streamTimer = null;
-      _streamBuffer.clear();
-      _generationCancel = null;
-      _isGeneratingInFlight = false;
+      _streamBuffer.dispose();
+      disposeGeneration();
     });
 
     // 读取当前母版文件名（用于子版命名）
@@ -136,30 +111,23 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
   /// 发送消息（用户输入 → 叙事推进）。
   void sendMessage(String content) {
     if (content.trim().isEmpty) return;
-    // 二次守卫：生成中禁止再次发送（UI 已禁用输入，极端连点/竞态时兜底）
-    // 同步标志位 + 状态字段双保险，彻底消除「状态更新前重复进入」的竞态窗口
-    if (state.isGenerating || _isGeneratingInFlight) return;
+    // 二次守卫：生成中禁止再次发送（UI 已禁用输入，极端连点/竞态时兜底）。
+    // 复用 [GenerationCoordinator.canSend]（同步标志位 + 状态字段双保险）
+    if (!canSend(isGenerating: state.isGenerating)) return;
 
     // 入口立即置位同步标志（在 dispatch 之前），确保并发/连点无法穿透
-    _isGeneratingInFlight = true;
+    beginGeneration();
 
     final trimmed = content.trim();
-    // 每次发送创建新的取消信号（覆盖上次生成可能遗留的已取消信号）
-    _generationCancel = Completer<void>();
     _dispatch(MessageSent(trimmed));
 
     _generateReply(trimmed);
   }
 
-  /// 停止当前生成：触发取消信号，让 LLM 流式读取提前终止。
-  ///
-  /// 协作式取消：不会中断底层 http 连接，而是让 [LlmClient] 在下一个
-  /// SSE 数据行处停止读取并返回已累积内容，随后生成流程正常走
-  /// [ReplySucceeded] 收尾（含自动存档），状态不会卡在「生成中」。
-  void stopGenerating() {
-    // 立即 flush 已到达的流式内容，避免遗留在缓冲中
+  /// 停止生成时 flush 流式缓冲（GenerationCoordinator 钩子）。
+  @override
+  void onGenerationStop() {
     _flushStreamBuffer();
-    _generationCancel?.complete();
   }
 
   /// 生成 AI 回复（委托 [NarrativeTurnService]，结果写回状态）。
@@ -196,7 +164,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       config: config,
       onChunk: _appendStreamChunk,
       // 当前生成任务的取消信号（停止生成时触发）
-      cancelSignal: _generationCancel?.future,
+      cancelSignal: generationCancelSignal,
       // 上下文窗口上限（保留最近 N 条历史消息，控制 token 消耗）
       maxHistoryMessages: maxHistoryMessages,
       // 记忆注入灌窗：每轮最多带入 N 条记忆（用户可配置；null = 全部注入），
@@ -241,9 +209,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
       _dispatch(const GenerationFailed(narrativeErrorGenFailed));
     } finally {
       // 无论成功/失败/异常，都必须复位同步标志位，允许下一次发送
-      _isGeneratingInFlight = false;
-      // 清理已完成/已取消的生成信号引用，避免悬挂引用占用内存
-      _generationCancel = null;
+      endGeneration();
     }
   }
 
@@ -344,7 +310,9 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
 
   /// 恢复默认子版（`faust.child.meph`）；成功返回 true。
   Future<bool> restoreSession() {
-    return restoreChild(defaultChildFileName(state.sourceFileName));
+    return restoreChild(
+      meph_file_name.defaultChildFileName(state.sourceFileName),
+    );
   }
 
   /// 删除指定子版文件。
@@ -352,7 +320,7 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
 
   /// 删除默认子版。
   Future<bool> deleteSave() =>
-      deleteChild(defaultChildFileName(state.sourceFileName));
+      deleteChild(meph_file_name.defaultChildFileName(state.sourceFileName));
 
   /// 列出当前母版的所有子版文件。
   Future<List<String>> listChildFiles() =>
@@ -386,34 +354,22 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
 
     // 复用全局 [MemoryManager] 单例（轻量无状态，共享 HTTP 连接池）
     final manager = ref.read(memoryManagerProvider);
-    final updated = await manager.maybeExtract(
-      history: state.history,
-      memories: state.memories,
+
+    // 委托 [MemoryExtractionService]（与多角色版共享安全合并逻辑）
+    final updated = await ref
+        .read(memoryExtractionServiceProvider)
+        .extractWithSafeMerge(
+      manager: manager,
+      input: MemoryExtractionInput(
+        history: state.history,
+        memories: state.memories,
+        historyLengthAtStart: historyLengthAtStart,
+      ),
       config: config,
     );
     if (updated == null) return;
 
-    // 提取期间没有新对话 → 直接采用提取结果（无覆盖风险）
-    if (state.history.length == historyLengthAtStart) {
-      state = state.copyWith(memories: updated);
-    } else {
-      // 提取期间有新对话 → 安全合并：
-      // 以当前 memories 为基底，仅追加「新提取结果中当前不存在」的条目。
-      // 利用 Memory 的 Equatable props（按 content 比较）判断是否已存在。
-      final currentContents = state.memories.map((m) => m.content).toSet();
-      final fresh = updated
-          .where((m) => !currentContents.contains(m.content))
-          .toList();
-      if (fresh.isEmpty) return; // 无新增条目，保持现状
-
-      var combined = [...state.memories, ...fresh];
-      // 遵循权重制取舍：合并后超限触发 compress（低权重优先压缩/舍弃，
-      // 高权重保护不丢）——而非无脑追加导致列表膨胀失控
-      if (combined.length > MemoryManager.maxLimit) {
-        combined = await manager.compress(combined, config: config);
-      }
-      state = state.copyWith(memories: combined);
-    }
+    state = state.copyWith(memories: updated);
 
     // 记忆写回后静默触发自动存档，确保新提取的记忆立即持久化
     // （saveCurrent 保存的是当前 state 最新快照，含提取期间的新对话，
@@ -421,9 +377,14 @@ class NarrativeNotifier extends Notifier<NarrativeState> {
     await _autoSaveChild();
   }
 
-  /// 构造默认子版文件名（`faust.meph` → `faust.child.meph`）。
+  /// 构造默认子版文件名（`faust.meph` → `faust.child.meph`；
+  /// `faust.dark.meph` → `faust.dark.child.meph`）。
+  ///
+  /// 委托共享工具 [meph_file_name.defaultChildFileName]，
+  /// 与 [StageNarrativeNotifier] 保持完全一致（此前两处实现不一致，
+  /// 且旧实现仅取母版根，多级分支下无法正确定位存档）。
   static String defaultChildFileName(String masterFileName) =>
-      '${extractMasterPrefix(masterFileName)}${ChildSaveStore.defaultChildSuffix}.meph';
+      meph_file_name.defaultChildFileName(masterFileName);
 
   /// 附加上下文（会话级，支持多选追加）。
   void attachContext(String fileName, String content) {
@@ -500,6 +461,13 @@ final narrativeTurnServiceProvider = Provider<NarrativeTurnService>((ref) {
 /// 与 [narrativeTurnServiceProvider] 同理，全局复用 [MemoryManager] 单例。
 final memoryManagerProvider = Provider<MemoryManager>((ref) {
   return MemoryManager(client: ref.watch(httpClientProvider));
+});
+
+/// 记忆提取编排服务 Provider
+///
+/// 轻量无状态单例，单角色与多角色 Notifier 共享「记忆提取 → 安全合并」管线。
+final memoryExtractionServiceProvider = Provider<MemoryExtractionService>((ref) {
+  return const MemoryExtractionService();
 });
 
 /// 叙事状态 Provider。

@@ -170,8 +170,9 @@ class NarrativeTurnService {
   /// 组装 LLM 输入：用户输入 + 规则指令 + 骰子结果。
   String _buildInstruction(String userInput, RuleRunResult result) {
     final parts = <String>[userInput];
-    if (result.activeRule != null) {
-      parts.add('（指令：${result.activeRule!.action}）');
+    final activeRule = result.activeRule;
+    if (activeRule != null) {
+      parts.add('（指令：${activeRule.action}）');
     }
     if (result.rollInfo.isNotEmpty) {
       parts.add('（骰子结果：\n${result.rollInfo}）');
@@ -194,7 +195,7 @@ class NarrativeTurnService {
         .where((m) => m.role != MessageRole.system)
         .map(
           (m) => LlmMessage(
-            role: m.role.isFate ? 'user' : 'assistant',
+            role: m.role == MessageRole.fate ? 'user' : 'assistant',
             content: m.content,
           ),
         );

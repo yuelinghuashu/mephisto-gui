@@ -1,108 +1,41 @@
-import 'package:equatable/equatable.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../domain/models.dart';
+
+part 'narrative_state.freezed.dart';
 
 /// 叙事状态
 ///
 /// 这是叙事会话的完整快照，包含所有动态数据。
 /// 每次用户交互（发消息、规则触发、状态变化）都会创建新的状态对象。
-class NarrativeState extends Equatable {
+///
+/// 由 freezed 生成 `copyWith` / `==` / `hashCode` / `toString`，
+/// 消除手写 Equatable props 与全 null 短路样板。
+@freezed
+abstract class NarrativeState with _$NarrativeState {
   /// 静态契约数据（来自 .meph 文件）
-  final Contract contract;
+  const factory NarrativeState({
+    required Contract contract,
+    @Default('faust.meph') String sourceFileName,
+    @Default(<Message>[]) List<Message> messages,
+    @Default(<String, StateValue>{}) Map<String, StateValue> currentState,
+    @Default(<Memory>[]) List<Memory> memories,
+    @Default(<HistoryEntry>[]) List<HistoryEntry> history,
+    @Default(false) bool isGenerating,
+    @Default('') String streamingContent,
+    @Default('') String lastError,
+    @Default(<String>[]) List<String> attachedFileNames,
+    @Default(<String>[]) List<String> attachedContexts,
+  }) = _NarrativeState;
 
-  final String sourceFileName;
-
-  /// 每轮对话增加
-  final List<Message> messages;
-
-  /// 规则触发时变化
-  final Map<String, StateValue> currentState;
-
-  /// 每 N 轮提取一次
-  final List<Memory> memories;
-
-  final List<HistoryEntry> history;
-
-  final bool isGenerating;
-
-  final String streamingContent;
-
-  /// 无错误时为空
-  final String lastError;
-
-  /// 会话级，支持多选
-  final List<String> attachedFileNames;
-
-  /// 会话级，作为补充上下文注入 LLM
-  final List<String> attachedContexts;
-
-  const NarrativeState({
-    required this.contract,
-    this.sourceFileName = 'faust.meph',
-    this.messages = const [],
-    this.currentState = const {},
-    this.memories = const [],
-    this.history = const [],
-    this.isGenerating = false,
-    this.streamingContent = '',
-    this.lastError = '',
-    this.attachedFileNames = const [],
-    this.attachedContexts = const [],
-  });
-
-  /// 创建状态的副本（用于更新）。
-  ///
-  /// 性能优化：所有参数均为 null（无任何字段变化）时直接返回 `this`，
-  /// 避免创建相同内容的新对象——流式输出过程中 [NarrativeNotifier] 会在
-  /// 50ms 节流窗口内频繁调用 copyWith，短路可减少无谓的对象创建与
-  /// Equatable 比较（以及 Riverpod 通知）。
-  NarrativeState copyWith({
-    Contract? contract,
-    String? sourceFileName,
-    List<Message>? messages,
-    Map<String, StateValue>? currentState,
-    List<Memory>? memories,
-    List<HistoryEntry>? history,
-    bool? isGenerating,
-    String? streamingContent,
-    String? lastError,
-    List<String>? attachedFileNames,
-    List<String>? attachedContexts,
-  }) {
-    // 所有参数均为 null → 无变化，直接返回自身
-    if (contract == null &&
-        sourceFileName == null &&
-        messages == null &&
-        currentState == null &&
-        memories == null &&
-        history == null &&
-        isGenerating == null &&
-        streamingContent == null &&
-        lastError == null &&
-        attachedFileNames == null &&
-        attachedContexts == null) {
-      return this;
-    }
-
-    return NarrativeState(
-      contract: contract ?? this.contract,
-      sourceFileName: sourceFileName ?? this.sourceFileName,
-      messages: messages ?? this.messages,
-      currentState: currentState ?? this.currentState,
-      memories: memories ?? this.memories,
-      history: history ?? this.history,
-      isGenerating: isGenerating ?? this.isGenerating,
-      streamingContent: streamingContent ?? this.streamingContent,
-      lastError: lastError ?? this.lastError,
-      attachedFileNames: attachedFileNames ?? this.attachedFileNames,
-      attachedContexts: attachedContexts ?? this.attachedContexts,
-    );
-  }
+  /// freezed 需要私有构造函数以支持 getter 扩展
+  const NarrativeState._();
 
   // ============================================================
   // 便捷访问（UI 常用）
   // ============================================================
 
+  /// 角色名（来自契约）
   String get roleName => contract.roleName;
 
   /// 当前分支名（子版时返回分支名；母版返回空字符串）。
@@ -120,26 +53,15 @@ class NarrativeState extends Equatable {
     return name == 'child' ? '存档' : name;
   }
 
+  /// 规则数量
   int get ruleCount => contract.rules.length;
 
+  /// 消息数量
   int get messageCount => messages.length;
 
+  /// 记忆数量
   int get memoryCount => memories.length;
 
+  /// 历史条目数量
   int get historyCount => history.length;
-
-  @override
-  List<Object?> get props => [
-    contract,
-    sourceFileName,
-    messages,
-    currentState,
-    memories,
-    history,
-    isGenerating,
-    streamingContent,
-    lastError,
-    attachedFileNames,
-    attachedContexts,
-  ];
 }

@@ -218,6 +218,18 @@ abstract class AppLocalizations {
   /// **'⚚ 成功 {success} 个，失败 {fail} 个'**
   String homeImportPartial(Object fail, Object success);
 
+  /// No description provided for @homeExportSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'✦ 已导出: {path}'**
+  String homeExportSuccess(Object path);
+
+  /// No description provided for @homeExportFail.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ 导出失败: {error}'**
+  String homeExportFail(Object error);
+
   /// No description provided for @homeRenameFail.
   ///
   /// In zh, this message translates to:
@@ -281,8 +293,146 @@ abstract class AppLocalizations {
   /// No description provided for @homeBrandSubtitle.
   ///
   /// In zh, this message translates to:
-  /// **'选择一份命运契约，故事由此展开'**
+  /// **'签下契约，书写命运'**
   String get homeBrandSubtitle;
+
+  /// No description provided for @homeStageSectionTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'🎭 多角色舞台'**
+  String get homeStageSectionTitle;
+
+  /// No description provided for @homeContractSectionTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'📜 单角色契约'**
+  String get homeContractSectionTitle;
+
+  /// No description provided for @stageCardCharacterCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'{count} 位角色'**
+  String stageCardCharacterCount(Object count);
+
+  /// No description provided for @stageCardLastModified.
+  ///
+  /// In zh, this message translates to:
+  /// **'最近活动：{time}'**
+  String stageCardLastModified(Object time);
+
+  /// No description provided for @stageCardHasSave.
+  ///
+  /// In zh, this message translates to:
+  /// **'有存档'**
+  String get stageCardHasSave;
+
+  /// No description provided for @stageCardRestart.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新开始（回母版）'**
+  String get stageCardRestart;
+
+  /// No description provided for @stageCardRoleMaster.
+  ///
+  /// In zh, this message translates to:
+  /// **'母版'**
+  String get stageCardRoleMaster;
+
+  /// No description provided for @stageCardRoleChild.
+  ///
+  /// In zh, this message translates to:
+  /// **'{role} · 子版'**
+  String stageCardRoleChild(Object role);
+
+  /// No description provided for @stageCardRoleChildSubtitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'续玩存档'**
+  String get stageCardRoleChildSubtitle;
+
+  /// No description provided for @stageCardExport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出（舞台 ZIP）'**
+  String get stageCardExport;
+
+  /// No description provided for @stageCardDeleteRole.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除母版角色卡'**
+  String get stageCardDeleteRole;
+
+  /// No description provided for @stageCardDeleteChild.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除存档'**
+  String get stageCardDeleteChild;
+
+  /// No description provided for @stageCardDeleteRoleConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要删除角色「{roleName}」的母版文件及其存档吗？此操作不可恢复。'**
+  String stageCardDeleteRoleConfirm(Object roleName);
+
+  /// No description provided for @stageCardDeleteChildConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要删除角色「{roleName}」的存档吗？此操作不可恢复。'**
+  String stageCardDeleteChildConfirm(Object roleName);
+
+  /// No description provided for @stageNarrativeReset.
+  ///
+  /// In zh, this message translates to:
+  /// **'重置会话（回到母版开局）'**
+  String get stageNarrativeReset;
+
+  /// No description provided for @stageNarrativeResetDone.
+  ///
+  /// In zh, this message translates to:
+  /// **'⇄ 已重置会话，舞台回到母版开局'**
+  String get stageNarrativeResetDone;
+
+  /// No description provided for @stageRenameDialogTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'✏️ 重命名舞台'**
+  String get stageRenameDialogTitle;
+
+  /// No description provided for @stageRenameDialogLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'新舞台名'**
+  String get stageRenameDialogLabel;
+
+  /// No description provided for @stageRenameDialogConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'重命名'**
+  String get stageRenameDialogConfirm;
+
+  /// No description provided for @stageRenameNameExists.
+  ///
+  /// In zh, this message translates to:
+  /// **'该舞台名已存在，请更换'**
+  String get stageRenameNameExists;
+
+  /// No description provided for @stageDeleteTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除舞台'**
+  String get stageDeleteTitle;
+
+  /// No description provided for @stageDeleteConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要删除舞台 {name} 及其所有角色吗？此操作不可恢复。'**
+  String stageDeleteConfirm(Object name);
+
+  /// No description provided for @stageDeleteMultipleConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要删除选中的 {count} 个舞台吗？此操作不可恢复。'**
+  String stageDeleteMultipleConfirm(Object count);
 
   /// No description provided for @contractCardEnter.
   ///
@@ -301,6 +451,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'编辑'**
   String get contractCardEdit;
+
+  /// No description provided for @contractCardExport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出（命运树 ZIP）'**
+  String get contractCardExport;
 
   /// No description provided for @contractCardRename.
   ///
@@ -337,12 +493,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'存档'**
   String get narrativeSaveMenu;
-
-  /// No description provided for @narrativeSaveCurrent.
-  ///
-  /// In zh, this message translates to:
-  /// **'保存当前进度'**
-  String get narrativeSaveCurrent;
 
   /// No description provided for @narrativeSaveBranch.
   ///
@@ -391,18 +541,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'设置'**
   String get narrativeSettings;
-
-  /// No description provided for @narrativeSaveSuccess.
-  ///
-  /// In zh, this message translates to:
-  /// **'✦ 契约已镌刻: {fileName}'**
-  String narrativeSaveSuccess(Object fileName);
-
-  /// No description provided for @narrativeSaveFail.
-  ///
-  /// In zh, this message translates to:
-  /// **'╳ 存档失败：请检查契约目录权限或磁盘空间'**
-  String get narrativeSaveFail;
 
   /// No description provided for @narrativeBranchSaved.
   ///

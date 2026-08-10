@@ -10,6 +10,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,9 +26,23 @@ const String _assetPrefix = 'assets/contracts/';
 const List<String> _builtinContracts = [
   'faust.meph',
   'dantes.meph',
+  'joan_of_arc.meph',
+  'arthur_sword.meph',
+  'gilgamesh.meph',
   'dantes.bonapart.meph',
   'faust.utopia.meph',
 ];
+
+/// 内置舞台（多角色）定义：舞台目录名 → 目录内角色 .meph 文件列表
+///
+/// 舞台是契约根目录下的一层子目录（见 [stage_repo.dart]）：
+/// 一个舞台 = 一个文件夹 + 内含 N 份平级角色 .meph 角色卡。
+/// 首次启动/恢复内置时需创建整个目录并逐文件复制，与单角色模板平级，
+/// 使首页「多角色舞台」聚合卡（listStages 扫描）能发现并展示内置舞台。
+const Map<String, List<String>> _builtinStages = {
+  'Kurukshetra': ['Arjuna.meph', 'Karna.meph'],
+  'Camlann': ['Arthur.meph', 'Mordred.meph'],
+};
 
 /// 首次种子标记前缀（SharedPreferences key 前缀）
 ///
@@ -60,6 +75,17 @@ const String _contractsDirKey = 'mephisto_contracts_directory';
 /// 内部沙盒（默认）使用 [getApplicationDocumentsDirectory]，同样随卸载清除。
 const String mobileExternalMarker = 'mobile_external';
 
+/// 确保目录存在（同步 API）。
+///
+/// 集中处理多处 `existsSync + createSync(recursive)` 样板。
+/// 保留同步是因为该函数被 widget 测试（FakeAsync zone）大量间接调用，
+/// 真实异步文件 IO 在 FakeAsync 中无法完成会导致测试挂起。
+void _ensureDirectory(Directory dir) {
+  if (!dir.existsSync()) {
+    dir.createSync(recursive: true);
+  }
+}
+
 /// 获取契约目录路径（用户自定义优先）。目录不存在时自动创建。
 Future<Directory> getContractsDirectory() async {
   final prefs = await SharedPreferences.getInstance();
@@ -71,10 +97,8 @@ Future<Directory> getContractsDirectory() async {
     if (custom == mobileExternalMarker && Platform.isAndroid) {
       final ext = await getExternalStorageDirectory();
       if (ext != null) {
-        final dir = Directory('${ext.path}/Mephisto/contracts');
-        if (!dir.existsSync()) {
-          dir.createSync(recursive: true);
-        }
+        final dir = Directory(p.join(ext.path, 'Mephisto', 'contracts'));
+        _ensureDirectory(dir);
         return dir;
       }
       // 获取外部目录失败（罕见）→ 清空标记，回落沙盒默认
@@ -85,18 +109,14 @@ Future<Directory> getContractsDirectory() async {
     } else {
       // 桌面端任意路径
       final customDir = Directory(custom);
-      if (!customDir.existsSync()) {
-        customDir.createSync(recursive: true);
-      }
+      _ensureDirectory(customDir);
       return customDir;
     }
   }
 
   // 默认位置
   final dir = await _defaultContractsDirectory();
-  if (!dir.existsSync()) {
-    dir.createSync(recursive: true);
-  }
+  _ensureDirectory(dir);
   return dir;
 }
 
@@ -141,11 +161,11 @@ Future<Directory> _defaultContractsDirectory() async {
   // 移动端：path_provider 的应用文档目录（sandbox 内）
   if (Platform.isAndroid || Platform.isIOS) {
     final docs = await getApplicationDocumentsDirectory();
-    return Directory('${docs.path}/Mephisto/contracts');
+    return Directory(p.join(docs.path, 'Mephisto', 'contracts'));
   }
 
   // 桌面端：环境变量主目录（与旧版本路径一致）
-  return Directory('${_homeDirectory().path}/Mephisto/contracts');
+  return Directory(p.join(_homeDirectory().path, 'Mephisto', 'contracts'));
 }
 
 /// 获取用户主目录（桌面端专用）。
@@ -180,9 +200,7 @@ Directory _homeDirectory() {
 Future<bool> setContractsDirectory(String path) async {
   try {
     final dir = Directory(path);
-    if (!dir.existsSync()) {
-      dir.createSync(recursive: true);
-    }
+    _ensureDirectory(dir);
     final prefs = await SharedPreferences.getInstance();
     return await prefs.setString(_contractsDirKey, path);
   } catch (_) {
@@ -213,8 +231,8 @@ Future<void> ensureContracts({bool force = false}) async {
 
   // 种子/强制恢复：复制内置模板（仅当文件不存在时，不覆盖用户已有文件）
   for (final name in _builtinContracts) {
-    final file = File('${dir.path}/$name');
-    if (file.existsSync()) continue;
+    final file = File(p.join(dir.path, name));
+    if (await file.exists()) continue;
 
     try {
       final content = await rootBundle.loadString('$_assetPrefix$name');
@@ -222,6 +240,25 @@ Future<void> ensureContracts({bool force = false}) async {
     } catch (e) {
       // 内置模板加载失败不影响主流程
       debugPrint('复制内置契约失败: $name ($e)');
+    }
+  }
+
+  // 种子/强制恢复：复制内置舞台（多角色目录，逐文件复制，同样不覆盖已有文件）
+  for (final entry in _builtinStages.entries) {
+    final stageDir = Directory(p.join(dir.path, entry.key));
+    _ensureDirectory(stageDir);
+    for (final roleFile in entry.value) {
+      final file = File(p.join(stageDir.path, roleFile));
+      if (await file.exists()) continue;
+      try {
+        final content = await rootBundle.loadString(
+          '$_assetPrefix${entry.key}/$roleFile',
+        );
+        await file.writeAsString(content);
+      } catch (e) {
+        // 内置舞台角色加载失败不影响主流程
+        debugPrint('复制内置舞台角色失败: ${entry.key}/$roleFile ($e)');
+      }
     }
   }
 
@@ -240,7 +277,7 @@ Future<List<String>> listMephFileNames(Directory dir) async {
   final names = <String>[];
   await for (final entity in dir.list()) {
     if (entity is! File) continue;
-    final name = entity.path.split(Platform.pathSeparator).last;
+    final name = p.basename(entity.path);
     if (name.endsWith('.meph')) names.add(name);
   }
   names.sort();

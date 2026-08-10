@@ -85,6 +85,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String homeExportSuccess(Object path) {
+    return '✦ Exported: $path';
+  }
+
+  @override
+  String homeExportFail(Object error) {
+    return '╳ Export failed: $error';
+  }
+
+  @override
   String get homeRenameFail =>
       '╳ Rename failed: target name already exists or old file is missing';
 
@@ -117,8 +127,92 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeBrandTitle => 'Mephisto Narrative Engine';
 
   @override
-  String get homeBrandSubtitle =>
-      'Choose a contract of fate, and the story unfolds from here';
+  String get homeBrandSubtitle => 'Sign the contract, write your fate';
+
+  @override
+  String get homeStageSectionTitle => '🎭 Multi-Character Stages';
+
+  @override
+  String get homeContractSectionTitle => '📜 Single-Character Contracts';
+
+  @override
+  String stageCardCharacterCount(Object count) {
+    return '$count characters';
+  }
+
+  @override
+  String stageCardLastModified(Object time) {
+    return 'Last activity: $time';
+  }
+
+  @override
+  String get stageCardHasSave => 'Has save';
+
+  @override
+  String get stageCardRestart => 'Restart (master opening)';
+
+  @override
+  String get stageCardRoleMaster => 'Master';
+
+  @override
+  String stageCardRoleChild(Object role) {
+    return '$role · child version';
+  }
+
+  @override
+  String get stageCardRoleChildSubtitle => 'Continue from save';
+
+  @override
+  String get stageCardExport => 'Export (Stage ZIP)';
+
+  @override
+  String get stageCardDeleteRole => 'Delete Character Card';
+
+  @override
+  String get stageCardDeleteChild => 'Delete Save';
+
+  @override
+  String stageCardDeleteRoleConfirm(Object roleName) {
+    return 'Delete the master file and its save for \"$roleName\"? This cannot be undone.';
+  }
+
+  @override
+  String stageCardDeleteChildConfirm(Object roleName) {
+    return 'Delete the save for \"$roleName\"? This cannot be undone.';
+  }
+
+  @override
+  String get stageNarrativeReset => 'Reset session (back to master opening)';
+
+  @override
+  String get stageNarrativeResetDone =>
+      '⇄ Session reset, stage is back at the master opening';
+
+  @override
+  String get stageRenameDialogTitle => '✏️ Rename Stage';
+
+  @override
+  String get stageRenameDialogLabel => 'New stage name';
+
+  @override
+  String get stageRenameDialogConfirm => 'Rename';
+
+  @override
+  String get stageRenameNameExists =>
+      'This stage name already exists, please choose another';
+
+  @override
+  String get stageDeleteTitle => 'Delete Stage';
+
+  @override
+  String stageDeleteConfirm(Object name) {
+    return 'Delete stage $name and all its characters? This cannot be undone.';
+  }
+
+  @override
+  String stageDeleteMultipleConfirm(Object count) {
+    return 'Delete the $count selected stages? This cannot be undone.';
+  }
 
   @override
   String get contractCardEnter => 'Enter';
@@ -128,6 +222,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contractCardEdit => 'Edit';
+
+  @override
+  String get contractCardExport => 'Export (Fate Tree ZIP)';
 
   @override
   String get contractCardRename => 'Rename';
@@ -146,9 +243,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get narrativeSaveMenu => 'Save';
-
-  @override
-  String get narrativeSaveCurrent => 'Save Current Progress';
 
   @override
   String get narrativeSaveBranch => 'Save as Branch...';
@@ -174,15 +268,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get narrativeSettings => 'Settings';
-
-  @override
-  String narrativeSaveSuccess(Object fileName) {
-    return '✦ Contract engraved: $fileName';
-  }
-
-  @override
-  String get narrativeSaveFail =>
-      '╳ Save failed: check contract directory permissions or disk space';
 
   @override
   String narrativeBranchSaved(Object fileName) {

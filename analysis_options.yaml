@@ -22,6 +22,26 @@ linter:
     prefer_final_fields: true
     unnecessary_lambdas: true
     unnecessary_null_checks: true
+    # 使用 Dart 3.7 通配符 `_`（消除未使用命名参数/变量的隐式下划线）
+    unnecessary_underscores: true
+    # 确保 import 自 pubspec 声明的依赖包
+    depend_on_referenced_packages: true
 
     # ---- 代码风格（Dart 3 已内置于语言特性） ----
     use_super_parameters: true
+
+    # ---- Widget 优化 ----
+    # 纯色容器使用 ColoredBox（更轻量）
+    use_colored_box: true
+
+    # ---- 新增：增强可读性与一致性 ----
+    # 多行参数/集合要求尾逗号，减少 diff 噪音并利于自动格式化稳定
+    require_trailing_commas: true
+    # 消除不必要的 await（如 `return await f()` → `return f()`）
+    unnecessary_await_in_return: true
+    # 避免返回 null 给 void 函数 / 无意义的三元表达式
+    avoid_returning_null_for_void: true
+    # 消除冗余的构造器名称写法（如 `Foo.new()` → `Foo()`）
+    unnecessary_constructor_name: true
+    # 消除不必要的字符串插值（如 `${x}` 当 x 是单个简单标识符时）
+    unnecessary_string_interpolations: true

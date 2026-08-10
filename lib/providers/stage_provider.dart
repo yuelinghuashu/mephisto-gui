@@ -23,6 +23,20 @@ final stageProvider =
   return loadStage(dirPath);
 });
 
+/// 指定舞台目录的「最近活动时间」Provider（缓存磁盘 mtime 读取）
+///
+/// 首页 [StageCardWithMeta] 以 `FutureBuilder` 每次重建都会重新发起
+/// `stageLastModified(dirPath)` 磁盘读取；改用 Riverpod 缓存后，
+/// 仅在 [invalidate]（如舞台列表刷新）时重新读取，避免 UI 重建造成的
+/// 无效 IO。舞台目录不存在/无 .meph 时返回 null。
+final stageLastModifiedProvider =
+    FutureProvider.autoDispose.family<DateTime?, String>((
+      ref,
+      dirPath,
+    ) async {
+  return stageLastModified(dirPath);
+});
+
 /// 契约根目录下所有舞台的列表 Provider（用于首页聚合卡）
 final stageListProvider =
     FutureProvider.autoDispose<List<StageInfo>>((ref) async {

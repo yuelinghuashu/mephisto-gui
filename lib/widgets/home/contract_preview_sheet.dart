@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
@@ -13,7 +15,7 @@ import '../contract_panel.dart';
 /// 读取 .meph 文件内容并解析为结构化 [Contract]，
 /// 使用共享 [ContractPanel] 结构化展示全部区块数据。
 class ContractPreviewSheet {
-  /// 显示预览
+  /// 显示预览（全局契约目录）
   ///
   /// 参数：
   ///   - context: 用于显示 SnackBar 和 BottomSheet 的 BuildContext
@@ -23,7 +25,38 @@ class ContractPreviewSheet {
   static Future<void> show(BuildContext context, ContractInfo info) async {
     // 读取 .meph 文件并解析为结构化契约
     final content = await readContract(info.fileName);
-    if (content == null) return;
+    if (content == null || !context.mounted) return;
+
+    await _showSheet(context, fileName: info.fileName, content: content);
+  }
+
+  /// 显示预览（指定目录 + 文件名）
+  ///
+  /// 用于多角色舞台展开区的角色卡预览：读取舞台目录下指定角色的
+  /// `.meph` 文件并结构化展示，不进入叙事/编辑页面。
+  ///
+  /// 参数：
+  ///   - [dirPath]: 舞台目录绝对路径
+  ///   - [fileName]: 角色卡文件名（如 `Arjuna.meph`）
+  static Future<void> showFromFile(
+    BuildContext context, {
+    required String dirPath,
+    required String fileName,
+  }) async {
+    final file = File('$dirPath/$fileName');
+    if (!await file.exists()) return;
+    final content = await file.readAsString();
+    if (content.trim().isEmpty || !context.mounted) return;
+
+    await _showSheet(context, fileName: fileName, content: content);
+  }
+
+  /// 共享的预览底表构建：解析内容 → 展示结构化面板。
+  static Future<void> _showSheet(
+    BuildContext context, {
+    required String fileName,
+    required String content,
+  }) async {
 
     final Contract contract;
     try {
@@ -70,7 +103,7 @@ class ContractPreviewSheet {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        info.fileName,
+                        fileName,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
