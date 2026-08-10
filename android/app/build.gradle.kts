@@ -32,7 +32,9 @@ if (hasReleaseKeystore) {
 
 android {
     namespace = "yuelinghuashu.mephisto"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_secure_storage 11.x 要求 compileSdk ≥ 37；固定为 37 而非使用
+    // flutter.compileSdkVersion（当前 Flutter 内置值为 36，会导致构建失败）。
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
