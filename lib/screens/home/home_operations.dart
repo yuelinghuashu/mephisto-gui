@@ -22,14 +22,20 @@ import '../contract_editor_screen.dart';
 
 /// 删除选中的契约文件。
 ///
-/// 逐个删除成功后退出多选并刷新列表；有失败时提示数量。
-Future<void> deleteSelectedContract(
+/// 逐个删除选中项；有失败时提示数量。
+///
+/// **注意**：本方法**不**退出多选/刷新列表——由调用方（[HomeScreen] 的
+/// 多选删除流程）在**所有选中项（契约 + 舞台 + 舞台内角色）都删除完成后**
+/// 统一收尾。若在此提前退出多选，`HomeSelectionController.exitSelectMode`
+/// 会清空 `_selectedStages` / `_selectedStageRoles`，导致后续舞台删除被跳过。
+///
+/// 返回值：`true` = 删除已执行（或无需删除）；`false` = 用户在确认对话框
+/// 点击「取消」，调用方应中止整个批量删除流程（保持多选模式不变）。
+Future<bool> deleteSelectedContract(
   WidgetRef ref,
   BuildContext context,
-  HomeSelectionController selection, {
-  required VoidCallback onExitSelectMode,
-  required VoidCallback onRefreshLists,
-}) async {
+  HomeSelectionController selection,
+) async {
   final messenger = ScaffoldMessenger.of(context);
   final count = selection.selectedCount;
   final l10n = AppLocalizations.of(context);
@@ -39,7 +45,7 @@ Future<void> deleteSelectedContract(
     title: l10n.homeDeleteContractTitle,
     message: l10n.homeDeleteSelectedConfirm(count),
   )) {
-    return;
+    return false; // 用户取消 → 中止整个批量删除
   }
 
   // 逐个删除
@@ -48,16 +54,14 @@ Future<void> deleteSelectedContract(
     if (!await deleteContract(name)) failCount++;
   }
 
-  if (!context.mounted) return;
-  onExitSelectMode();
-  onRefreshLists();
-
-  // 成功时列表已直观反映（文件消失），无需提示；仅当存在删除失败时告知
+  // 成功时列表由调用方统一刷新；仅当存在删除失败时在此提示
+  if (!context.mounted) return false;
   if (failCount > 0) {
     messenger.showSnackBar(
       SnackBar(content: Text(l10n.homeDeleteSelectedFail(count))),
     );
   }
+  return true;
 }
 
 /// 从本地文件系统导入契约文件到用户契约目录。

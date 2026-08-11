@@ -24,7 +24,7 @@ Future<List<String>> listContracts() async {
 Future<String?> readContract(String name) async {
   final dir = await getContractsDirectory();
   final file = File('${dir.path}/$name');
-  if (!file.existsSync()) return null;
+  if (!await file.exists()) return null;
   return file.readAsString();
 }
 
@@ -38,7 +38,7 @@ Future<void> saveContract(String name, String content) async {
 Future<bool> deleteContract(String name) async {
   final dir = await getContractsDirectory();
   final file = File('${dir.path}/$name');
-  if (!file.existsSync()) return false;
+  if (!await file.exists()) return false;
   try {
     await file.delete();
     return true;
@@ -51,15 +51,17 @@ Future<bool> deleteContract(String name) async {
 Future<String> importContract(String sourcePath, String fileName) async {
   final dir = await getContractsDirectory();
   final source = File(sourcePath);
-  if (!source.existsSync()) {
+  if (!await source.exists()) {
     throw Exception('源文件不存在: $sourcePath');
   }
 
   // 处理重名：追加序号（如 `my_story (2).meph`）
+  // 一次性列出目录中所有 .meph 文件名后在内存中判断（避免多次异步 exists 往返）
+  final existingNames = await listMephFileNames(dir);
   var targetName = fileName;
   final baseName = fileName.replaceAll('.meph', '');
   var counter = 2;
-  while (File('${dir.path}/$targetName').existsSync()) {
+  while (existingNames.contains(targetName)) {
     targetName = '$baseName ($counter).meph';
     counter++;
   }
@@ -80,7 +82,7 @@ Future<bool> renameContract(String oldName, String newName) async {
   final dir = await getContractsDirectory();
   final oldFile = File('${dir.path}/$oldName');
   final newFile = File('${dir.path}/$newName');
-  if (!oldFile.existsSync() || newFile.existsSync()) return false;
+  if (!await oldFile.exists() || await newFile.exists()) return false;
   try {
     await oldFile.rename(newFile.path);
     return true;
@@ -94,7 +96,7 @@ Future<bool> renameContract(String oldName, String newName) async {
 /// 返回值：true 表示名称可用；false 表示冲突。
 Future<bool> isContractNameAvailable(String name) async {
   final dir = await getContractsDirectory();
-  return !File('${dir.path}/$name').existsSync();
+  return !await File('${dir.path}/$name').exists();
 }
 
 /// 级联重命名母版及其下所有子版（同步子树文件名前缀）。
@@ -332,7 +334,7 @@ Future<bool> updateContractBranchTitle(
 ) async {
   final dir = await getContractsDirectory();
   final file = File('${dir.path}/$fileName');
-  if (!file.existsSync()) return false;
+  if (!await file.exists()) return false;
   try {
     final content = await file.readAsString();
     final updated = updateFateBlock(content, newTitle);

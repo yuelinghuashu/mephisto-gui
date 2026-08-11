@@ -44,17 +44,39 @@
 未填写命运说明的分支，主标签回落为显示分支名（与旧版行为一致）。
 母版不显示命运说明（只显示角色名）。
 
-## 3. 命名规则
+## 3. 命名规则与多级分支树
 
-| 场景             | 文件名                          |
-| ---------------- | ------------------------------- |
-| 默认保存         | `faust.child.meph`              |
-| 默认已存在       | `faust.child2.meph`（自动递增） |
-| 自定义分支       | `faust.dark.meph`               |
-| 自定义分支已存在 | `faust.dark2.meph`（自动递增）  |
+### 3.1 默认「保存」：覆盖当前分支（不递增序号）
+
+`保存`（`ChildSaveStore.saveCurrent`）总是**覆盖当前分支的默认存档**，从不递增序号，
+保证存档数量不膨胀。命名规则为「当前分支路径 + `.child`」：
+
+| 当前文件                                 | 默认存档文件                       |
+| ---------------------------------------- | ---------------------------------- |
+| 母版 `faust.meph`                        | 覆盖 `faust.child.meph`            |
+| 分支 `faust.dark.meph`                   | 覆盖 `faust.dark.child.meph`       |
+| 二级分支 `faust.dark.light.meph`         | 覆盖 `faust.dark.light.child.meph` |
+| 已打开的存档自身 `faust.dark.child.meph` | 覆盖它自己                         |
+
+### 3.2 另存为分支：多级继承
+
+`另存为分支`（`ChildSaveStore.saveAsBranch`）以**当前分支路径**为命名根 +
+自定义分支名生成新文件，支持从分支继续派生多级分支树：
+
+| 场景                                             | 新分支文件                           |
+| ------------------------------------------------ | ------------------------------------ |
+| 母版 `faust.meph` → 另存 `dark`                  | `faust.dark.meph`                    |
+| 分支 `faust.dark.meph` → 另存 `light`            | `faust.dark.light.meph`              |
+| 二级分支 `faust.dark.light.meph` → 另存 `utopia` | `faust.dark.light.utopia.meph`       |
+| 存档 `faust.dark.child.meph` → 另存 `light`      | `faust.dark.light.meph`（继承 dark） |
+
+> 传统场景（直接调用底层 `save`）仍保留递增行为：
+> 默认 `.child` 已存在 → `child2`、自定义分支已存在 → `branch2`。
+
+### 3.3 通用规则
 
 - 子版与母版**存放在同一契约目录**，便于查找与管理
-- 同名文件通过递增序号自动避免冲突
+- 同名文件通过递增序号自动避免冲突（仅底层 `save` 场景）
 
 ## 4. 常用操作
 

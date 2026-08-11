@@ -9,7 +9,7 @@ import 'package:http/testing.dart';
 import 'package:mephisto/domain/models.dart';
 import 'package:mephisto/domain/reducer_utils.dart';
 import 'package:mephisto/providers/providers.dart';
-import 'package:mephisto/services/session/session_saver.dart';
+import 'package:mephisto/services/session/child_save_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// NarrativeNotifier 单元测试
@@ -388,9 +388,9 @@ void main() {
       final notifier = container.read(narrativeProvider.notifier);
 
       // 创建存档文件
-      await SessionSaver.save(
-        masterFileName: 'faust.meph',
-        contract: container.read(narrativeProvider).contract,
+      await ChildSaveStore.save(
+        'faust.meph',
+        container.read(narrativeProvider).contract,
         currentState: const {},
         memories: const [],
         history: const [],

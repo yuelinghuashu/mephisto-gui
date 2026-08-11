@@ -48,6 +48,9 @@ class IntValue extends StateValue {
   @override
   final int value;
   const IntValue(this.value);
+
+  @override
+  String toString() => value.toString();
 }
 
 /// 浮点数状态值
@@ -55,6 +58,9 @@ class DoubleValue extends StateValue {
   @override
   final double value;
   const DoubleValue(this.value);
+
+  @override
+  String toString() => value.toString();
 }
 
 /// 布尔状态值
@@ -62,6 +68,9 @@ class BoolValue extends StateValue {
   @override
   final bool value;
   const BoolValue(this.value);
+
+  @override
+  String toString() => value.toString();
 }
 
 /// 字符串状态值
@@ -69,4 +78,7 @@ class StringValue extends StateValue {
   @override
   final String value;
   const StringValue(this.value);
+
+  @override
+  String toString() => value.toString();
 }

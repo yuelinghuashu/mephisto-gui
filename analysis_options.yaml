@@ -39,6 +39,12 @@ linter:
     require_trailing_commas: true
     # 消除不必要的 await（如 `return await f()` → `return f()`）
     unnecessary_await_in_return: true
+    # 统一字符串引号风格为单引号
+    prefer_single_quotes: true
+    # 简化字符串插值（如 `${x}` → `$x`）
+    unnecessary_brace_in_string_interps: true
+    # 避免在 closure 参数上显式标注类型（由上下文推断）
+    avoid_types_on_closure_parameters: true
     # 避免返回 null 给 void 函数 / 无意义的三元表达式
     avoid_returning_null_for_void: true
     # 消除冗余的构造器名称写法（如 `Foo.new()` → `Foo()`）

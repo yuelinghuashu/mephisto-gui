@@ -299,14 +299,26 @@ abstract class AppLocalizations {
   /// No description provided for @homeStageSectionTitle.
   ///
   /// In zh, this message translates to:
-  /// **'🎭 多角色舞台'**
+  /// **'多角色舞台'**
   String get homeStageSectionTitle;
 
   /// No description provided for @homeContractSectionTitle.
   ///
   /// In zh, this message translates to:
-  /// **'📜 单角色契约'**
+  /// **'单角色契约'**
   String get homeContractSectionTitle;
+
+  /// No description provided for @homeSectionExpand.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开'**
+  String get homeSectionExpand;
+
+  /// No description provided for @homeSectionCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'收起'**
+  String get homeSectionCollapse;
 
   /// No description provided for @stageCardCharacterCount.
   ///
@@ -487,6 +499,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'收起子版'**
   String get contractCardCollapseChildren;
+
+  /// No description provided for @contractBranchCount.
+  ///
+  /// In zh, this message translates to:
+  /// **'分支 · {count}'**
+  String contractBranchCount(Object count);
 
   /// No description provided for @narrativeSaveMenu.
   ///

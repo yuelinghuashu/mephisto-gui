@@ -7,6 +7,8 @@
   3. release.yml 中 dpkg 版本号剥离必须同时处理 v/V 前缀（防止 dpkg 报错）
   4. ci.yml / release.yml 中关键步骤存在（ci 只承担代码检查 analyze/test，
      发布构建/打包全部归 release.yml，防止职责漂移或配置被误删）
+  5. assets/contracts 下的舞台子目录必须在 pubspec.yaml 中显式声明
+     （Flutter assets 不递归，漏声明会导致 rootBundle 加载舞台角色静默失败）
 
 用法：
   python3 tool/validate_build_config.py
@@ -26,6 +28,8 @@ ANDROID_MANIFEST = os.path.join(ROOT, 'android', 'app', 'src', 'main', 'AndroidM
 IOS_INFO_PLIST = os.path.join(ROOT, 'ios', 'Runner', 'Info.plist')
 RELEASE_WORKFLOW = os.path.join(ROOT, '.github', 'workflows', 'release.yml')
 CI_WORKFLOW = os.path.join(ROOT, '.github', 'workflows', 'ci.yml')
+PUBSPEC = os.path.join(ROOT, 'pubspec.yaml')
+CONTRACTS_DIR = os.path.join(ROOT, 'assets', 'contracts')
 
 failures: list[str] = []
 
@@ -104,6 +108,62 @@ def check_release_workflow_version_pattern() -> None:
     )
 
 
+def check_assets_stage_dirs() -> None:
+    """Flutter assets 不递归，舞台子目录必须在 pubspec.yaml 中显式声明。
+
+    新增内置舞台（如 `assets/contracts/Kurukshetra/`）时若忘记在
+    pubspec.yaml 的 `flutter.assets` 中声明，rootBundle 将无法加载
+    舞台角色文件（运行时静默失败）。此断言在 CI 中强制同步声明。
+    """
+    # ---- 读取 pubspec.yaml 中 flutter.assets 列表 ----
+    declared: list[str] = []
+    in_flutter = False
+    in_assets = False
+    try:
+        with open(PUBSPEC, encoding='utf-8') as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped == 'flutter:':
+                    in_flutter = True
+                    in_assets = False
+                    continue
+                if not in_flutter:
+                    continue
+                if stripped == 'assets:':
+                    in_assets = True
+                    continue
+                if in_assets:
+                    if stripped.startswith('- '):
+                        declared.append(stripped[2:].strip().rstrip('/'))
+                    elif stripped and not stripped.startswith('#'):
+                        # 遇到下一个顶层键（如 fonts:）则结束 assets 段
+                        in_assets = False
+                        in_flutter = False
+    except OSError as e:
+        check('pubspec.yaml 可读取', False, str(e))
+        return
+
+    # ---- 检测 assets/contracts/ 下的舞台（子）目录 ----
+    stage_dirs: list[str] = []
+    if os.path.isdir(CONTRACTS_DIR):
+        for entry in os.listdir(CONTRACTS_DIR):
+            full = os.path.join(CONTRACTS_DIR, entry)
+            if os.path.isdir(full):
+                stage_dirs.append(entry)
+
+    # ---- 每个舞台目录都必须被显式声明 ----
+    missing = [
+        d for d in stage_dirs
+        if f'assets/contracts/{d}' not in declared
+    ]
+    check(
+        'assets/contracts 舞台子目录均已声明',
+        not missing,
+        ', '.join(f'assets/contracts/{d}' for d in missing) if missing else
+        ', '.join(f'assets/contracts/{d}' for d in stage_dirs) or '无舞台目录',
+    )
+
+
 def check_workflow_paths() -> None:
     """ci.yml 只承担代码检查；release.yml 承担全部发布构建与打包。"""
     with open(CI_WORKFLOW, encoding='utf-8') as f:
@@ -135,6 +195,7 @@ def main() -> None:
     check_ios_ats()
     check_version_normalization()
     check_release_workflow_version_pattern()
+    check_assets_stage_dirs()
     check_workflow_paths()
     print('=' * 46)
     if failures:

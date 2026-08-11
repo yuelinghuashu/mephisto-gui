@@ -8,6 +8,7 @@ import '../../app/theme.dart';
 ///   - 前导图标（[leadingIcon]）
 ///   - 金色加粗标题文本（[title]）
 ///   - 可选的项目计数徽标（[count]，null 时不显示）
+///   - 可选的右侧操作区（[trailing]，如折叠/展开按钮）
 ///
 /// 标题后绘制一条淡金色水平延伸线，强化分区边界。
 class SectionHeader extends StatelessWidget {
@@ -20,11 +21,15 @@ class SectionHeader extends StatelessWidget {
   /// 项目计数（null 时不显示计数徽标）
   final int? count;
 
+  /// 右侧操作区（通常为折叠/展开按钮；null 时不显示）
+  final Widget? trailing;
+
   const SectionHeader({
     super.key,
     required this.leadingIcon,
     required this.title,
     this.count,
+    this.trailing,
   });
 
   @override
@@ -60,7 +65,7 @@ class SectionHeader extends StatelessWidget {
               ),
             ),
           ],
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
           // 淡金色延伸线
           Expanded(
             child: Container(
@@ -68,6 +73,8 @@ class SectionHeader extends StatelessWidget {
               color: AppTheme.gold.withValues(alpha: 0.2),
             ),
           ),
+          // 右侧操作区（折叠/展开按钮等）
+          if (trailing != null) ...[const SizedBox(width: 4), trailing!],
         ],
       ),
     );

@@ -48,17 +48,39 @@ on the home page, each child shows:
 Branches without a fate description fall back to showing the branch name (same behavior as before).
 Masters do not show a fate description (only the character name).
 
-## 3. Naming Rules
+## 3. Naming Rules and the Multi-Level Branch Tree
 
-| Scenario                     | File Name                            |
-| ---------------------------- | ------------------------------------ |
-| Default save                 | `faust.child.meph`                   |
-| Default already exists       | `faust.child2.meph` (auto-increment) |
-| Custom branch                | `faust.dark.meph`                    |
-| Custom branch already exists | `faust.dark2.meph` (auto-increment)  |
+### 3.1 Default "Save": Overwrite the Current Branch (No Increment)
+
+`Save` (`ChildSaveStore.saveCurrent`) always **overwrites the current branch's default save**, never incrementing
+the number, so the number of saves does not balloon. The naming rule is "current branch path + `.child`":
+
+| Current File                                | Default Save File                        |
+| ------------------------------------------- | ---------------------------------------- |
+| Master `faust.meph`                         | overwrites `faust.child.meph`            |
+| Branch `faust.dark.meph`                    | overwrites `faust.dark.child.meph`       |
+| Second-level branch `faust.dark.light.meph` | overwrites `faust.dark.light.child.meph` |
+| Opened save itself `faust.dark.child.meph`  | overwrites itself                        |
+
+### 3.2 Save as Branch: Multi-Level Inheritance
+
+`Save as Branch` (`ChildSaveStore.saveAsBranch`) uses the **current branch path** as the naming root +
+a custom branch name to create a new file, supporting multi-level branch trees derived from existing branches:
+
+| Scenario                                                       | New Branch File                           |
+| -------------------------------------------------------------- | ----------------------------------------- |
+| Master `faust.meph` → save as `dark`                           | `faust.dark.meph`                         |
+| Branch `faust.dark.meph` → save as `light`                     | `faust.dark.light.meph`                   |
+| Second-level branch `faust.dark.light.meph` → save as `utopia` | `faust.dark.light.utopia.meph`            |
+| Save `faust.dark.child.meph` → save as `light`                 | `faust.dark.light.meph` (inherits `dark`) |
+
+> The legacy scenario (directly calling the low-level `save`) still retains incrementing behavior:
+> default `.child` already exists → `child2`; custom branch already exists → `branch2`.
+
+### 3.3 General Rules
 
 - Children are stored in the **same contract directory** as the master, for easy lookup and management
-- Name collisions are avoided automatically via incrementing numbers
+- Name collisions are avoided automatically via incrementing numbers (legacy low-level `save` scenario only)
 
 ## 4. Common Operations
 

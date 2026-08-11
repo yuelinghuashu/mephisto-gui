@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mephisto/domain/models.dart';
 import 'package:mephisto/services/session/child_save_store.dart';
-import 'package:mephisto/services/session/session_saver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// SessionSaver 存档服务单测
@@ -46,10 +45,10 @@ void main() {
     const HistoryEntry(role: MessageRole.assistant, content: '浮士德沉默着。'),
   ];
 
-  group('SessionSaver.saveCurrent', () {
+  group('ChildSaveStore.saveCurrent', () {
     test('母版文件名 → 生成 .child 子版', () async {
       expect(File('${tempDir.path}/faust.child.meph').existsSync(), isFalse);
-      final saved = await SessionSaver.saveCurrent(
+      final saved = await ChildSaveStore.saveCurrent(
         sourceFileName: 'faust.meph',
         contract: contract,
         currentState: currentState,
@@ -68,7 +67,7 @@ void main() {
       await File('${tempDir.path}/faust.child.meph').writeAsString(
         '【角色名】\n浮士德\n',
       );
-      final saved = await SessionSaver.saveCurrent(
+      final saved = await ChildSaveStore.saveCurrent(
         sourceFileName: 'faust.child.meph',
         contract: contract,
         currentState: currentState,
@@ -81,7 +80,7 @@ void main() {
     });
 
     test('快照序列化完整性：保存含状态/记忆/历史的快照后可完整恢复', () async {
-      await SessionSaver.saveCurrent(
+      await ChildSaveStore.saveCurrent(
         sourceFileName: 'faust.meph',
         contract: contract,
         currentState: currentState,
@@ -102,9 +101,9 @@ void main() {
     });
   });
 
-  group('SessionSaver.saveAsBranch', () {
+  group('ChildSaveStore.saveAsBranch', () {
     test('从母版另存为分支 → faust.<分支名>.meph', () async {
-      final saved = await SessionSaver.saveAsBranch(
+      final saved = await ChildSaveStore.saveAsBranch(
         sourceFileName: 'faust.meph',
         branchName: 'dark',
         contract: contract,
@@ -122,7 +121,7 @@ void main() {
       await File('${tempDir.path}/faust.child.meph').writeAsString(
         '【角色名】\n浮士德\n',
       );
-      final saved = await SessionSaver.saveAsBranch(
+      final saved = await ChildSaveStore.saveAsBranch(
         sourceFileName: 'faust.child.meph',
         branchName: 'dark',
         contract: contract,

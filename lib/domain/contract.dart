@@ -4,11 +4,12 @@
 /// 这是叙事引擎的核心数据结构，代表完整的角色设定和运行时快照。
 library;
 
-import 'package:equatable/equatable.dart';
-import 'package:meta/meta.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'entities.dart';
 import 'values.dart';
+
+part 'contract.freezed.dart';
 
 // ============================================================
 // 契约模型（核心）
@@ -31,118 +32,52 @@ import 'values.dart';
 ///   系统区块（由程序自动生成）：
 ///     - [memories]：记忆
 ///     - [history]：历史
-@immutable
-class Contract extends Equatable {
+///
+/// 由 freezed 生成 `copyWith` / `==` / `hashCode` / `toString`，
+/// 消除手写 Equatable props 与全 null 短路样板。
+@freezed
+abstract class Contract with _$Contract {
   // ==========================================================
   // 用户区块
   // ==========================================================
 
-  /// 角色名（必选）
-  final String roleName;
+  const factory Contract({
+    /// 角色名（必选）
+    required String roleName,
 
-  /// 锚点（核心人格设定，推荐）
-  final List<StateItem> anchor;
+    /// 锚点（核心人格设定，推荐）
+    @Default(<StateItem>[]) List<StateItem> anchor,
+    @Default('') String worldview,
+    @Default('') String background,
+    @Default('') String opening,
 
-  final String worldview;
+    /// 初始状态
+    @Default(<StateItem>[]) List<StateItem> state,
 
-  final String background;
+    /// 规则列表
+    @Default(<Rule>[]) List<Rule> rules,
 
-  final String opening;
+    /// 分支的一句话描述（来自系统保留区块 `@命运`）
+    ///
+    /// 仅子版可能有；用户在「另存为分支」时填写。
+    /// 非空时 serializer 输出 `@命运` 区块，首页据此展示「命运一句话」。
+    @Default('') String branchTitle,
 
-  final List<StateItem> state;
+    /// 记忆
+    @Default(<Memory>[]) List<Memory> memories,
 
-  final List<Rule> rules;
+    /// 历史
+    @Default(<HistoryEntry>[]) List<HistoryEntry> history,
+  }) = _Contract;
 
-  // ==========================================================
-  // 系统区块（由程序自动生成）
-  // ==========================================================
+  /// freezed 需要私有构造函数以支持 getter 扩展
+  const Contract._();
 
-  /// 分支的一句话描述（来自系统保留区块 `@命运`）
-  ///
-  /// 仅子版可能有；用户在「另存为分支」时填写。
-  /// 非空时 serializer 输出 `@命运` 区块，首页据此展示「命运一句话」。
-  final String branchTitle;
-
-  final List<Memory> memories;
-
-  final List<HistoryEntry> history;
-
-  const Contract({
-    required this.roleName,
-    this.anchor = const [],
-    this.worldview = '',
-    this.background = '',
-    this.opening = '',
-    this.state = const [],
-    this.rules = const [],
-    this.branchTitle = '',
-    this.memories = const [],
-    this.history = const [],
-  });
-
+  /// 空契约兜底（角色名为 '角色'）。
   factory Contract.empty() => const Contract(roleName: '角色');
 
-  /// 创建副本（仅更新指定字段，其余保留原值）。
-  ///
-  /// 用于状态迁移/保存路径中「保留大部分字段、仅替换部分区块」的场景，
-  /// 避免手工复制全部字段导致未来新增字段时漏同步。
-  ///
-  /// 性能优化：所有参数均为 null（无任何字段变化）时直接返回 `this`，
-  /// 与 [NarrativeState.copyWith] 语义一致，避免创建无意义的新对象。
-  Contract copyWith({
-    String? roleName,
-    List<StateItem>? anchor,
-    String? worldview,
-    String? background,
-    String? opening,
-    List<StateItem>? state,
-    List<Rule>? rules,
-    String? branchTitle,
-    List<Memory>? memories,
-    List<HistoryEntry>? history,
-  }) {
-    if (roleName == null &&
-        anchor == null &&
-        worldview == null &&
-        background == null &&
-        opening == null &&
-        state == null &&
-        rules == null &&
-        branchTitle == null &&
-        memories == null &&
-        history == null) {
-      return this;
-    }
-
-    return Contract(
-      roleName: roleName ?? this.roleName,
-      anchor: anchor ?? this.anchor,
-      worldview: worldview ?? this.worldview,
-      background: background ?? this.background,
-      opening: opening ?? this.opening,
-      state: state ?? this.state,
-      rules: rules ?? this.rules,
-      branchTitle: branchTitle ?? this.branchTitle,
-      memories: memories ?? this.memories,
-      history: history ?? this.history,
-    );
-  }
-
+  /// 从状态列表构建状态映射（键 → 值）。
   Map<String, StateValue> get stateMap {
     return {for (final item in state) item.key: item.value};
   }
-
-  @override
-  List<Object?> get props => [
-    roleName,
-    anchor,
-    worldview,
-    background,
-    opening,
-    state,
-    rules,
-    branchTitle,
-    memories,
-    history,
-  ];
 }

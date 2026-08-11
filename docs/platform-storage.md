@@ -87,9 +87,20 @@
 
 首次启动（或首次切换契约目录）时，从 assets 复制内置模板：
 
-- 内置模板：`assets/contracts/faust.meph`、`dantes.meph`
-- 种子标记按目录绑定（`mephisto_contracts_seeded_<目录路径>`），避免新目录为空
-- `force: true` 时强制恢复缺失的内置模板（空状态兜底按钮）
+- **内置单角色契约**（`assets/contracts/`）：
+  - `faust.meph`（浮士德）
+  - `dantes.meph`（基督山伯爵）
+  - `joan_of_arc.meph`（贞德）
+  - `arthur_sword.meph`（少年亚瑟）
+  - `gilgamesh.meph`（吉尔伽美什）
+  - `dantes.bonapart.meph`（基督山伯爵 × 波拿巴党卧底 if 线，预置示范子版）
+  - `faust.utopia.meph`（浮士德 × 理想国 / 乌托邦 if 线，预置示范子版）
+- **内置舞台**（多角色目录，`assets/contracts/<舞台名>/`）：
+  - `Kurukshetra/`：`Arjuna.meph` + `Karna.meph`（俱卢之野）
+  - `Camlann/`：`Arthur.meph` + `Mordred.meph`（卡美洛之陨）
+- 种子标记按目录绑定（`mephisto_contracts_seeded_<目录路径>`），避免新目录为空；
+  已种子过的目录**不再自动恢复**被用户删除的模板（尊重用户删除），仅 `force: true`
+  强制恢复缺失的内置模板（空状态兜底按钮），且不覆盖用户已有文件
 
 ## 7. 相关代码
 

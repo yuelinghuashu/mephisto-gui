@@ -3,6 +3,7 @@ import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 import '../../providers/contract_provider.dart';
+import '../../widgets/card_menu.dart';
 
 /// 移动端母版分支选择器（BottomSheet）
 ///
@@ -19,10 +20,14 @@ class HomeBranchSheet extends StatelessWidget {
   /// 点击分支/母版进入叙事的回调
   final ValueChanged<ContractInfo> onEnter;
 
+  /// 分支项「⋮ 菜单」操作回调（参数为分支信息 + 操作名）
+  final void Function(ContractInfo info, String action)? onMenu;
+
   const HomeBranchSheet({
     super.key,
     required this.group,
     required this.onEnter,
+    this.onMenu,
   });
 
   /// 弹出分支选择器的便捷入口。
@@ -30,6 +35,7 @@ class HomeBranchSheet extends StatelessWidget {
     BuildContext context, {
     required ContractGroup group,
     required ValueChanged<ContractInfo> onEnter,
+    void Function(ContractInfo info, String action)? onMenu,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -39,7 +45,11 @@ class HomeBranchSheet extends StatelessWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: HomeBranchSheet(group: group, onEnter: onEnter),
+        child: HomeBranchSheet(
+          group: group,
+          onEnter: onEnter,
+          onMenu: onMenu,
+        ),
       ),
     );
   }
@@ -73,6 +83,12 @@ class HomeBranchSheet extends StatelessWidget {
                   Navigator.pop(context);
                   onEnter(master);
                 },
+                onSelected: onMenu == null
+                    ? null
+                    : (action) {
+                        Navigator.pop(context);
+                        onMenu!(master, action);
+                      },
               ),
               if (branches.isEmpty)
                 Padding(
@@ -93,6 +109,12 @@ class HomeBranchSheet extends StatelessWidget {
                       Navigator.pop(context);
                       onEnter(info);
                     },
+                    onSelected: onMenu == null
+                        ? null
+                        : (action) {
+                            Navigator.pop(context);
+                            onMenu!(info, action);
+                          },
                   ),
             ],
           ),
@@ -160,27 +182,25 @@ class _BranchTile extends StatelessWidget {
   final String subtitle;
   final bool isMaster;
   final VoidCallback onTap;
+  final ValueChanged<String>? onSelected;
 
   const _BranchTile({
     required this.title,
     required this.subtitle,
     this.isMaster = false,
     required this.onTap,
+    this.onSelected,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return ListTile(
       onTap: onTap,
       dense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-      leading: Icon(
-        isMaster ? Icons.graphic_eq : Icons.circle,
-        size: isMaster ? 16 : 8,
-        color: AppTheme.gold,
-      ),
       title: Text(
         title,
         style: theme.textTheme.bodyMedium?.copyWith(
@@ -199,6 +219,17 @@ class _BranchTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
+      // 尾部：⋮ 菜单（进入 / 预览 / 编辑 / 导出 / 重命名 / 删除）
+      trailing: onSelected == null
+          ? null
+          : buildCardMenu(
+              menuItems: buildContractMenuItems(
+                isMaster: isMaster,
+                l10n: l10n,
+              ),
+              onSelected: onSelected!,
+              tooltip: l10n.contractCardOperations,
+            ),
     );
   }
 }

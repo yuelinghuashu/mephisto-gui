@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../domain/stage_models.dart';
 import 'contract_provider.dart';
 
 /// 首页多选/展开状态控制器
@@ -86,10 +87,9 @@ class HomeSelectionController extends ChangeNotifier {
     String roleName,
     String fileName, {
     bool isChild = false,
-  }) =>
-      _selectedStageRoles.contains(
-        _stageRoleKey(stagePath, roleName, fileName, isChild: isChild),
-      );
+  }) => _selectedStageRoles.contains(
+    stageRoleKey(stagePath, roleName, fileName, isChild: isChild),
+  );
 
   // ============================================================
   // 多选操作
@@ -139,7 +139,7 @@ class HomeSelectionController extends ChangeNotifier {
   }) {
     _toggleInSet(
       _selectedStageRoles,
-      _stageRoleKey(stagePath, roleName, fileName, isChild: isChild),
+      stageRoleKey(stagePath, roleName, fileName, isChild: isChild),
     );
   }
 
@@ -181,7 +181,7 @@ class HomeSelectionController extends ChangeNotifier {
   }) {
     _isSelectMode = true;
     _selectedStageRoles.add(
-      _stageRoleKey(stagePath, roleName, fileName, isChild: isChild),
+      stageRoleKey(stagePath, roleName, fileName, isChild: isChild),
     );
     notifyListeners();
   }
@@ -243,11 +243,15 @@ class HomeSelectionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 全选所有契约（含所有层级子节点）。
-  void selectAll(List<ContractGroup> groups) {
+  /// 全选所有契约（含所有层级子节点）+ 所有舞台目录。
+  ///
+  /// 同时选中单角色契约树（契约文件名集合）与多角色舞台（舞台目录路径
+  /// 集合），使「全选 → 批量删除」能覆盖首页全部可删实体。
+  void selectAll(List<ContractGroup> groups, List<StageInfo> stages) {
     for (final group in groups) {
       _selected.addAll(group.allInfos.map((i) => i.fileName));
     }
+    _selectedStages.addAll(stages.map((s) => s.path));
     notifyListeners();
   }
 
@@ -265,15 +269,34 @@ class HomeSelectionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 舞台角色选中集合的 key 格式："舞台路径|角色名|角色卡文件名|isChild"
+  /// 舞台角色选中集合 key 的分隔符（`\u001F` = Unit Separator）。
+  ///
+  /// 为什么不用 `|`：Linux/macOS 文件名中 `|` 是合法字符，若舞台路径或
+  /// 文件名包含 `|`，`split('|')` 解析会出错。`\u001F` 是 ASCII 控制字符，
+  /// 在文件系统中几乎不可能出现。
+  static const String _stageRoleKeySeparator = '\u001F';
+
+  /// 舞台角色选中集合的 key 格式："舞台路径{sep}角色名{sep}角色卡文件名{sep}isChild"
   ///
   /// 携带 [fileName] 使批量删除可直接定位角色卡/存档文件（角色名与
   /// 文件名不一定一致，如 `阿周那` → `Arjuna.meph`）。
-  static String _stageRoleKey(
+  /// 公开静态方法：HomeScreen 等外部调用方统一通过此方法构建 key，
+  /// 确保分隔符一致。
+  static String stageRoleKey(
     String stagePath,
     String roleName,
     String fileName, {
     bool isChild = false,
   }) =>
-      '$stagePath|$roleName|$fileName|$isChild';
+      '$stagePath$_stageRoleKeySeparator$roleName$_stageRoleKeySeparator'
+      '$fileName$_stageRoleKeySeparator$isChild';
+
+  /// 解析舞台角色 key 为 (stagePath, roleName, fileName, isChild)。
+  ///
+  /// 返回 null 表示 key 格式无效。
+  static (String, String, String, bool)? parseStageRoleKey(String key) {
+    final parts = key.split(_stageRoleKeySeparator);
+    if (parts.length != 4) return null;
+    return (parts[0], parts[1], parts[2], parts[3] == 'true');
+  }
 }

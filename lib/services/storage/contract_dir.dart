@@ -14,6 +14,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../constants/storage_keys.dart';
+
 /// 内置模板资产前缀
 const String _assetPrefix = 'assets/contracts/';
 
@@ -44,7 +46,7 @@ const Map<String, List<String>> _builtinStages = {
   'Camlann': ['Arthur.meph', 'Mordred.meph'],
 };
 
-/// 首次种子标记前缀（SharedPreferences key 前缀）
+/// 种子标记 key 前缀常量（从 [contractsSeededPrefix] 重导出）
 ///
 /// 标记内置模板是否已经复制到用户目录。
 /// 只在首次安装/首次启动时执行一次，之后不再自动恢复被删除的模板。
@@ -52,28 +54,13 @@ const Map<String, List<String>> _builtinStages = {
 /// **按目录绑定**：为避免用户切换契约目录（自定义路径/外部存储）后新目录为空，
 /// 种子标记必须绑定目录路径（`<前缀><目录绝对路径>`），
 /// 而不是全局单一标记——否则全局标记为 true 后新目录永远不会获得内置模板。
-const String _seededPrefix = 'mephisto_contracts_seeded_';
+const String _seededPrefix = contractsSeededPrefix;
 
 /// 构建指定目录的种子标记 key。
 ///
 /// 目录路径中包含分隔符（`/`、`\`），在 SharedPreferences key 中合法，
 /// 直接拼接即可（JSON 键无字符限制）。
 String _seededKeyFor(Directory dir) => '$_seededPrefix${dir.path}';
-
-/// 用户自定义契约目录（SharedPreferences key）
-///
-/// 值含义（按平台）：
-///   - 桌面端：任意目录路径（如 `~/Mephisto/contracts`）
-///   - Android：外部存储标记 [mobileExternalMarker] 表示应用外部存储
-///   - iOS：未配置（系统沙盒限制，仅应用内目录）
-const String _contractsDirKey = 'mephisto_contracts_directory';
-
-/// 移动端外部存储标记（SharedPreferences `_contractsDirKey` 的可选值）。
-///
-/// 仅 Android 使用：外部存储位于应用专属外部目录（`Android/data/<pkg>/files`），
-/// dart:io 可直接读写（真实文件路径），卸载应用时清除。
-/// 内部沙盒（默认）使用 [getApplicationDocumentsDirectory]，同样随卸载清除。
-const String mobileExternalMarker = 'mobile_external';
 
 /// 确保目录存在（同步 API）。
 ///
@@ -91,7 +78,7 @@ Future<Directory> getContractsDirectory() async {
   final prefs = await SharedPreferences.getInstance();
 
   // 用户自定义存储位置
-  final custom = prefs.getString(_contractsDirKey);
+  final custom = prefs.getString(contractsDirKey);
   if (custom != null && custom.isNotEmpty) {
     // Android：外部存储标记 → 应用外部目录（真实路径，dart:io 直接可用）
     if (custom == mobileExternalMarker && Platform.isAndroid) {
@@ -102,10 +89,10 @@ Future<Directory> getContractsDirectory() async {
         return dir;
       }
       // 获取外部目录失败（罕见）→ 清空标记，回落沙盒默认
-      await prefs.remove(_contractsDirKey);
+      await prefs.remove(contractsDirKey);
     } else if (custom == mobileExternalMarker) {
       // 其他平台出现该标记（理论不发生的脏数据）→ 回落默认
-      await prefs.remove(_contractsDirKey);
+      await prefs.remove(contractsDirKey);
     } else {
       // 桌面端任意路径
       final customDir = Directory(custom);
@@ -126,7 +113,7 @@ Future<Directory> getContractsDirectory() async {
 Future<bool> isUsingMobileExternalStorage() async {
   if (!Platform.isAndroid) return false;
   final prefs = await SharedPreferences.getInstance();
-  return prefs.getString(_contractsDirKey) == mobileExternalMarker;
+  return prefs.getString(contractsDirKey) == mobileExternalMarker;
 }
 
 /// 设置移动端外部存储开关（仅 Android 生效；其余平台返回 false）。
@@ -140,9 +127,9 @@ Future<bool> setMobileExternalStorage(bool enabled) async {
   try {
     final prefs = await SharedPreferences.getInstance();
     if (enabled) {
-      return await prefs.setString(_contractsDirKey, mobileExternalMarker);
+      return await prefs.setString(contractsDirKey, mobileExternalMarker);
     }
-    return await prefs.remove(_contractsDirKey);
+    return await prefs.remove(contractsDirKey);
   } catch (_) {
     return false;
   }
@@ -202,7 +189,7 @@ Future<bool> setContractsDirectory(String path) async {
     final dir = Directory(path);
     _ensureDirectory(dir);
     final prefs = await SharedPreferences.getInstance();
-    return await prefs.setString(_contractsDirKey, path);
+    return await prefs.setString(contractsDirKey, path);
   } catch (_) {
     return false;
   }

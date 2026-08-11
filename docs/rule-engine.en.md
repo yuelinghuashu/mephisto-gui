@@ -10,9 +10,9 @@
 ```text
 Player Input (Fate Guidance)
     ↓
-Rule engine evaluates each 【规则】 in sequence
+Phase 1: Passive rules execute in batch (state modification / narrative injection)
     ↓
-Condition matched? → Execute action (inject narrative / modify state / roll dice)
+Phase 2: Active rules match exclusively (LLM instructions / static text → only the first match executes)
     ↓
 State updated → Enter next narrative round
 ```
@@ -107,7 +107,23 @@ Actions of rules in the same group are **mutually exclusive**—once one is matc
 - Group names are arbitrary, but rules in the same group must use the same `[group:GroupName]`
 - Rules within a group are evaluated in file order; the first match executes
 
-## 6. Practical Example (Built-in faust.meph)
+## 6. Two-Phase Execution Model
+
+Whether a rule is "passive" or "active" is determined by its **action expression**:
+
+| Category | Action Type                                | Execution                                                                           |
+| -------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Passive  | Starts with `状态.` modification or `注入` | **Batch execution**: all matching rules execute simultaneously                      |
+| Active   | Others (e.g., `指令` LLM instructions)     | **Exclusive matching**: only the first matching rule executes; the rest are skipped |
+
+Within the same round, all passive rules execute first (Phase 1), then active rules execute (Phase 2).
+Within each phase, rules are evaluated in file appearance order; mutual exclusion groups
+(`[group:GroupName]`) execute in condition-match order within their phase, skipping the remaining actions in the group once matched.
+
+> Example: if rules of both "narrative injection" and "LLM instruction" types match,
+> the narrative injection executes, and only the first matching LLM instruction is used.
+
+## 7. Practical Example (Built-in faust.meph)
 
 ```meph
 【规则】
@@ -118,12 +134,12 @@ Actions of rules in the same group are **mutually exclusive**—once one is matc
 - "灵魂危机" (Soul Crisis): when soul integrity drops below 30, inject a warning narrative
 - "契约觉醒" (Pact Awakening): when the player mentions "契约" and the dice roll succeeds, soul integrity +10
 
-## 7. Related Code
+## 8. Related Code
 
-| Module | Description |
-| -------------------------------------- | -------------------- |
-| `lib/services/engine/condition.dart` | Condition expression parsing and evaluation |
-| `lib/services/engine/dice.dart` | Dice rolling |
-| `lib/services/engine/executor.dart` | Action execution |
-| `lib/services/engine/rule_engine.dart` | Rule engine main entry |
-| `lib/services/parser/meph_dsl.dart` | Rule syntax parsing and validation |
+| Module                                 | Description                                 |
+| -------------------------------------- | ------------------------------------------- |
+| `lib/services/engine/condition.dart`   | Condition expression parsing and evaluation |
+| `lib/services/engine/dice.dart`        | Dice rolling                                |
+| `lib/services/engine/executor.dart`    | Action execution                            |
+| `lib/services/engine/rule_engine.dart` | Rule engine main entry                      |
+| `lib/services/parser/meph_dsl.dart`    | Rule syntax parsing and validation          |

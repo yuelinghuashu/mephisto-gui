@@ -68,12 +68,16 @@ abstract class StageNarrativeState with _$StageNarrativeState {
 
   /// 各角色消息段数统计（有戏份的角色名列表）
   List<String> get speakingRoles {
+    // 预编译正则（static final）：避免每次访问都重新构造 RegExp
     final rolesWithContent = <String>{};
     for (final msg in messages.where((m) => m.role == MessageRole.assistant)) {
       // 舞台的 assistant 消息以 `【角色名】` 开头记录
-      final match = RegExp(r'^【(.+?)】').firstMatch(msg.content);
+      final match = _speakingRolePattern.firstMatch(msg.content);
       if (match != null) rolesWithContent.add(match[1]!);
     }
     return rolesWithContent.toList();
   }
+
+  /// 舞台角色消息开头的分节标题正则（`【角色名】`），预编译提升性能。
+  static final RegExp _speakingRolePattern = RegExp(r'^【(.+?)】');
 }

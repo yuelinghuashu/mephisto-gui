@@ -25,6 +25,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 
 import 'storage/contract_dir.dart';
 import 'storage/contract_repo.dart';
@@ -181,7 +182,9 @@ class ContractFileWatcher {
     // 注意：这里必须比较**完整路径**（path == _contractsDir.path），
     // 而非文件名（name == _contractsDir.path）——文件名只是路径最后一段，
     // 与目录完整路径永远不会相等，导致目录事件无法被正确过滤。
-    final name = path.split(Platform.pathSeparator).last;
+    // 使用 `p.basename` 而非 `split(Platform.pathSeparator)`：跨平台兼容
+    // （Windows 可能返回 `/` 或 `\` 混合分隔符）。
+    final name = p.basename(path);
     if (name.isEmpty || path == _contractsDir?.path) return null;
     if (!name.endsWith('.meph')) return null;
     return name;

@@ -39,9 +39,9 @@ void main() {
     final contract = parseMeph(source);
 
     expect(contract.roleName, '浮士德');
-    expect(contract.anchor, hasLength(3));
+    expect(contract.anchor, hasLength(4));
     expect(contract.state, hasLength(3));
-    expect(contract.rules, hasLength(14));
+    expect(contract.rules, hasLength(12));
     expect(contract.worldview, isNotEmpty);
     expect(contract.opening, isNotEmpty);
     // 规则带行号
@@ -126,6 +126,73 @@ void main() {
         container.read(contractFallbackNoticeProvider),
         narrativeErrorContractFallback,
       );
+    });
+  });
+
+  group('buildContractTree - 孤儿节点处理', () {
+    test('父链缺失的子版 → 占位根 + 真实子节点', () {
+      // 只有 faust.dark 子版，没有 faust 母版根
+      final infos = [
+        ContractInfo(
+          fileName: 'faust.dark.meph',
+          roleName: '浮士德·黑暗面',
+          isChild: true,
+        ),
+      ];
+
+      final groups = buildContractTree(infos);
+
+      // faust 占位根 → faust.dark 真实节点
+      expect(groups, hasLength(1));
+      expect(groups.first.master.fileName, 'faust.meph');
+      expect(groups.first.hasChildren, isTrue);
+      expect(
+        groups.first.children.first.master.fileName,
+        'faust.dark.meph',
+      );
+    });
+
+    test('孤儿深链 → 占位根 + 多级子树', () {
+      // 只有 faust.dark.light 二级子版，没有 faust 和 faust.dark
+      final infos = [
+        ContractInfo(
+          fileName: 'faust.dark.light.meph',
+          roleName: '光',
+          isChild: true,
+        ),
+      ];
+
+      final groups = buildContractTree(infos);
+
+      // faust 占位根 → faust.dark 占位 → faust.dark.light 真实节点
+      expect(groups, hasLength(1));
+      expect(groups.first.master.fileName, 'faust.meph');
+      expect(groups.first.hasChildren, isTrue);
+      expect(groups.first.children.first.master.fileName, 'faust.dark.meph');
+      expect(
+        groups.first.children.first.children.first.master.fileName,
+        'faust.dark.light.meph',
+      );
+    });
+  });
+
+  group('buildContractTree - 深度守卫', () {
+    test('超过 maxContractDepth 层级 → 截断为叶子节点', () {
+      // 构造 maxContractDepth+1 层（当前常量为 8）的超长链
+      final segments = List.generate(maxContractDepth + 1, (i) => 'x$i');
+      final deepName = '${segments.join('.')}.meph';
+      final infos = [
+        ContractInfo(
+          fileName: deepName,
+          roleName: '深度角色',
+          isChild: true,
+        ),
+      ];
+
+      final groups = buildContractTree(infos);
+
+      // 能正常构建、不栈溢出；至少存在顶层根
+      expect(groups, hasLength(1));
     });
   });
 

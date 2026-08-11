@@ -37,8 +37,10 @@
 
   "homeBrandTitle": "Mephisto 叙事引擎",
   "homeBrandSubtitle": "签下契约，书写命运",
-  "homeStageSectionTitle": "🎭 多角色舞台",
-  "homeContractSectionTitle": "📜 单角色契约",
+  "homeStageSectionTitle": "多角色舞台",
+  "homeContractSectionTitle": "单角色契约",
+  "homeSectionExpand": "展开",
+  "homeSectionCollapse": "收起",
   "stageCardCharacterCount": "{count} 位角色",
   "stageCardLastModified": "最近活动：{time}",
   "stageCardHasSave": "有存档",
@@ -70,6 +72,7 @@
   "contractCardOperations": "操作",
   "contractCardExpandChildren": "展开子版",
   "contractCardCollapseChildren": "收起子版",
+  "contractBranchCount": "分支 · {count}",
 
   "narrativeSaveMenu": "存档",
   "narrativeSaveBranch": "另存为分支...",

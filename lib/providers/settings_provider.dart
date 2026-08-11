@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../constants/storage_keys.dart';
 import 'prefs_notifier.dart';
 
 /// 设置持久化 Provider
@@ -8,11 +9,9 @@ import 'prefs_notifier.dart';
 /// 管理所有应用级用户偏好，当前支持：
 ///   - 主题模式（跟随系统/亮色/暗色）
 class SettingsController extends PrefsNotifier<ThemeMode> {
-  /// SharedPreferences 存储键
+  /// SharedPreferences 存储键（统一来自 [themeModeKey]）
   @override
-  String get key => _themeModeKey;
-
-  static const String _themeModeKey = 'mephisto_theme_mode';
+  String get key => themeModeKey;
 
   @override
   ThemeMode get defaultValue => ThemeMode.system;
@@ -37,11 +36,9 @@ final themeModeProvider = NotifierProvider<SettingsController, ThemeMode>(
 /// 管理用户选择的界面语言，持久化到 SharedPreferences。
 /// 当前支持：`zh`（简体中文，默认）/ `en`（English）。
 class AppLanguageController extends PrefsNotifier<String> {
-  /// SharedPreferences 存储键
+  /// SharedPreferences 存储键（统一来自 [languageKey]）
   @override
-  String get key => _languageKey;
-
-  static const String _languageKey = 'mephisto_language';
+  String get key => languageKey;
 
   @override
   String get defaultValue => 'zh';

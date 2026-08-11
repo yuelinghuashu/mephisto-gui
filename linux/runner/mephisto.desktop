@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Mephisto
+Comment=AI Narrative Engine
+Exec=mephisto
+Icon=mephisto
+Terminal=false
+Categories=Utility;
+StartupWMClass=yuelinghuashu.mephisto

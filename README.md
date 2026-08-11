@@ -48,7 +48,15 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 - **子版存档**：母版只读，运行时对话生成子版快照，支持分支与恢复
 - **规则热重载**：保存 `.meph` → 仅规则即时生效，对话/状态/记忆/历史全保留
 - **多角色舞台**：契约目录下的一层子目录 = 舞台，多位角色可同场互动、独立存档
-- **跨平台**：Windows / macOS / Linux / Android / iOS，内置契约含浮士德、基督山伯爵、贞德、少年亚瑟、吉尔伽美什
+- **跨平台**：Windows / macOS / Linux / Android / iOS，内置契约含浮士德、基督山伯爵、贞德、少年亚瑟、吉尔伽美什；另有俱卢之野、卡美洛之陨两个多角色舞台
+
+## 📥 下载正式版
+
+已打包好的多平台安装程序（Windows / Linux / Android / macOS / iOS）可在
+**[GitHub Releases](https://github.com/yuelinghuashu/mephisto-gui/releases)** 页面下载，
+无需从源码自行构建。
+
+> 各平台的系统版本要求与验证状态详见下方「平台支持与测试声明」。
 
 ## 📖 快速开始
 
@@ -126,7 +134,9 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 - **SharedPreferences**（偏好持久化）
 - **flutter_secure_storage**（系统密钥链存储 API Key）
 - **HTTP**（OpenAI 兼容 SSE 流式调用）
+- **archive**（ZIP 打包 / 还原）
 - **MephParser**（自研契约解析器）
+- **freezed**（数据模型代码生成）
 
 ## 📁 目录结构
 
@@ -162,15 +172,15 @@ flutter test
 > **诚实标注**：本项目由个人维护，受硬件与账号条件限制，以下平台**未经过真机验证**，
 > 可能存在尚未发现的 bug。
 
-| 平台                                          | 验证状态                       | 说明                                                                |
-| --------------------------------------------- | ------------------------------ | ------------------------------------------------------------------- |
-| **Windows**                                   | ✅ 真机验证                    |                                                                    |
-| **Linux**                                     | ✅ 真机验证 + 本机构建通过     | 含 `flutter build linux` 原生编译                                  |
-| **Android**                                   | ✅ 真机验证                    | 外部存储 ↔ 内部沙盒切换已验证                                       |
-| **macOS**                                     | ⚠️ CI 编译通过，**未真机运行** |                                                                    |
-| **iOS**                                       | ⚠️ CI 编译通过，**未真机运行** |                                                                    |
-| **旧版鸿蒙**（HarmonyOS 2/3/4）               | ✅ 可运行本项目 Android APK    | 本质是 Android 兼容层，未实测                                      |
-| **纯血鸿蒙**（HarmonyOS NEXT / 5.0+）         | ⛔ **不支持**                  | 需 OpenHarmony Flutter 分支独立移植                                 |
+| 平台                                  | 验证状态                       | 说明                                |
+| ------------------------------------- | ------------------------------ | ----------------------------------- |
+| **Windows**                           | ✅ 真机验证                    |                                     |
+| **Linux**                             | ✅ 真机验证 + 本机构建通过     | 含 `flutter build linux` 原生编译   |
+| **Android**                           | ✅ 真机验证                    | 外部存储 ↔ 内部沙盒切换已验证       |
+| **macOS**                             | ⚠️ CI 编译通过，**未真机运行** |                                     |
+| **iOS**                               | ⚠️ CI 编译通过，**未真机运行** |                                     |
+| **旧版鸿蒙**（HarmonyOS 2/3/4）       | ✅ 可运行本项目 Android APK    | 本质是 Android 兼容层，未实测       |
+| **纯血鸿蒙**（HarmonyOS NEXT / 5.0+） | ⛔ **不支持**                  | 需 OpenHarmony Flutter 分支独立移植 |
 
 ### 系统版本要求
 
@@ -178,7 +188,7 @@ flutter test
 | ----------- | ------------------------------------------------------------------------ | -------------------------------------- |
 | **Windows** | Windows 10（Flutter 桌面最低要求）                                       | Windows 11                             |
 | **Linux**   | 需 GTK 3 + libsecret（构建需 `libsecret-1-dev`，运行需 `libsecret-1-0`） | 近两年发布的发行版（如 Ubuntu 22.04+） |
-| **Android** | Android 6.0（API 23，`minSdk = 23`）                                     | Android 10+（API 29）                  |
+| **Android** | Android 6.0（API 23，`minSdk = flutter.minSdkVersion`，当前解析为 23）   | Android 10+（API 29）                  |
 | **iOS**     | iOS 13.0（项目配置 `IPHONEOS_DEPLOYMENT_TARGET`）                        | iOS 16+                                |
 | **macOS**   | macOS 10.15 Catalina（项目配置 `MACOSX_DEPLOYMENT_TARGET`）              | macOS 12 Monterey+                     |
 

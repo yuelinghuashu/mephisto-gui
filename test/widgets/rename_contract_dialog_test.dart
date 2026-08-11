@@ -99,9 +99,14 @@ void main() {
   testWidgets('合法 .meph 名称 + 回车返回新名称', (tester) async {
     await openDialog(tester);
 
-    // 歌德.meph 在目录中不存在 → 异步校验通过
+    // 歌德.meph 在目录中不存在 → 异步校验通过。
+    // 注意：isContractNameAvailable → File.exists() 是真实异步 IO，
+    // FakeAsync zone 中无法由 fake clock 驱动完成，需 runAsync 给真实事件循环时间。
     await tester.enterText(find.byType(TextField), '歌德.meph');
     await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await tester.pumpAndSettle();
 
     expect(await completer.future, ('歌德.meph', null));
@@ -117,8 +122,12 @@ void main() {
 
     expect(find.byType(TextField), findsOneWidget);
 
+    // 合法名称提交 → 异步校验（真实 IO）需 runAsync 完成
     await tester.enterText(find.byType(TextField), '歌德.meph');
     await tester.tap(find.text('重命名'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await tester.pumpAndSettle();
 
     expect(await completer.future, ('歌德.meph', null));
@@ -136,18 +145,24 @@ void main() {
   testWidgets('目标文件名已存在（非自身）→ 阻止提交并展示错误', (tester) async {
     await openDialog(tester);
 
-    // dantes.meph 已存在于契约目录 → 异步校验拦截
+    // dantes.meph 已存在于契约目录 → 异步校验拦截（真实 IO 需 runAsync）
     await tester.enterText(find.byType(TextField), 'dantes.meph');
     await tester.tap(find.text('重命名'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await tester.pumpAndSettle();
 
     // 对话框未关闭 + 错误提示出现（重名提交已被异步校验拦截）
     expect(find.byType(TextField), findsOneWidget);
     expect(find.text('该文件名已存在，请更换'), findsOneWidget);
 
-    // 改为合法新名后仍可提交
+    // 改为合法新名后仍可提交（同样需要 runAsync 完成真实 IO）
     await tester.enterText(find.byType(TextField), '歌德.meph');
     await tester.tap(find.text('重命名'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await tester.pumpAndSettle();
     expect(await completer.future, ('歌德.meph', null));
   });
@@ -173,10 +188,13 @@ void main() {
     // 命运说明预填当前值
     expect(find.text('旧的命运说明'), findsOneWidget);
 
-    // 修改命运说明后提交
+    // 修改命运说明后提交（faust.dark.meph 非当前名 → 异步校验需 runAsync）
     await tester.enterText(find.byType(TextField).first, 'faust.dark.meph');
     await tester.enterText(find.byType(TextField).last, '新的命运说明');
     await tester.tap(find.text('重命名'));
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
     await tester.pumpAndSettle();
 
     expect(await completer.future, ('faust.dark.meph', '新的命运说明'));

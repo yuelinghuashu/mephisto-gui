@@ -183,4 +183,115 @@ void main() {
     );
     expect(await ChildSaveStore.exists(fileName), isTrue);
   });
+
+  // ============================================================
+  // saveCurrent（默认存档）行为
+  // ============================================================
+
+  test('saveCurrent 从母版首次保存生成 faust.child.meph', () async {
+    final fileName = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.meph',
+      contract: contract,
+      currentState: const {},
+      memories: const [],
+      history: const [],
+    );
+    expect(fileName, 'faust.child.meph');
+  });
+
+  test('saveCurrent 从母版重复开始自动递增 child2 / child3', () async {
+    // 模拟「每轮从首页打开母版重新游玩」→ 每次都应生成新的递增存档
+    final first = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.meph',
+      contract: contract,
+      currentState: const {},
+      memories: const [],
+      history: const [],
+    );
+    final second = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.meph',
+      contract: contract,
+      currentState: const {},
+      memories: const [],
+      history: const [],
+    );
+    final third = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.meph',
+      contract: contract,
+      currentState: const {},
+      memories: const [],
+      history: const [],
+    );
+    expect(first, 'faust.child.meph');
+    expect(second, 'faust.child2.meph');
+    expect(third, 'faust.child3.meph');
+  });
+
+  test('saveCurrent 打开的存档自身持续覆盖不递增', () async {
+    // 首次从母版开始 → 自动生成 child.meph
+    final first = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.meph',
+      contract: contract,
+      currentState: const {'灵魂完整度': IntValue(50)},
+      memories: const [],
+      history: const [],
+    );
+    expect(first, 'faust.child.meph');
+
+    // 在 child.meph 内继续对话 → 覆盖自己，不产生 child2
+    final second = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.child.meph',
+      contract: contract,
+      currentState: const {'灵魂完整度': IntValue(40)},
+      memories: const [],
+      history: const [],
+    );
+    expect(second, 'faust.child.meph');
+    expect(File('${tempDir.path}/faust.child2.meph').existsSync(), isFalse);
+
+    // child2 存档内继续对话 → 覆盖 child2 自己
+    final third = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.child2.meph',
+      contract: contract,
+      currentState: const {'灵魂完整度': IntValue(30)},
+      memories: const [],
+      history: const [],
+    );
+    expect(third, 'faust.child2.meph');
+    expect(File('${tempDir.path}/faust.child.meph').existsSync(), isTrue);
+    expect(File('${tempDir.path}/faust.child2.meph').existsSync(), isTrue);
+  });
+
+  test('saveCurrent 分支拥有独立存档且各自递增', () async {
+    // 母版分支 dark：首次保存 → faust.dark.child.meph
+    final darkFirst = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.dark.meph',
+      contract: contract,
+      currentState: const {},
+      memories: const [],
+      history: const [],
+    );
+    expect(darkFirst, 'faust.dark.child.meph');
+
+    // 再次从 dark 分支重新开始 → faust.dark.child2.meph
+    final darkSecond = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.dark.meph',
+      contract: contract,
+      currentState: const {},
+      memories: const [],
+      history: const [],
+    );
+    expect(darkSecond, 'faust.dark.child2.meph');
+
+    // dark 存档内继续 → 覆盖自己
+    final darkInSession = await ChildSaveStore.saveCurrent(
+      sourceFileName: 'faust.dark.child2.meph',
+      contract: contract,
+      currentState: const {},
+      memories: const [],
+      history: const [],
+    );
+    expect(darkInSession, 'faust.dark.child2.meph');
+    expect(File('${tempDir.path}/faust.dark.child3.meph').existsSync(), isFalse);
+  });
 }

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../app/theme.dart';
+import '../constants/menu_actions.dart';
 import '../domain/narrative_error.dart';
 import '../providers/providers.dart';
 import '../screens/contract_editor_screen.dart';
@@ -281,12 +282,16 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
               popUpAnimationStyle: AppTheme.popupAnimationStyle,
               itemBuilder: (context) => [
                 ContractMenuItem(
-                  'save_branch',
+                  menuActionSaveBranch,
                   Icons.account_tree_outlined,
                   l10n.narrativeSaveBranch,
                 ),
                 const PopupMenuDivider(),
-                ContractMenuItem('delete', Icons.delete_outline, l10n.narrativeDeleteSave),
+                ContractMenuItem(
+                  menuActionDelete,
+                  Icons.delete_outline,
+                  l10n.narrativeDeleteSave,
+                ),
               ],
             ),
             // 智能跳转：顶部附近 → 跳到底部；其余 → 跳到顶部。
@@ -417,10 +422,10 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final l10n = AppLocalizations.of(context);
 
     switch (value) {
-      case 'save_branch':
+      case menuActionSaveBranch:
         await _showSaveBranchDialog();
         break;
-      case 'delete':
+      case menuActionDelete:
         final ok = await notifier.deleteSave();
         if (!mounted) return;
         messenger.showSnackBar(

@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
+import '../../constants/menu_actions.dart';
 import '../../providers/contract_provider.dart';
 import '../../services/storage/contract_repo.dart';
 import '../../widgets/dialogs/confirm_delete_dialog.dart';
@@ -30,16 +31,21 @@ Future<void> handleNodeMenu(
   required Future<void> Function() onDelete,
 }) async {
   switch (action) {
-    case 'enter':
+    case menuActionEnter:
       await onOpenNarrative(node);
-    case 'preview':
+      return;
+    case menuActionPreview:
       await ContractPreviewSheet.show(context, node);
-    case 'edit':
+      return;
+    case menuActionEdit:
       if (includeEdit) await onEdit();
-    case 'rename':
+      return;
+    case menuActionRename:
       await onRename(node);
-    case 'delete':
+      return;
+    case menuActionDelete:
       await onDelete();
+      return;
   }
 }
 

@@ -82,12 +82,19 @@ String buildSystemPrompt({
   buffer.writeln('【角色】');
   buffer.writeln('你是${contract.roleName}');
   if (contract.anchor.isNotEmpty) {
-    final style = _extractStyle(contract.anchor);
-    if (style != null) {
-      buffer.writeln('，一个$style的存在');
+    // 人格标签/核心信念 → 「你是……的存在」；说话风格 → 独立句（说话方式）
+    final persona = _extractAnchorValue(contract.anchor, _personaKeys);
+    if (persona != null) {
+      buffer.writeln('，一个$persona的存在');
     }
+    buffer.writeln('。');
+    final speechStyle = _extractAnchorValue(contract.anchor, _styleKeys);
+    if (speechStyle != null) {
+      buffer.writeln('你的说话风格：$speechStyle。');
+    }
+  } else {
+    buffer.writeln('。');
   }
-  buffer.writeln('。');
   if (contract.background.isNotEmpty) {
     buffer.writeln(
       '你的背景：${_interpolate(contract.background, contract.roleName)}',
@@ -186,14 +193,19 @@ const String defaultNarrativeRules = '''
 梅菲斯特从阴影中走出，笑道：“那么，与我作一场交易如何？”浮士德转过身，目光深沉：“交易？你开得出我付不起的价码吗？”
 ''';
 
-/// 从锚点中提取风格描述。
+/// 锚点键组：用于「你是……的存在」的人格类键。
 ///
-/// 依次查找"风格"、"说话风格"、"人格标签"、"核心信念"键，
-/// 返回第一个非空的值。
-String? _extractStyle(List<StateItem> anchor) {
-  const styleKeys = ['风格', '说话风格', '人格标签', '核心信念'];
+/// `风格`（如「沉思而炽热的求道者」）指人格气质，做「存在」修饰语义通顺；
+/// `人格标签` / `核心信念` 同理。仅 `说话风格` 是独立句（说话方式）。
+const _personaKeys = ['人格标签', '核心信念', '风格'];
+
+/// 锚点键组：用于「你的说话风格：……」的说话风格键。
+const _styleKeys = ['说话风格'];
+
+/// 从锚点中提取指定键组的第一个非空值。
+String? _extractAnchorValue(List<StateItem> anchor, List<String> keys) {
   for (final item in anchor) {
-    if (styleKeys.contains(item.key)) {
+    if (keys.contains(item.key)) {
       final value = item.value.value.toString();
       if (value.isNotEmpty) return value;
     }

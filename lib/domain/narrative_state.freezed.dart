@@ -49,7 +49,7 @@ $Res call({
 });
 
 
-
+$ContractCopyWith<$Res> get contract;
 
 }
 /// @nodoc
@@ -78,7 +78,16 @@ as List<String>,attachedContexts: null == attachedContexts ? _self.attachedConte
 as List<String>,
   ));
 }
-
+/// Create a copy of NarrativeState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$ContractCopyWith<$Res> get contract {
+  
+  return $ContractCopyWith<$Res>(_self.contract, (value) {
+    return _then(_self.copyWith(contract: value));
+  });
+}
 }
 
 
@@ -301,7 +310,7 @@ $Res call({
 });
 
 
-
+@override $ContractCopyWith<$Res> get contract;
 
 }
 /// @nodoc
@@ -331,7 +340,16 @@ as List<String>,
   ));
 }
 
-
+/// Create a copy of NarrativeState
+/// with the given fields replaced by the non-null parameter values.
+@override
+@pragma('vm:prefer-inline')
+$ContractCopyWith<$Res> get contract {
+  
+  return $ContractCopyWith<$Res>(_self.contract, (value) {
+    return _then(_self.copyWith(contract: value));
+  });
+}
 }
 
 // dart format on

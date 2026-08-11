@@ -18,15 +18,16 @@ import '../../domain/models.dart';
 import '../parser/meph_parser.dart';
 import '../parser/meph_serializer.dart';
 import '../storage/contract_dir.dart';
+import '../storage/meph_file_name.dart';
+
+/// 子版存档文件名（`faust.meph` → `faust.child.meph`）的快捷别名。
+///
+/// 与旧 [SessionSaver] 语义一致——默认存档属于「当前分支路径 + `.child`」。
+String childSaveFileName(String sourceFileName) =>
+    defaultChildFileName(stripChildSuffix(sourceFileName));
 
 /// 子版存档存储
 class ChildSaveStore {
-  /// 默认子版后缀（母版名 + `.child`）
-  ///
-  /// 与 [meph_file_name.dart] 中的顶层 [defaultChildSuffix] 保持同值，
-  /// 保留类静态成员以兼容既有调用点（`ChildSaveStore.defaultChildSuffix`）。
-  static const String defaultChildSuffix = '.child';
-
   /// 保存当前会话为子版文件。
   ///
   /// 参数：
@@ -81,6 +82,104 @@ class ChildSaveStore {
     return fileName;
   }
 
+  /// 保存当前会话的**默认存档**（`.child`），每个分支有自己的存档。
+  ///
+  /// 多级树模型下，存档命名规则为「当前分支路径 + `.child`」：
+  ///   - 母版 `faust.meph`          → `faust.child.meph`（递增：child2 / child3 …）
+  ///   - 分支 `faust.dark.meph`     → `faust.dark.child.meph`（递增：child2 / child3 …）
+  ///   - 二级分支 `faust.dark.light.meph` → `faust.dark.light.child.meph`（递增）
+  ///   - 若已打开存档自身（`faust.dark.child.meph`）→ 覆盖它自己（同一轮会话不膨胀）
+  ///
+  /// 区分两种语义：
+  ///   - **从母版/分支重新开始**（每次首页打开）→ 递增序号生成新存档，
+  ///     避免 `faust.child.meph` 被新一轮游玩直接覆盖导致旧进度丢失。
+  ///   - **已在存档内继续对话**（存档自身是 `.child` 结尾）→ 覆盖自己，
+  ///     同一轮会话内连续自动保存不产生多余文件。
+  static Future<String> saveCurrent({
+    required String sourceFileName,
+    required Contract contract,
+    required Map<String, StateValue> currentState,
+    required List<Memory> memories,
+    required List<HistoryEntry> history,
+  }) {
+    // 计算「当前分支路径」（去掉 .child 存档尾段 / 文件名的层级前缀）：
+    //   faust.meph            → faust
+    //   faust.dark.meph       → faust.dark
+    //   faust.dark.child.meph → faust.dark（存档属于 dark 分支）
+    final branchPath = stripChildSuffix(sourceFileName);
+
+    // 当前打开的是存档自身（`.child` 或 `.childN` 结尾）→ 覆盖它自己，
+    // 保持同一轮会话内数量不膨胀。
+    if (_isSaveFileName(sourceFileName)) {
+      return save(
+        branchPath,
+        contract,
+        currentState: currentState,
+        memories: memories,
+        history: history,
+        overwriteFileName: sourceFileName,
+      );
+    }
+
+    // 当前打开的是母版根/分支（faust.meph / faust.dark.meph）→
+    // 不传 overwriteFileName，由 _resolveFileName 自动递增：
+    //   faust.child.meph → faust.child2.meph → faust.child3.meph …
+    return save(
+      branchPath,
+      contract,
+      currentState: currentState,
+      memories: memories,
+      history: history,
+    );
+  }
+
+  /// 判断文件名是否为「存档文件」（`.child` 或递增存档 `.childN`）。
+  ///
+  ///   - `faust.child.meph`    → true（默认存档）
+  ///   - `faust.child2.meph`   → true（递增存档）
+  ///   - `faust.dark.child.meph` → true（dark 分支的存档）
+  ///   - `faust.meph`          → false（母版根）
+  ///   - `faust.dark.meph`     → false（自定义分支）
+  static bool _isSaveFileName(String fileName) {
+    final lastSegment = splitBaseName(fileName).last;
+    if (lastSegment == 'child') return true;
+    // child2 / child3 / child10 …（递增存档变体）
+    if (lastSegment.startsWith('child') &&
+        int.tryParse(lastSegment.substring('child'.length)) != null) {
+      return true;
+    }
+    return false;
+  }
+
+  /// 另存为分支：以**当前分支路径**为命名根 + [branchName] 生成新分支文件。
+  ///
+  /// 多级树模型下，从分支再另存会**继承派生路径**：
+  ///   - 母版 `faust.meph`                  → 另存 `dark`   → `faust.dark.meph`
+  ///   - 分支 `faust.dark.meph`             → 另存 `light`  → `faust.dark.light.meph`
+  ///   - 二级分支 `faust.dark.light.meph`   → 另存 `utopia` → `faust.dark.light.utopia.meph`
+  ///   - 存档 `faust.dark.child.meph`       → 另存 `light`  → `faust.dark.light.meph`（继承 dark）
+  static Future<String> saveAsBranch({
+    required String sourceFileName,
+    required String branchName,
+    String? branchTitle,
+    required Contract contract,
+    required Map<String, StateValue> currentState,
+    required List<Memory> memories,
+    required List<HistoryEntry> history,
+  }) {
+    // 从「当前分支路径」派生（而非母版根），实现多级继承
+    final branchPath = stripChildSuffix(sourceFileName);
+    return save(
+      branchPath,
+      contract,
+      currentState: currentState,
+      memories: memories,
+      history: history,
+      branchName: branchName,
+      branchTitle: branchTitle,
+    );
+  }
+
   /// 从子版文件恢复会话。
   ///
   /// 参数：
@@ -92,7 +191,7 @@ class ChildSaveStore {
         ? Directory(dirPath)
         : await getContractsDirectory();
     final file = File('${dir.path}/$fileName');
-    if (!file.existsSync()) return null;
+    if (!await file.exists()) return null;
 
     try {
       final content = await file.readAsString();
@@ -134,7 +233,7 @@ class ChildSaveStore {
         ? Directory(dirPath)
         : await getContractsDirectory();
     final file = File('${dir.path}/$fileName');
-    if (!file.existsSync()) return false;
+    if (!await file.exists()) return false;
     try {
       await file.delete();
       return true;
@@ -150,7 +249,7 @@ class ChildSaveStore {
     final dir = dirPath != null
         ? Directory(dirPath)
         : await getContractsDirectory();
-    return File('${dir.path}/$fileName').existsSync();
+    return File('${dir.path}/$fileName').exists();
   }
 
   /// 解析目标文件名：
@@ -164,6 +263,7 @@ class ChildSaveStore {
     String baseName,
     String? branchName,
   ) async {
+    // 引用共享顶层常量 `defaultChildSuffix`（meph_file_name.dart）
     final suffix = branchName == null || branchName.isEmpty
         ? defaultChildSuffix
         : '.${branchName.trim()}';

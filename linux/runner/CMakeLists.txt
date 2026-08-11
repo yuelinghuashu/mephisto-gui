@@ -24,3 +24,9 @@ target_link_libraries(${BINARY_NAME} PRIVATE flutter)
 target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
+
+# Install the .desktop file and icon for desktop environment integration.
+install(FILES "mephisto.desktop"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications")
+install(FILES "mephisto.png"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/256x256/apps")

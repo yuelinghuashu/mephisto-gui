@@ -26,7 +26,6 @@ import '../domain/stage_narrative_reducer.dart';
 import '../domain/stage_narrative_state.dart';
 import '../services/memory/memory_extraction_service.dart';
 import '../services/session/child_save_store.dart';
-import '../services/session/session_saver.dart';
 import '../services/stage_turn_service.dart';
 import '../services/storage/meph_file_name.dart' as meph_file_name;
 import '../services/storage/stage_repo.dart' as stage_repo;
@@ -41,11 +40,11 @@ import 'narrative_window_provider.dart';
 /// 舞台叙事状态管理器
 class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     with GenerationCoordinator<StageNarrativeState> {
-  /// 流式输出节流合并缓冲（50ms 窗口内累积后一次性提交）
+  /// 流式内容累积器（节流合并 + StringBuffer 一体化）
   ///
-  /// 复用 [StreamThrottleBuffer]（与单角色 [NarrativeNotifier] 共享），
-  /// 避免两处约 50 行的重复实现。
-  final StreamThrottleBuffer _streamBuffer = StreamThrottleBuffer();
+  /// 复用 [ThrottledStreamBuffer]（与单角色 [NarrativeNotifier] 共享），
+  /// 消除两处约 30 行的重复流式缓冲样板。
+  final ThrottledStreamBuffer _streaming = ThrottledStreamBuffer();
 
   /// 舞台加载请求版本号（用于竞态保护）
   ///
@@ -56,17 +55,18 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
 
   /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交。
   void _appendStreamChunk(String chunk) {
-    _streamBuffer.addChunk(chunk, _applyStreamChunk);
+    _streaming.append(chunk, _applyStreamChunk);
   }
 
   /// 提交缓冲中的流式内容到状态。
   void _flushStreamBuffer() {
-    _streamBuffer.flush(_applyStreamChunk);
+    _streaming.flush(_applyStreamChunk);
   }
 
-  /// 将累积的流式内容追加到状态。
+  /// 将累积的流式内容写入状态（StringBuffer 累积 → 一次性 toString）。
   void _applyStreamChunk(String pending) {
-    state = state.copyWith(streamingContent: state.streamingContent + pending);
+    final fullContent = _streaming.applyAndGet(pending);
+    state = state.copyWith(streamingContent: fullContent);
   }
 
   /// 状态迁移统一走 [stageNarrativeReducer]
@@ -77,7 +77,7 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   @override
   StageNarrativeState build() {
     ref.onDispose(() {
-      _streamBuffer.dispose();
+      _streaming.dispose();
       disposeGeneration();
     });
     return const StageNarrativeState();
@@ -197,6 +197,10 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     if (!canSend(isGenerating: state.isGenerating)) return;
 
     beginGeneration();
+
+    // 新一轮生成：清空流式累积器，避免旧内容残留
+    _streaming.reset();
+
     _dispatch(StageMessageSent(content.trim()));
 
     try {
@@ -374,9 +378,9 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
         if (role == null) return;
 
         try {
-          await SessionSaver.save(
-            masterFileName: character.fileName,
-            contract: character.contract,
+          await ChildSaveStore.save(
+            character.fileName,
+            character.contract,
             currentState: role.currentState,
             memories: role.memories,
             history: role.history,

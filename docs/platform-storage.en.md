@@ -7,11 +7,11 @@
 
 ## 1. Contract Directory by Platform
 
-| Platform | Default Contract Directory | Customizable? |
-| ------- | ---------------------------------------------------------------------------- | -------------------------- |
-| Desktop | `~/Mephisto/contracts` (Linux/macOS uses `$HOME`, Windows uses `%USERPROFILE%`) | ✅ Any path |
-| Android | App private directory (path contains app package name `yuelinghuashu.mephisto`, see full paths below) | ❌ Only switch between internal/external sandbox |
-| iOS | App documents directory (sandbox) `.../Documents/Mephisto/contracts` | ❌ System sandbox restriction |
+| Platform | Default Contract Directory                                                                            | Customizable?                                    |
+| -------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Desktop  | `~/Mephisto/contracts` (Linux/macOS uses `$HOME`, Windows uses `%USERPROFILE%`)                       | ✅ Any path                                      |
+| Android  | App private directory (path contains app package name `yuelinghuashu.mephisto`, see full paths below) | ❌ Only switch between internal/external sandbox |
+| iOS      | App documents directory (sandbox) `.../Documents/Mephisto/contracts`                                  | ❌ System sandbox restriction                    |
 
 ## 2. Priority
 
@@ -32,10 +32,10 @@ Default directory (platform-adaptive default location)
 
 ### Two Storage Locations (both app-private)
 
-| Option | Actual Location | Characteristics |
-| -------- | ---------------------------- | ---------------------------- |
-| Internal storage | App-specific partition (default) | Uses system internal space, cleared on uninstall |
-| External storage | `Android/data/<package>/files/` | Uses device mass storage partition, cleared on uninstall |
+| Option           | Actual Location                  | Characteristics                                          |
+| ---------------- | -------------------------------- | -------------------------------------------------------- |
+| Internal storage | App-specific partition (default) | Uses system internal space, cleared on uninstall         |
+| External storage | `Android/data/<package>/files/`  | Uses device mass storage partition, cleared on uninstall |
 
 ### Full Path Examples (package = `yuelinghuashu.mephisto`)
 
@@ -90,9 +90,20 @@ Default directory (platform-adaptive default location)
 
 On first launch (or first switch to a new contract directory), built-in templates are copied from assets:
 
-- Built-in templates: `assets/contracts/faust.meph`, `dantes.meph`
-- The seeding marker is bound to the directory (`mephisto_contracts_seeded_<directory path>`), preventing a new directory from being empty
-- `force: true` forcibly restores missing built-in templates (the empty-state fallback button)
+- **Built-in single-character contracts** (`assets/contracts/`):
+  - `faust.meph` (Faust)
+  - `dantes.meph` (Edmond Dantès)
+  - `joan_of_arc.meph` (Joan of Arc)
+  - `arthur_sword.meph` (Young Arthur)
+  - `gilgamesh.meph` (Gilgamesh)
+  - `dantes.bonapart.meph` (Dantès × Bonapartist mole if-line, pre-seeded demo child)
+  - `faust.utopia.meph` (Faust × Republic / Utopia if-line, pre-seeded demo child)
+- **Built-in stages** (multi-character directories, `assets/contracts/<stage name>/`):
+  - `Kurukshetra/`: `Arjuna.meph` + `Karna.meph` (Kurukshetra)
+  - `Camlann/`: `Arthur.meph` + `Mordred.meph` (The Fall of Camlann)
+- The seeding marker is bound to the directory (`mephisto_contracts_seeded_<directory path>`), preventing a new directory from being empty;
+  an already-seeded directory will **not auto-restore** templates the user deleted (respecting user deletion);
+  only `force: true` forcibly restores missing built-in templates (the empty-state fallback button), and it never overwrites existing user files
 
 ## 7. Related Code
 

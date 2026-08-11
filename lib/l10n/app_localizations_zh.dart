@@ -129,10 +129,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeBrandSubtitle => '签下契约，书写命运';
 
   @override
-  String get homeStageSectionTitle => '🎭 多角色舞台';
+  String get homeStageSectionTitle => '多角色舞台';
 
   @override
-  String get homeContractSectionTitle => '📜 单角色契约';
+  String get homeContractSectionTitle => '单角色契约';
+
+  @override
+  String get homeSectionExpand => '展开';
+
+  @override
+  String get homeSectionCollapse => '收起';
 
   @override
   String stageCardCharacterCount(Object count) {
@@ -237,6 +243,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get contractCardCollapseChildren => '收起子版';
+
+  @override
+  String contractBranchCount(Object count) {
+    return '分支 · $count';
+  }
 
   @override
   String get narrativeSaveMenu => '存档';

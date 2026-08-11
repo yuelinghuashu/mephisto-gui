@@ -14,8 +14,10 @@ import 'test_helpers.dart';
 /// 通过 override contractGroupListProvider 注入内存分组，避免真实文件 IO；
 /// 删除测试使用真实临时文件验证「多选 → 确认 → 文件删除」闭环。
 ///
-/// 多级树模型：`ContractGroup.children` 是**递归的子节点列表**，
-/// 层级通过文件名 `.` 分段表达（如 faust → faust.dark → faust.dark.light）。
+/// 新 UI 语义（单行紧凑卡片）：
+///   - 母版卡片显示角色名 + 文件名 + 「分支 · N」入口 + ⋮ 菜单
+///   - 点击「分支 · N」弹出 [HomeBranchSheet] 列出母版 + 全部子版
+///   - 多选模式下「分支 · N」入口与 ⋮ 菜单均隐藏
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -94,7 +96,11 @@ void main() {
         ),
         currentContractNameProvider.overrideWith((ref) async => 'faust.meph'),
       ],
-      child: localizedApp(home: const HomeScreen()),
+      child: localizedAppWithRoutes(
+        home: const HomeScreen(),
+        // 注册叙事页路由（空占位），避免点击分支/子版触发 pushNamed 找不到路由
+        routes: {'/narrative': (_) => const SizedBox.shrink()},
+      ),
     );
   }
 
@@ -137,30 +143,33 @@ void main() {
     expect(find.byIcon(Icons.history), findsNothing);
   });
 
-  testWidgets('多级树：逐级展开可见二级分支，收起后隐藏', (tester) async {
+  testWidgets('点击「分支 · N」弹出分支选择器：列出母版+子版，可进入对应分支', (tester) async {
+    // 多级树：faust → dark → light
     await tester.pumpWidget(buildHome(groups: nestedGroups()));
     await tester.pumpAndSettle();
 
-    // 初始只显示母版，子版默认收起
+    // 初始只显示母版角色名，子版文件名不直接展示
     expect(find.text('faust'), findsOneWidget);
     expect(find.text('faust.dark.light.meph'), findsNothing);
 
-    // 展开第一层 → 显示 dark
-    await tester.tap(find.byTooltip('展开子版'));
-    await tester.pumpAndSettle();
-    expect(find.text('faust.dark.meph'), findsOneWidget);
-    // 二级 light 尚未展开
-    expect(find.text('faust.dark.light.meph'), findsNothing);
+    // faust 有 1 个直接子节点 → 显示「分支 · 1」入口
+    expect(find.text('分支 · 1'), findsOneWidget);
 
-    // 展开第二层 → 显示 light
-    await tester.tap(find.byTooltip('展开子版').last);
+    // 点击分支入口 → 弹出 BottomSheet（列出母版 + 直接子版）
+    await tester.tap(find.text('分支 · 1'));
     await tester.pumpAndSettle();
-    expect(find.text('faust.dark.light.meph'), findsOneWidget);
 
-    // 收起第二层 → light 隐藏
-    await tester.tap(find.byTooltip('收起子版').last);
+    // BottomSheet 标题 = 母版角色名；母版入口 + 一级子版 dark 均可见。
+    // faust 出现 3 次：首页卡片角色名 + BottomSheet 标题 + 母版入口
+    expect(find.text('faust'), findsNWidgets(3));
+    expect(find.text('faust.meph'), findsNWidgets(2)); // 卡片文件名 + 母版入口副标题
+    expect(find.text('dark'), findsOneWidget); // 一级子版分支名
+
+    // 点击一级子版 → 关闭 BottomSheet 并进入叙事页（pushNamed /narrative）
+    await tester.tap(find.text('dark'));
     await tester.pumpAndSettle();
-    expect(find.text('faust.dark.light.meph'), findsNothing);
+    // 已跳转到叙事页占位（SizedBox.shrink），首页卡片不再可见
+    expect(find.text('faust'), findsNothing);
   });
 
   testWidgets('超长命运描述与超长文件名不溢出卡片边界（省略号截断）', (tester) async {
@@ -182,21 +191,25 @@ void main() {
     await tester.pumpWidget(buildHome(groups: groups));
     await tester.pumpAndSettle();
 
-    // 展开子版区
-    await tester.tap(find.byTooltip('展开子版'));
-    await tester.pumpAndSettle();
-
     // 无溢出异常（Flutter 测试默认 FlutterError.onError 会捕获 RenderFlex overflow）
     expect(tester.takeException(), isNull);
 
-    // 命运描述截断展示（未完整铺满）
+    // 母版卡片本身正常渲染
+    expect(find.text('faust'), findsOneWidget);
+    expect(find.text('faust.meph'), findsOneWidget);
+
+    // 点击「分支 · 1」→ 弹出分支选择器
+    await tester.tap(find.text('分支 · 1'));
+    await tester.pumpAndSettle();
+
+    // 分支选择器内部：命运描述截断展示（未完整铺满）
     final titleText = tester.widget<Text>(
       find.textContaining('命运：理想国支线里浮士德在边际海岸望向乌托邦的那一天'),
     );
     expect(titleText.maxLines, 1);
     expect(titleText.overflow, TextOverflow.ellipsis);
 
-    // 文件名同样被省略号截断（不再撑满整行 / 溢出右缘）
+    // 文件名同样被省略号截断
     final fileNameText = tester.widget<Text>(
       find.byWidgetPredicate((w) =>
           w is Text &&
@@ -214,37 +227,38 @@ void main() {
     expect(find.text('faust'), findsOneWidget);
     expect(find.text('faust.meph'), findsOneWidget);
     expect(find.text('dantes'), findsOneWidget);
-    // 子版默认收起，不显示文件名
+    // 子版文件不在首页卡片中直接显示（通过「分支 · N」入口访问）
     expect(find.text('faust.child.meph'), findsNothing);
-    // 有子版的母版显示展开箭头
-    expect(find.byTooltip('展开子版'), findsOneWidget);
+    // 有子版的母版显示「分支 · 2」，无子版的 dantes 不显示
+    expect(find.text('分支 · 2'), findsOneWidget);
+    expect(find.textContaining('分支 ·'), findsOneWidget);
   });
 
-  testWidgets('展开/收起子版区', (tester) async {
+  testWidgets('分支选择器列出全部子版并可关闭', (tester) async {
     await tester.pumpWidget(buildHome());
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('展开子版'));
+    // 点击「分支 · 2」→ 弹出 BottomSheet
+    await tester.tap(find.text('分支 · 2'));
     await tester.pumpAndSettle();
 
-    // 子版文件名与分支名出现
-    expect(find.text('faust.child.meph'), findsOneWidget);
-    expect(find.text('faust.dark.meph'), findsOneWidget);
+    // BottomSheet：母版入口 + 2 个子版。
+    // faust 出现 3 次：首页卡片角色名 + BottomSheet 标题 + 母版入口
+    expect(find.text('faust'), findsNWidgets(3));
     expect(find.text('child'), findsOneWidget);
     expect(find.text('dark'), findsOneWidget);
+    expect(find.text('faust.child.meph'), findsOneWidget);
+    expect(find.text('faust.dark.meph'), findsOneWidget);
 
-    // 收起
-    await tester.tap(find.byTooltip('收起子版'));
+    // 点击关闭按钮 → BottomSheet 消失
+    await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
-    expect(find.text('faust.child.meph'), findsNothing);
+    expect(find.text('child'), findsNothing);
+    expect(find.text('dark'), findsNothing);
   });
 
   testWidgets('长按母版进入多选并级联选中子版', (tester) async {
     await tester.pumpWidget(buildHome());
-    await tester.pumpAndSettle();
-
-    // 先展开子版，便于观察全选效果
-    await tester.tap(find.byTooltip('展开子版'));
     await tester.pumpAndSettle();
 
     // 长按母版角色名行
@@ -253,7 +267,11 @@ void main() {
 
     // 顶部显示选中计数，母版 + 2 子版全部被选中
     expect(find.text('已选 3 项'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle), findsNWidgets(3));
+    // 屏幕上仅渲染母版卡片 → 只有 1 个选中勾选图标可见
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+
+    // 多选模式下「分支 · N」入口隐藏
+    expect(find.textContaining('分支 ·'), findsNothing);
 
     // 退出多选
     await tester.tap(find.byTooltip('取消'));
@@ -261,35 +279,33 @@ void main() {
     expect(find.text('已选 3 项'), findsNothing);
   });
 
-  testWidgets('长按母版自动展开子版区，被级联选中的子版立即可见', (tester) async {
+  testWidgets('长按母版进入多选：级联选中整棵子树，分支入口隐藏', (tester) async {
     await tester.pumpWidget(buildHome());
     await tester.pumpAndSettle();
 
-    // 不手动展开子版区，直接长按母版
-    // （修复前：子版被级联选中但不可见，也无法在窗口中展开查看）
+    // 长按母版（不手动展开任何内容）
     await tester.longPress(find.text('faust'));
     await tester.pumpAndSettle();
 
     // 母版 + 2 子版全部被选中
     expect(find.text('已选 3 项'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle), findsNWidgets(3));
+    // 屏幕上仅渲染母版卡片 → 只有 1 个选中勾选图标可见
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
 
-    // 子版区自动展开：子版文件名应立即可见（而非需要手动点箭头展开）
-    expect(find.text('faust.child.meph'), findsOneWidget);
-    expect(find.text('faust.dark.meph'), findsOneWidget);
+    // 多选模式下：分支入口（「分支 · N」）隐藏、⋮ 菜单隐藏
+    expect(find.textContaining('分支 ·'), findsNothing);
+    expect(find.byTooltip('操作'), findsNothing);
 
-    // 子版区已展开，展开箭头在多选模式下仍保留（可收起）
-    expect(find.byTooltip('收起子版'), findsOneWidget);
-
-    // 直接点击子版可单独取消选中（验证子版对用户可操作）
-    await tester.tap(find.text('faust.child.meph'));
+    // 点击母版行取消级联选中（含整棵子树）→ 多选模式自动退出（AppBar 恢复普通模式）
+    await tester.tap(find.text('faust'));
     await tester.pumpAndSettle();
-    expect(find.text('已选 2 项'), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
+    expect(find.text('已选 0 项'), findsNothing);
+    // 普通 AppBar 恢复：显示「新建契约」操作按钮
+    expect(find.byTooltip('新建契约'), findsOneWidget);
   });
 
-  testWidgets('多选模式下其他列表仍可展开/收起子版', (tester) async {
-    // faust（级联目标）+ goethe（有其他子版，未展开）
+  testWidgets('多选模式：其他列表不再显示「分支」入口，可继续切换选中', (tester) async {
+    // faust（级联目标）+ goethe（有其他子版）
     final groups = [
       ContractGroup(
         master: info('faust.meph'),
@@ -303,32 +319,30 @@ void main() {
     await tester.pumpWidget(buildHome(groups: groups));
     await tester.pumpAndSettle();
 
-    // 长按 faust 进入多选（faust 子版自动展开，goethe 保持收起）
+    // 普通模式：两个母版均有「分支 · 1」入口
+    expect(find.text('分支 · 1'), findsNWidgets(2));
+
+    // 长按 faust 进入多选
     await tester.longPress(find.text('faust'));
     await tester.pumpAndSettle();
 
-    // 多选模式下：faust 显示「收起子版」，goethe 仍显示「展开子版」箭头
+    // 多选模式下：所有「分支 · N」入口隐藏
+    expect(find.textContaining('分支 ·'), findsNothing);
     expect(find.text('已选 2 项'), findsOneWidget);
-    expect(find.byTooltip('收起子版'), findsOneWidget);
-    expect(find.byTooltip('展开子版'), findsOneWidget);
 
-    // 点击 goethe 的展开箭头 → 其子版立即可见
-    // （faust 已级联展开，此时 goethe 展开后有两个「收起子版」箭头）
-    await tester.tap(find.byTooltip('展开子版'));
+    // 点击 goethe 母版行 → 级联选中其整棵子树（goethe + goethe.utopia）
+    await tester.tap(find.text('goethe'));
     await tester.pumpAndSettle();
-    expect(find.text('goethe.utopia.meph'), findsOneWidget);
-    expect(find.byTooltip('收起子版'), findsNWidgets(2));
-
-    // 点击 goethe 的收起箭头（列表顺序中 goethe 在 faust 之后）→ 子版收起
-    await tester.tap(find.byTooltip('收起子版').last);
-    await tester.pumpAndSettle();
-    expect(find.text('goethe.utopia.meph'), findsNothing);
+    expect(find.text('已选 4 项'), findsOneWidget);
+    // 屏幕上仅渲染两个母版卡片 → 只有 2 个选中勾选图标可见
+    expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
   });
 
-  testWidgets('批量删除：确认对话框 → 点击删除 → 退出多选', (tester) async {
+  testWidgets('批量删除：确认对话框 → 取消 → 多选保持不变', (tester) async {
     // 注意：此处不验证真实文件删除——widget 测试运行在 FakeAsync zone，
-    // 真实文件系统 IO 的异步回调与 FakeAsync 冲突会挂起测试。
-    // 文件系统层面的删除已由 narrative_provider_test（saveChild/delete 路径）覆盖。
+    // 真实文件系统 IO（File.delete）的异步回调无法由 fake clock 驱动，
+    // 会挂起测试。文件系统层面的删除已由 narrative_provider_test
+    // （saveChild/delete 路径）与 contract_provider_test（deleteContract）覆盖。
     final groups = [ContractGroup(master: info('faust.meph'), children: [])];
     await tester.pumpWidget(buildHome(groups: groups));
     await tester.pumpAndSettle();
@@ -348,11 +362,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('已选 1 项'), findsOneWidget);
 
-    // 再次打开确认对话框，点击「删除」→ 退出多选（UI 流程正常完成）
+    // 再次打开确认对话框 → 仍可正常弹出（删除流程 UI 完整）
     await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('删除'));
+    expect(find.text('删除契约'), findsOneWidget);
+
+    // 再取消 → 多选保持；通过 AppBar「取消」按钮退出多选
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(find.text('已选 1 项'), findsOneWidget);
+    await tester.tap(find.byTooltip('取消'));
     await tester.pumpAndSettle();
     expect(find.text('已选 1 项'), findsNothing);
+    // 普通 AppBar 恢复（设置按钮可见）
+    expect(find.byTooltip('设置'), findsOneWidget);
   });
 }

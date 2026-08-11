@@ -48,7 +48,15 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
 - **Child Save System**: Master contracts are read-only; runtime dialogues generate child snapshots, supporting branches and restoration
 - **Rule Hot-Reload**: Save `.meph` → **only rules take effect instantly**, with dialogue/state/memory/history all preserved
 - **Multi-Character Stage**: A subdirectory under the contracts folder = a stage, where multiple characters interact and save independently
-- **Cross-Platform**: Windows / macOS / Linux / Android / iOS, with built-in contracts including Faust, Edmond Dantès, Joan of Arc, Young Arthur, and Gilgamesh
+- **Cross-Platform**: Windows / macOS / Linux / Android / iOS, with built-in contracts including Faust, Edmond Dantès, Joan of Arc, Young Arthur, and Gilgamesh; plus two multi-character stages: Kurukshetra and Camlann
+
+## 📥 Download Releases
+
+Pre-built multi-platform installers (Windows / Linux / Android / macOS / iOS) are available
+on the **[GitHub Releases](https://github.com/yuelinghuashu/mephisto-gui/releases)** page—
+no need to build from source.
+
+> See "Platform Support & Testing Statement" below for system version requirements and verification status.
 
 ## 📖 Quick Start
 
@@ -126,7 +134,9 @@ For writing `.meph` contracts, we recommend the **Mephisto VSCode plugin** (synt
 - **SharedPreferences** (Preference persistence)
 - **flutter_secure_storage** (System-keychain API Key storage)
 - **HTTP** (OpenAI-compatible SSE streaming calls)
+- **archive** (ZIP pack / restore)
 - **MephParser** (Self-developed contract parser)
+- **freezed** (Data model code generation)
 
 ## 📁 Directory Structure
 
@@ -162,15 +172,15 @@ flutter test
 > **Honest Disclosure**: This project is maintained by an individual. Due to hardware and account constraints,
 > the following platforms have **not been verified on real devices** and may contain undiscovered bugs.
 
-| Platform                                                   | Verification Status                            | Notes                                         |
-| ---------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------- |
-| **Windows**                                                | ✅ Verified on real device                     |                                               |
-| **Linux**                                                  | ✅ Real device + local build passed            | Includes `flutter build linux` native build   |
-| **Android**                                                | ✅ Verified on real device                     | External ↔ internal storage switch verified   |
-| **macOS**                                                  | ⚠️ CI build passed, **not run on real device** |                                               |
-| **iOS**                                                    | ⚠️ CI build passed, **not run on real device** |                                               |
-| **Legacy HarmonyOS** (HarmonyOS 2/3/4)                     | ✅ Can run this project's Android APK          | Android compatibility layer, not tested       |
-| **Pure HarmonyOS** (HarmonyOS NEXT / 5.0+)                 | ⛔ **Not supported**                           | Requires OpenHarmony Flutter fork migration   |
+| Platform                                   | Verification Status                            | Notes                                       |
+| ------------------------------------------ | ---------------------------------------------- | ------------------------------------------- |
+| **Windows**                                | ✅ Verified on real device                     |                                             |
+| **Linux**                                  | ✅ Real device + local build passed            | Includes `flutter build linux` native build |
+| **Android**                                | ✅ Verified on real device                     | External ↔ internal storage switch verified |
+| **macOS**                                  | ⚠️ CI build passed, **not run on real device** |                                             |
+| **iOS**                                    | ⚠️ CI build passed, **not run on real device** |                                             |
+| **Legacy HarmonyOS** (HarmonyOS 2/3/4)     | ✅ Can run this project's Android APK          | Android compatibility layer, not tested     |
+| **Pure HarmonyOS** (HarmonyOS NEXT / 5.0+) | ⛔ **Not supported**                           | Requires OpenHarmony Flutter fork migration |
 
 ### System Version Requirements
 
@@ -178,7 +188,7 @@ flutter test
 | ----------- | ------------------------------------------------------------------------------------- | ------------------------------------------ |
 | **Windows** | Windows 10 (Flutter desktop minimum)                                                  | Windows 11                                 |
 | **Linux**   | GTK 3 + libsecret required (`libsecret-1-dev` for build, `libsecret-1-0` for runtime) | Recent distributions (e.g., Ubuntu 22.04+) |
-| **Android** | Android 6.0 (API 23, `minSdk = 23`)                                                   | Android 10+ (API 29)                       |
+| **Android** | Android 6.0 (API 23, `minSdk = flutter.minSdkVersion`, currently resolves to 23)      | Android 10+ (API 29)                       |
 | **iOS**     | iOS 13.0 (project configured `IPHONEOS_DEPLOYMENT_TARGET`)                            | iOS 16+                                    |
 | **macOS**   | macOS 10.15 Catalina (project configured `MACOSX_DEPLOYMENT_TARGET`)                  | macOS 12 Monterey+                         |
 

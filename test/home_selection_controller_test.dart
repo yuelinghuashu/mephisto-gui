@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mephisto/domain/stage_models.dart';
 import 'package:mephisto/providers/contract_provider.dart';
 import 'package:mephisto/providers/home_selection_controller.dart';
 
@@ -187,9 +188,22 @@ void main() {
     test('enterStageSelectMode 长按舞台 → 级联选中所有角色 + 自动展开舞台', () {
       final controller = HomeSelectionController();
       final roleKeys = [
-        '/stage/Kurukshetra|阿周那|Arjuna.meph|false',
-        '/stage/Kurukshetra|阿周那|Arjuna.meph|true', // 有存档
-        '/stage/Kurukshetra|迦尔纳|Karna.meph|false',
+        HomeSelectionController.stageRoleKey(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+        ),
+        HomeSelectionController.stageRoleKey(
+          '/stage/Kurukshetra',
+          '阿周那',
+          'Arjuna.meph',
+          isChild: true,
+        ), // 有存档
+        HomeSelectionController.stageRoleKey(
+          '/stage/Kurukshetra',
+          '迦尔纳',
+          'Karna.meph',
+        ),
       ];
 
       controller.enterStageSelectMode('/stage/Kurukshetra', roleKeys);
@@ -303,7 +317,7 @@ void main() {
   });
 
   group('全选 + 退出', () {
-    test('selectAll 全选所有契约（含递归子节点）', () {
+    test('selectAll 全选所有契约（含递归子节点）+ 所有舞台目录', () {
       final controller = HomeSelectionController();
       final trees = [
         treeGroup(
@@ -312,13 +326,22 @@ void main() {
         ),
         treeGroup(master: info('dantes.meph')),
       ];
+      final stages = [
+        const StageInfo(path: '/contracts/Kurukshetra', name: 'Kurukshetra', characterCount: 2),
+        const StageInfo(path: '/contracts/Camlann', name: 'Camlann', characterCount: 2),
+      ];
 
-      controller.selectAll(trees);
+      controller.selectAll(trees, stages);
 
+      // 契约：faust.meph + faust.dark.meph + dantes.meph = 3
       expect(controller.selectedCount, 3);
       expect(controller.isSelected('faust.meph'), isTrue);
       expect(controller.isSelected('faust.dark.meph'), isTrue);
       expect(controller.isSelected('dantes.meph'), isTrue);
+      // 舞台：2 个舞台目录
+      expect(controller.selectedStageCount, 2);
+      expect(controller.isStageSelected('/contracts/Kurukshetra'), isTrue);
+      expect(controller.isStageSelected('/contracts/Camlann'), isTrue);
     });
 
     test('exitSelectMode 清空选中并退出多选', () {

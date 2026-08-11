@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
+import '../constants/menu_actions.dart';
+import '../l10n/app_localizations.dart';
 import 'contract_menu_item.dart';
 
 /// 卡片「⋮ 菜单」项定义：菜单值 + 图标 + 标签。
@@ -12,6 +14,52 @@ class CardMenuItem {
   final String label;
 
   const CardMenuItem(this.value, this.icon, this.label);
+}
+
+/// 构建契约卡/分支选择器的菜单项列表（母版/子版共用）。
+///
+/// 首页 [ContractCard] 的节点 ⋮ 菜单 与 [HomeBranchSheet] 的分支项 ⋮ 菜单
+/// 结构完全一致，统一收敛至此避免两处维护。母版（[isMaster]）额外显示
+/// 「编辑」与「导出」两项；子版不显示。
+List<CardMenuItem> buildContractMenuItems({
+  required bool isMaster,
+  required AppLocalizations l10n,
+}) {
+  return [
+    CardMenuItem(
+      menuActionEnter,
+      Icons.play_arrow_outlined,
+      l10n.contractCardEnter,
+    ),
+    CardMenuItem(
+      menuActionPreview,
+      Icons.visibility_outlined,
+      l10n.contractCardPreview,
+    ),
+    if (isMaster) ...[
+      CardMenuItem(
+        menuActionEdit,
+        Icons.edit_outlined,
+        l10n.contractCardEdit,
+      ),
+      // 导出（命运树 ZIP）：仅在母版根显示，导出整棵母版子树
+      CardMenuItem(
+        menuActionExport,
+        Icons.archive_outlined,
+        l10n.contractCardExport,
+      ),
+    ],
+    CardMenuItem(
+      menuActionRename,
+      Icons.drive_file_rename_outline,
+      l10n.contractCardRename,
+    ),
+    CardMenuItem(
+      menuActionDelete,
+      Icons.delete_outline,
+      l10n.contractCardDelete,
+    ),
+  ];
 }
 
 /// 构建轻量卡片「⋮ 菜单」的共享工具。

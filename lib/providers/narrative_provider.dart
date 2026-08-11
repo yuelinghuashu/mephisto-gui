@@ -14,7 +14,6 @@ import '../services/memory/memory_manager.dart';
 import '../services/narrative_turn_service.dart';
 import '../services/parser/meph_parser.dart';
 import '../services/session/child_save_store.dart';
-import '../services/session/session_saver.dart';
 import '../services/storage/meph_file_name.dart' as meph_file_name;
 import '../services/stream_throttle.dart';
 import 'contract_provider.dart';
@@ -43,25 +42,26 @@ import 'narrative_window_provider.dart';
 ///     并与 `Future.wait` 并发执行，角色上下文天然隔离。
 class NarrativeNotifier extends Notifier<NarrativeState>
     with GenerationCoordinator<NarrativeState> {
-  /// 流式输出节流合并缓冲（50ms 窗口内累积后一次性提交）
+  /// 流式内容累积器（节流合并 + StringBuffer 一体化）
   ///
-  /// 复用 [StreamThrottleBuffer]（与多角色 [StageNarrativeNotifier] 共享），
-  /// 避免两处约 50 行的重复实现。
-  final StreamThrottleBuffer _streamBuffer = StreamThrottleBuffer();
+  /// 复用 [ThrottledStreamBuffer]（与多角色 [StageNarrativeNotifier] 共享），
+  /// 消除两处约 30 行的重复流式缓冲样板。
+  final ThrottledStreamBuffer _streaming = ThrottledStreamBuffer();
 
   /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交（减少 Riverpod 通知）。
   void _appendStreamChunk(String chunk) {
-    _streamBuffer.addChunk(chunk, _applyStreamChunk);
+    _streaming.append(chunk, _applyStreamChunk);
   }
 
   /// 提交缓冲中的流式内容到状态。
   void _flushStreamBuffer() {
-    _streamBuffer.flush(_applyStreamChunk);
+    _streaming.flush(_applyStreamChunk);
   }
 
-  /// 将累积的流式内容追加到状态。
+  /// 将累积的流式内容写入状态（StringBuffer 累积 → 一次性 toString）。
   void _applyStreamChunk(String pending) {
-    state = state.copyWith(streamingContent: state.streamingContent + pending);
+    final fullContent = _streaming.applyAndGet(pending);
+    state = state.copyWith(streamingContent: fullContent);
   }
 
   /// 状态迁移统一走 [narrativeReducer]
@@ -73,7 +73,7 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   NarrativeState build() {
     // Notifier 重建（契约切换/Provider 失效）时清理流式定时器，避免泄漏
     ref.onDispose(() {
-      _streamBuffer.dispose();
+      _streaming.dispose();
       disposeGeneration();
     });
 
@@ -117,6 +117,9 @@ class NarrativeNotifier extends Notifier<NarrativeState>
 
     // 入口立即置位同步标志（在 dispatch 之前），确保并发/连点无法穿透
     beginGeneration();
+
+    // 新一轮生成：清空流式累积器，避免旧内容残留到新会话
+    _streaming.reset();
 
     final trimmed = content.trim();
     _dispatch(MessageSent(trimmed));
@@ -249,7 +252,7 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   Future<String?> _saveDefault({required String errorMessage}) {
     return _performSave(
       errorMessage: errorMessage,
-      saver: () => SessionSaver.saveCurrent(
+      saver: () => ChildSaveStore.saveCurrent(
         sourceFileName: state.sourceFileName,
         contract: state.contract,
         currentState: state.currentState,
@@ -283,7 +286,7 @@ class NarrativeNotifier extends Notifier<NarrativeState>
     if (branchName != null && branchName.isNotEmpty) {
       return _performSave(
         errorMessage: narrativeErrorSaveFail,
-        saver: () => SessionSaver.saveAsBranch(
+        saver: () => ChildSaveStore.saveAsBranch(
           sourceFileName: state.sourceFileName,
           branchName: branchName,
           branchTitle: branchTitle,

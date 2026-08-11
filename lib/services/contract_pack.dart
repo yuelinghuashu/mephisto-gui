@@ -15,6 +15,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
+import 'package:path/path.dart' as p;
 
 import 'storage/contract_dir.dart';
 
@@ -56,10 +57,12 @@ Future<Uint8List> packContractTree(
   final targetDir = dir ?? await getContractsDirectory();
   final prefix = masterFileName.replaceAll('.meph', '');
 
+  // 使用 `p.basename` 而非 `split(Platform.pathSeparator)`：跨平台兼容
+  // （Windows 上 `Directory.list()` 的 path 可能使用 `/` 或 `\` 混合分隔符）。
   final names = await targetDir
       .list()
       .where((e) => e is File && e.path.endsWith('.meph'))
-      .map((e) => e.path.split(Platform.pathSeparator).last)
+      .map((e) => p.basename(e.path))
       .where((name) => name == masterFileName || name.startsWith('$prefix.'))
       .toList();
 
@@ -77,11 +80,11 @@ Future<Uint8List> packStage(
   final dir = Directory(stageDirPath);
   if (!await dir.exists()) throw Exception('舞台目录不存在: $stageDirPath');
 
-  final name = stageName ?? stageDirPath.split(Platform.pathSeparator).last;
+  final name = stageName ?? p.basename(stageDirPath);
   final names = await dir
       .list()
       .where((e) => e is File && e.path.endsWith('.meph'))
-      .map((e) => e.path.split(Platform.pathSeparator).last)
+      .map((e) => p.basename(e.path))
       .toList();
 
   final files = names.map((n) => '$stageDirPath/$n').toList();

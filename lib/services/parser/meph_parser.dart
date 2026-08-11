@@ -377,7 +377,7 @@ void _validateKeywordSpacing(
       throw MephParseError(
         line: lineNumber,
         blockName: blockName,
-        message: "关键词「${entry.key}」中间不能有空格",
+        message: '关键词「${entry.key}」中间不能有空格',
       );
     }
   }
@@ -424,7 +424,7 @@ void _validateKeywordSpacing(
       throw MephParseError(
         line: lineNumber,
         blockName: blockName,
-        message: "骰子表达式格式无效，仅支持 roll(1d2)（二元判定）与 roll(1d100)（高精度判定）",
+        message: '骰子表达式格式无效，仅支持 roll(1d2)（二元判定）与 roll(1d100)（高精度判定）',
       );
     }
   }

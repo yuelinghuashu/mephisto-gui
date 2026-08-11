@@ -130,10 +130,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeBrandSubtitle => 'Sign the contract, write your fate';
 
   @override
-  String get homeStageSectionTitle => '🎭 Multi-Character Stages';
+  String get homeStageSectionTitle => 'Multi-Character Stages';
 
   @override
-  String get homeContractSectionTitle => '📜 Single-Character Contracts';
+  String get homeContractSectionTitle => 'Single-Character Contracts';
+
+  @override
+  String get homeSectionExpand => 'Expand';
+
+  @override
+  String get homeSectionCollapse => 'Collapse';
 
   @override
   String stageCardCharacterCount(Object count) {
@@ -240,6 +246,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get contractCardCollapseChildren => 'Collapse child versions';
+
+  @override
+  String contractBranchCount(Object count) {
+    return 'Branches · $count';
+  }
 
   @override
   String get narrativeSaveMenu => 'Save';

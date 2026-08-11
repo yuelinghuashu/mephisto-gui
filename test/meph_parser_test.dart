@@ -16,11 +16,12 @@ void main() {
       // 角色名
       expect(contract.roleName, '浮士德');
 
-      // 锚点
-      expect(contract.anchor, hasLength(3));
+      // 锚点（含新增的「说话风格」——与其他模板保持一致）
+      expect(contract.anchor, hasLength(4));
       expect(contract.anchor[0].key, '核心信念');
       expect(contract.anchor[1].key, '欲望');
-      expect(contract.anchor[2].key, '绝对禁忌');
+      expect(contract.anchor[2].key, '行为基线');
+      expect(contract.anchor[3].key, '说话风格');
 
       // 状态（含类型推断）
       expect(contract.state, hasLength(3));
@@ -35,7 +36,8 @@ void main() {
       expect(contract.opening, contains('烛火摇曳'));
 
       // 规则（覆盖全语法：注入/状态赋值/复合赋值/复合动作/LLM指令/互斥组/括号/骰子）
-      expect(contract.rules, hasLength(14));
+      // 注：已移除不符合人设的 [代价已付] 与 [边界]，保留 12 条
+      expect(contract.rules, hasLength(12));
       expect(contract.rules.first.name, '灵魂危机');
       expect(contract.rules.first.condition, '状态.灵魂完整度 < 30');
       expect(contract.rules.first.action, startsWith('注入 '));

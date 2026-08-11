@@ -11,6 +11,7 @@ export 'narrative_provider.dart';
 export 'narrative_rule_provider.dart';
 export 'narrative_width_provider.dart';
 export 'narrative_window_provider.dart';
+export 'recent_edit_provider.dart';
 export 'settings_provider.dart';
 export 'stage_narrative_provider.dart';
 export 'stage_provider.dart';

@@ -37,8 +37,10 @@
 
   "homeBrandTitle": "Mephisto Narrative Engine",
   "homeBrandSubtitle": "Sign the contract, write your fate",
-  "homeStageSectionTitle": "🎭 Multi-Character Stages",
-  "homeContractSectionTitle": "📜 Single-Character Contracts",
+  "homeStageSectionTitle": "Multi-Character Stages",
+  "homeContractSectionTitle": "Single-Character Contracts",
+  "homeSectionExpand": "Expand",
+  "homeSectionCollapse": "Collapse",
   "stageCardCharacterCount": "{count} characters",
   "stageCardLastModified": "Last activity: {time}",
   "stageCardHasSave": "Has save",
@@ -70,6 +72,7 @@
   "contractCardOperations": "Actions",
   "contractCardExpandChildren": "Expand child versions",
   "contractCardCollapseChildren": "Collapse child versions",
+  "contractBranchCount": "Branches · {count}",
 
   "narrativeSaveMenu": "Save",
   "narrativeSaveBranch": "Save as Branch...",

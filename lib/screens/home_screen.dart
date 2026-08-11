@@ -3,22 +3,20 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
+import 'package:path/path.dart' as p;
 
-import '../app/theme.dart';
 import '../providers/contract_provider.dart';
 import '../providers/home_selection_controller.dart';
 import '../providers/stage_provider.dart';
 import '../services/storage/stage_repo.dart';
 import '../widgets/dialogs/confirm_delete_dialog.dart';
 import '../widgets/dialogs/text_input_dialog.dart';
-import '../widgets/home/contract_card.dart';
 import '../widgets/home/contract_preview_sheet.dart';
+import '../widgets/home/contract_tree_section.dart';
 import '../widgets/home/home_app_bar.dart';
 import '../widgets/home/home_branch_sheet.dart';
-import '../widgets/home/home_brand_header.dart';
 import '../widgets/home/home_state_views.dart';
-import '../widgets/home/section_header.dart';
-import '../widgets/home/stage_card.dart';
+import '../widgets/home/role_quick_actions_sheet.dart';
 import 'contract_editor_screen.dart';
 import 'home/home_menu_actions.dart';
 import 'home/home_operations.dart';
@@ -41,6 +39,7 @@ import 'stage_narrative_screen.dart';
 ///   - 多选/展开状态：[_selection]（独立 Controller）
 ///   - 文件操作：`home_operations.dart`（导入/删除/编辑/新建/恢复内置）
 ///   - 菜单/重命名/删除确认：`home_menu_actions.dart`
+///   - 契约树 + 舞台渲染：[ContractTreeSection]（只读 ConsumerWidget）
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -77,7 +76,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     // 先读取当前缓存的舞台列表（invalidate 之前），获取所有舞台路径
     final stagePaths = [
-      for (final stage in ref.read(stageListProvider).value ?? const <StageInfo>[])
+      for (final stage
+          in ref.read(stageListProvider).value ?? const <StageInfo>[])
         stage.path,
     ];
 
@@ -99,40 +99,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // 文件操作委托（实现在 home_operations.dart）
   // ============================================================
 
-  /// 删除选中的契约文件 + 选中的舞台目录。
+  /// 删除选中的契约文件 + 选中的舞台目录 + 舞台内角色。
+  ///
+  /// **顺序执行契约 → 舞台 → 舞台内角色**，全部删除完成后**统一退出多选
+  /// + 刷新列表**。各分类内部不宜提前退出多选——`exitSelectMode` 会清空
+  /// `_selectedStages` / `_selectedStageRoles`，导致后续分类的
+  /// `isNotEmpty` 判断落空、删除被静默跳过。
   Future<void> _deleteSelected() async {
-    // 1. 删除选中的契约文件（沿用现有逻辑）
+    // 1. 删除选中的契约文件；用户取消 → 中止整个流程（保持多选）
     if (_selection.selected.isNotEmpty) {
-      await deleteSelectedContract(
+      final confirmed = await deleteSelectedContract(
         ref,
         context,
         _selection,
-        onExitSelectMode: _selection.exitSelectMode,
-        onRefreshLists: _refreshLists,
       );
-      if (!mounted) return;
+      if (!mounted || !confirmed) return;
     }
-    // 2. 删除选中的舞台目录（若无契约选中，也要退出多选 + 刷新）
+    // 2. 删除选中的舞台目录（manageSelection: false = 由外层统一收尾）
     if (_selection.selectedStages.isNotEmpty) {
-      await _deleteStages(_selection.selectedStages.toList());
-      if (!mounted) return;
-      _selection.exitSelectMode();
-      _refreshLists();
+      final confirmed = await _deleteStages(
+        _selection.selectedStages.toList(),
+        manageSelection: false,
+      );
+      if (!mounted || !confirmed) return;
     }
     // 3. 删除选中的舞台内角色卡 / 存档（批量）
     if (_selection.selectedStageRoles.isNotEmpty) {
-      await _deleteSelectedStageRoles();
-      if (!mounted) return;
+      final confirmed = await _deleteSelectedStageRoles();
+      if (!mounted || !confirmed) return;
     }
+
+    // 全部删除完成 → 统一退出多选 + 刷新列表
+    _selection.exitSelectMode();
+    _refreshLists();
   }
 
   /// 批量删除多选模式下勾选的舞台内角色（母版角色卡 / .child.meph 存档）。
   ///
-  /// 选中 key 格式为 `"舞台路径|角色名|角色卡文件名|isChild"`（由
-  /// [HomeSelectionController] 生成，携带实际文件名）。逐个解析后
-  /// 直接使用文件名调用 [deleteStageRoleCard] / [deleteStageRoleChild]，
-  /// 不再用中文角色名反查文件名（角色名与文件名不一定一致）。
-  Future<void> _deleteSelectedStageRoles() async {
+  /// 选中 key 由 [HomeSelectionController] 生成（携带路径/角色名/文件名/
+  /// isChild 四个字段），通过 [HomeSelectionController.parseStageRoleKey]
+  /// 安全解析后直接使用文件名调用 [deleteStageRoleCard] /
+  /// [deleteStageRoleChild]，不再用中文角色名反查文件名。
+  /// 返回 `false` = 用户取消（调用方中止整个批量删除流程）。
+  Future<bool> _deleteSelectedStageRoles() async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final count = _selection.selectedStageRoles.length;
@@ -142,29 +151,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       title: l10n.homeDeleteContractTitle,
       message: l10n.homeDeleteSelectedConfirm(count),
     );
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     var failCount = 0;
     for (final key in _selection.selectedStageRoles.toList()) {
-      final parts = key.split('|');
-      if (parts.length != 4) continue;
-      final stagePath = parts[0];
-      final fileName = parts[2];
-      final isChild = parts[3] == 'true';
+      final parsed = HomeSelectionController.parseStageRoleKey(key);
+      if (parsed == null) continue;
+      final (stagePath, _, fileName, isChild) = parsed;
       final ok = isChild
           ? await deleteStageRoleChild(stagePath, fileName)
           : await deleteStageRoleCard(stagePath, fileName);
       if (!ok) failCount++;
     }
 
-    if (!mounted) return;
-    _selection.exitSelectMode();
-    _refreshLists();
+    // 不在此处退出多选/刷新——由 _deleteSelected 在全部删除完成后统一收尾
+    if (!mounted) return false;
     if (failCount > 0) {
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.homeDeleteSelectedFail(count))),
       );
     }
+    return true;
   }
 
   /// 导入本地 .meph 文件。
@@ -260,12 +267,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 处理舞台卡「⋮ 菜单」操作（进入 / 导出 / 重命名 / 删除）。
   Future<void> _handleStageMenu(String stagePath, String action) async {
     final l10n = AppLocalizations.of(context);
-    final stageName = stagePath.split(Platform.pathSeparator).last;
+    // 使用 p.basename 跨平台兼容（Windows 路径可能使用 / 或 \ 混合分隔符）
+    final stageName = p.basename(stagePath);
 
     switch (action) {
       case 'enter':
         // 进入：从母版干净开局（对齐单角色「点母版 = 进母版」）。
-        // 想续玩存档请用展开区角色「子版行」或直接点开舞台内的子版入口。
         await _openStageNarrative(stagePath);
         return;
       case 'restart':
@@ -306,33 +313,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  /// 删除指定舞台目录（确认 → 删除 → 刷新）。
-  Future<void> _deleteStages(List<String> paths) async {
+  /// 删除指定舞台目录（确认 → 删除 → 收尾）。
+  ///
+  /// [manageSelection]：
+  ///   - true（默认，单舞台菜单删除）：删除后自行退出多选 + 刷新列表
+  ///   - false（多选批量删除 `_deleteSelected`）：由外层统一收尾，避免
+  ///     提前清空 `_selectedStages` / `_selectedStageRoles` 导致后续分类
+  ///     删除被跳过
+  ///
+  /// 返回 `false` = 用户取消（调用方中止整个批量删除流程）。
+  Future<bool> _deleteStages(
+    List<String> paths, {
+    bool manageSelection = true,
+  }) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final confirmed = await ConfirmDeleteDialog.show(
       context,
       title: l10n.stageDeleteTitle,
       message: paths.length == 1
-          ? l10n.stageDeleteConfirm(
-              paths.first.split(Platform.pathSeparator).last,
-            )
+          ? l10n.stageDeleteConfirm(p.basename(paths.first))
           : l10n.stageDeleteMultipleConfirm(paths.length),
     );
-    if (!confirmed) return;
+    if (!confirmed) return false;
 
     var failCount = 0;
     for (final path in paths) {
       if (!await deleteStage(path)) failCount++;
     }
-    if (!mounted) return;
-    _selection.exitSelectMode();
-    _refreshLists();
+    if (!mounted) return false;
+    if (manageSelection) {
+      _selection.exitSelectMode();
+      _refreshLists();
+    }
     if (failCount > 0) {
       messenger.showSnackBar(
         SnackBar(content: Text(l10n.homeDeleteSelectedFail(failCount))),
       );
     }
+    return true;
   }
 
   /// 长按舞台卡 → 进入多选并**级联选中该舞台内所有角色** + 自动展开舞台。
@@ -343,13 +362,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _enterStageSelectMode(String stagePath) {
     final characters =
         ref.read(stageProvider(stagePath)).value?.characters ??
-            const <StageCharacter>[];
+        const <StageCharacter>[];
     final roleKeys = <String>[
       for (final c in characters) ...[
-        // 母版卡 key：舞台路径|角色名|角色卡文件名|isChild=false
-        '$stagePath|${c.roleName}|${c.fileName}|false',
+        // 母版卡 key（isChild=false）：统一通过 stageRoleKey 构建
+        HomeSelectionController.stageRoleKey(stagePath, c.roleName, c.fileName),
         // 子版卡 key（仅有存档时）：isChild=true
-        if (c.hasSave) '$stagePath|${c.roleName}|${c.fileName}|true',
+        if (c.hasSave)
+          HomeSelectionController.stageRoleKey(
+            stagePath,
+            c.roleName,
+            c.fileName,
+            isChild: true,
+          ),
       ],
     ];
     _selection.enterStageSelectMode(stagePath, roleKeys);
@@ -364,37 +389,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ///
   /// [fileName] 为角色卡文件名（如 `Arjuna.meph`），由 StageCard 传入；
   /// 多选 key 中携带文件名，使批量删除可直接定位目标文件。
-  void _toggleStageRoleSelect(
-    String stagePath,
-    String roleName,
-    String fileName, {
-    bool isChild = false,
-  }) {
-    _selection.toggleStageRoleSelect(
-      stagePath,
-      roleName,
-      fileName,
-      isChild: isChild,
-    );
-  }
-
-  /// 普通模式长按舞台内角色卡 → 进入多选并选中该角色。
-  ///
-  /// [fileName] 为角色卡文件名（如 `Arjuna.meph`），由 StageCard 传入；
-  /// 多选 key 中携带文件名，使批量删除可直接定位目标文件。
-  void _enterStageRoleSelectMode(
-    String stagePath,
-    String roleName,
-    String fileName, {
-    bool isChild = false,
-  }) {
-    _selection.enterStageRoleSelectMode(
-      stagePath,
-      roleName,
-      fileName,
-      isChild: isChild,
-    );
-  }
 
   // ============================================================
   // 导航
@@ -449,12 +443,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   ///
   /// 与单角色契约树「点母版玩母版、点子版玩子版」对应的多角色语义：
   ///   - 点角色**母版行**（restoreSave=false）→ 整个舞台从母版干净开局
-  ///     （空消息流，所有角色从各自母版文件；对齐单角色「点母版 = 进母版」）
   ///   - 点角色**子版行**（restoreSave=true）→ 恢复所有角色存档
-  ///     （被点角色从 `.child.meph` 存档续玩，其余角色也续玩各自存档）
-  ///
-  /// [restoreSave]：true = 恢复全部角色存档（子版续玩）；
-  /// false = 全部角色从母版干净开局（母版开局，空消息流）。
   Future<void> _openStageRole(
     String stagePath,
     String roleName, {
@@ -466,8 +455,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   /// 处理角色行 ⋮ 菜单操作（进入 / 预览 / 编辑 / 删除角色卡 / 删除存档）。
   ///
   /// [fileName] 为角色卡文件名（如 `Arjuna.meph`），由 StageCard 直接从
-  /// `StageCharacter.fileName` 传递，**不使用中文角色名反查文件名**——
-  /// 角色名与文件名可能不一致（如内置 Kurukshetra 舞台的 `阿周那 → Arjuna.meph`）。
+  /// `StageCharacter.fileName` 传递，**不使用中文角色名反查文件名**。
   Future<void> _handleStageRoleMenu(
     String stagePath,
     String roleName,
@@ -477,11 +465,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final l10n = AppLocalizations.of(context);
     switch (action) {
       case 'enter':
-        // 进入舞台叙事（从母版开局对齐角色行点击行为）
         await _openStageRole(stagePath, roleName, restoreSave: false);
         return;
       case 'preview':
-        // 预览角色卡内容（结构化展示契约数据）
         await ContractPreviewSheet.showFromFile(
           context,
           dirPath: stagePath,
@@ -512,7 +498,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }
         return;
       case 'delete_role':
-        // 删除母版角色卡 .meph（直接用 fileName 定位，级联删存档）
         final confirmed = await ConfirmDeleteDialog.show(
           context,
           title: l10n.stageDeleteTitle,
@@ -522,9 +507,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         await deleteStageRoleCard(stagePath, fileName);
         if (!mounted) return;
         _refreshLists();
-        break;
+        return;
       case 'delete_child':
-        // 删除该角色的 .child.meph 存档（基于 fileName 推导存档名）
         final confirmed = await ConfirmDeleteDialog.show(
           context,
           title: l10n.stageDeleteTitle,
@@ -534,32 +518,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         await deleteStageRoleChild(stagePath, fileName);
         if (!mounted) return;
         _refreshLists();
-        break;
+        return;
     }
   }
 
-  /// 处理母版卡片点击。
+  /// 长按角色芯片 → 弹出快捷菜单（进入 / 预览 / 编辑 / 删除）。
   ///
-  /// 移动端：弹出分支选择器（列出母版本体 + 全部子版，一步直达）。
-  /// 桌面端：保持原有行为——有子节点时展开/收起，无子节点时直接进入。
-  Future<void> _onMasterTap(BuildContext context, ContractGroup group) async {
-    if (!_selection.isSelectMode &&
-        MediaQuery.sizeOf(context).width < AppTheme.mobileBreakpoint &&
-        group.hasChildren) {
-      // 移动端：弹出分支选择器 BottomSheet
-      await HomeBranchSheet.show(
-        context,
-        group: group,
-        onEnter: _openNarrative,
-      );
-      return;
-    }
+  /// 替代旧版「展开区每个角色的 ⋮ 菜单」，长按角色 chip 弹出上下文菜单，
+  /// 保留所有角色级操作的入口。
+  Future<void> _handleRoleLongPress(String stagePath, String roleName) async {
+    // 查找角色卡文件名
+    final characters =
+        ref.read(stageProvider(stagePath)).value?.characters ??
+        const <StageCharacter>[];
+    final match = characters.where((c) => c.roleName == roleName).firstOrNull;
+    final fileName = match?.fileName ?? roleName;
 
-    // 桌面端：保持原有行为
+    // 弹出角色快捷菜单
+    final action = await RoleQuickActionsSheet.show(
+      context,
+      roleName: roleName,
+    );
+
+    if (action == null || !mounted) return;
+    await _handleStageRoleMenu(stagePath, roleName, fileName, action);
+  }
+
+  /// 处理母版卡片点击：直接进入母版叙事。
+  ///
+  /// 分支入口已由 [ContractCard] 的分支徽标（↳ N）承载——
+  /// 点击徽标弹出 [HomeBranchSheet] 选择分支，母版点击保持直接进入。
+  void _onMasterTap(ContractInfo info) {
     if (_selection.isSelectMode) {
-      _selection.toggleSelectSubtree(group);
+      // 多选模式：切换母版选中（含其子树）
+      final match = ref
+          .read(contractGroupListProvider)
+          .value
+          ?.where((g) => g.master.fileName == info.fileName)
+          .firstOrNull;
+      if (match != null) {
+        _selection.toggleSelectSubtree(match);
+      } else {
+        _selection.toggleSelect(info.fileName);
+      }
     } else {
-      _openNarrative(group.master);
+      _openNarrative(info);
     }
   }
 
@@ -569,7 +572,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final groupsAsync = ref.watch(contractGroupListProvider);
 
     // 通过 ListenableBuilder 监听 _selection 的变化自动重绘，
@@ -580,22 +582,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // 全部契约文件数（递归收集所有节点，含所有层级）
         final allFiles =
             groupsAsync.value?.expand((g) => g.allInfos).toList() ?? [];
+        // 全部舞台目录（用于全选合并计数 + 全选传递）。
+        // 舞台内角色不参与全选/计数——全选只勾选「契约文件 + 舞台目录」两类实体，
+        // 与 HomeSelectionController.selectAll 选中范围保持一致。
+        final stages = ref
+            .read(stageListProvider)
+            .value ?? const <StageInfo>[];
+        // 全选总数 = 契约文件 + 舞台目录
+        final totalSelectable = allFiles.length + stages.length;
 
         return Scaffold(
           appBar: _selection.isSelectMode
               ? HomeSelectModeAppBar(
                   selectedCount: _selection.totalSelectedCount,
-                  totalCount: allFiles.length,
+                  totalCount: totalSelectable,
                   onDelete: _selection.totalSelectedCount == 0
                       ? null
                       : _deleteSelected,
                   onCancel: _selection.exitSelectMode,
                   onToggleSelectAll: () {
                     // 全部选中时再点全选 = 取消全选
-                    if (_selection.selectedCount == allFiles.length) {
+                    if (_selection.totalSelectedCount == totalSelectable) {
                       _selection.exitSelectMode();
                     } else {
-                      _selection.selectAll(groupsAsync.value ?? const []);
+                      _selection.selectAll(
+                        groupsAsync.value ?? const [],
+                        stages,
+                      );
                     }
                   },
                 )
@@ -613,204 +626,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   isRestoring: _isRestoring,
                 );
               }
-              return _buildContractList(context, theme, groups);
+              // 已加载契约树：委托 ContractTreeSection 渲染
+              // （契约树 + 舞台聚合 + 最近编辑，交互经回调上抛）
+              return ContractTreeSection(
+                groups: groups,
+                selection: _selection,
+                onMasterTap: _onMasterTap,
+                onMasterMenu: _handleMasterMenu,
+                onChildMenu: (child, action) =>
+                    _handleChildMenu(context, child, action),
+                onChildTap: (child) {
+                  if (_selection.isSelectMode) {
+                    _selection.toggleSelect(child.fileName);
+                  } else {
+                    _openNarrative(child);
+                  }
+                },
+                onChildLongPress: (child) {
+                  if (!_selection.isSelectMode) {
+                    // 长按子节点 → 单独选中（不级联）
+                    _selection.enterSelectMode(child.fileName);
+                  }
+                },
+                onEnterNarrative: _openNarrative,
+                // ---- 舞台回调 ----
+                onStageTap: _openStageNarrative,
+                onStageLongPress: _enterStageSelectMode,
+                onStageToggleSelect: _toggleStageSelect,
+                onStageMenu: _handleStageMenu,
+                onRoleTap: (stagePath, roleName, {restoreSave = false}) =>
+                    _openStageRole(
+                      stagePath,
+                      roleName,
+                      restoreSave: restoreSave,
+                    ),
+                onRoleLongPress: _handleRoleLongPress,
+              );
             },
           ),
         );
       },
-    );
-  }
-
-  // ============================================================
-  // 最近编辑（合并契约 + 舞台）
-  // ============================================================
-
-  /// 合并「单角色契约 + 多角色舞台」两侧最近编辑，返回全局最新入口。
-  ///
-  /// - **契约侧**：所有 [ContractInfo] 中 `lastModified` 最新者 → 进入对应叙事页
-  /// - **舞台侧**：所有舞台目录中 `stageLastModified` 最新者 → 进入舞台叙事页
-  /// - 比较两侧 mtime，取最新者作为首页右上角「最近编辑」胶囊入口
-  ///
-  /// 修复：旧实现仅考虑契约树（.meph 文件的 mtime），完全遗漏了多角色舞台
-  /// （舞台目录内的角色卡 + `.child.meph` 存档同样代表「最近在玩哪个」）。
-  RecentEditEntry? _computeRecentEntry(List<ContractInfo> allContractInfos) {
-    // ---- 契约侧候选 ----
-    ContractInfo? bestContract;
-    for (final info in allContractInfos) {
-      final t = info.lastModified;
-      if (t == null) continue;
-      if (bestContract == null || t.isAfter(bestContract.lastModified!)) {
-        bestContract = info;
-      }
-    }
-
-    // ---- 舞台侧候选（Riverpod 缓存 mtime，避免磁盘 IO 重复） ----
-    final stages = ref.watch(stageListProvider).value ?? const <StageInfo>[];
-    StageInfo? bestStage;
-    DateTime? bestStageTime;
-    for (final stage in stages) {
-      final t = ref.watch(stageLastModifiedProvider(stage.path)).value;
-      if (t == null) continue;
-      if (bestStage == null || t.isAfter(bestStageTime!)) {
-        bestStage = stage;
-        bestStageTime = t;
-      }
-    }
-
-    final contractTime = bestContract?.lastModified;
-
-    // 舞台更新比契约更新更晚（或契约无 mtime）→ 优先展示舞台入口
-    if (bestStage != null &&
-        bestStageTime != null &&
-        (contractTime == null || bestStageTime.isAfter(contractTime))) {
-      final stage = bestStage;
-      return RecentEditEntry(
-        label: stage.name,
-        lastModified: bestStageTime,
-        onTap: () => _openStageNarrative(stage.path),
-      );
-    }
-
-    // 契约侧赢（或两侧均无 mtime）→ 展示契约入口
-    final contract = bestContract;
-    if (contract == null) return null;
-    return RecentEditEntry(
-      label: contract.roleName,
-      lastModified: contract.lastModified,
-      onTap: () => _openNarrative(contract),
-    );
-  }
-
-  // ============================================================
-  // 契约列表（多级命运树）
-  // ============================================================
-
-  Widget _buildContractList(
-    BuildContext context,
-    ThemeData theme,
-    List<ContractGroup> groups,
-  ) {
-    final l10n = AppLocalizations.of(context);
-    // 预先计算每棵契约树的全部节点信息（一次性递归收集），
-    // 避免在 childSelection 构建与 onLongPress 回调中对同一棵树反复递归遍历
-    // （大型层级树场景下减少重复 O(N) 遍历）。
-    final groupInfosCache = <String, List<ContractInfo>>{
-      for (final group in groups) group.master.fileName: group.allInfos,
-    };
-
-    // 「最近编辑」：合并单角色契约 + 多角色舞台两侧候选，取全局最新入口。
-    // 直接从已构建的 groupInfosCache 展开全部 ContractInfo（避免再次调用
-    // `group.allInfos` getter 对同一棵子树重复递归遍历）。
-    final recentEntry = _computeRecentEntry([
-      for (final infos in groupInfosCache.values) ...infos,
-    ]);
-
-    // 垂直列表。深层分支的横向滚动由 [ContractCard] 子节点区按需内嵌
-    // （仅展开的子节点区有深层后代时出现），不在此全局加宽/滚动。
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-      children: [
-        // ---- 品牌展示区（多选模式下隐藏，聚焦操作） ----
-        // 「最近编辑」快捷入口：显示最近修改的契约或舞台，点击直接进入
-        if (!_selection.isSelectMode) HomeBrandHeader(recentEntry: recentEntry),
-
-        // ---- 多角色舞台聚合入口（独立于单角色契约树） ----
-        // 支持：⋮ 菜单（进入/重命名/删除）+ 长按多选 + 批量删除
-        // （舞台分区标题由 StageSection 内部渲染，带计数徽标）
-        StageSection(
-          onStageTap: _openStageNarrative,
-          onStageLongPress: _selection.isSelectMode
-              ? null
-              : _enterStageSelectMode,
-          onStageToggleSelect: _selection.isSelectMode
-              ? _toggleStageSelect
-              : null,
-          onStageMenu: _selection.isSelectMode ? null : _handleStageMenu,
-          isSelectMode: _selection.isSelectMode,
-          isStageSelected: _selection.isStageSelected,
-          expandedStages: _selection.expandedStages,
-          onToggleStageExpanded: _selection.toggleStageExpanded,
-          onRoleTap: _selection.isSelectMode
-              ? null
-              : (stagePath, roleName, {restoreSave = false}) => _openStageRole(
-                  stagePath,
-                  roleName,
-                  restoreSave: restoreSave,
-                ),
-          onRoleMenu: _selection.isSelectMode ? null : _handleStageRoleMenu,
-          onRoleToggleSelect: _selection.isSelectMode
-              ? _toggleStageRoleSelect
-              : null,
-          onRoleLongPress: _selection.isSelectMode
-              ? null
-              : _enterStageRoleSelectMode,
-          isRoleSelected: _selection.isStageRoleSelected,
-        ),
-
-        // ---- 单角色契约分区标题（仅普通模式显示，多选时聚焦操作） ----
-        if (!_selection.isSelectMode)
-          SectionHeader(
-            leadingIcon: Icons.menu_book_outlined,
-            title: l10n.homeContractSectionTitle,
-            count: groups.length,
-          ),
-        const SizedBox(height: 4),
-
-        // ---- 每棵命运树（母版为根，递归渲染子节点） ----
-        for (final group in groups) ...[
-          ContractCard(
-            group: group,
-            childrenExpanded: _selection.expandedGroups.contains(
-              group.master.fileName,
-            ),
-            expandedChildren: _selection.expandedGroups,
-            onToggleNode: _selection.toggleChildrenExpanded,
-            isSelectMode: _selection.isSelectMode,
-            isSelected: _selection.isSelected(group.master.fileName),
-            childSelection: {
-              for (final info
-                  in groupInfosCache[group.master.fileName] ??
-                      const <ContractInfo>[])
-                info.fileName: _selection.isSelected(info.fileName),
-            },
-            onTap: () => _onMasterTap(context, group),
-            onLongPress: () {
-              if (!_selection.isSelectMode) {
-                // 长按节点 → 级联选中其整棵子树
-                // 同时自动展开该子树路径，使被级联选中的节点立即可见
-                final subtreeNames =
-                    (groupInfosCache[group.master.fileName] ??
-                            const <ContractInfo>[])
-                        .map((i) => i.fileName)
-                        .toList();
-                _selection.enterSelectMode(
-                  group.master.fileName,
-                  cascadeNames: subtreeNames,
-                  expandNodes: subtreeNames,
-                );
-              }
-            },
-            onMenu: (action) =>
-                _handleMasterMenu(context, group.master, action),
-            onChildTap: (child) {
-              if (_selection.isSelectMode) {
-                _selection.toggleSelect(child.fileName);
-              } else {
-                _openNarrative(child);
-              }
-            },
-            onChildLongPress: (child) {
-              if (!_selection.isSelectMode) {
-                // 长按子节点 → 单独选中（不级联）
-                _selection.enterSelectMode(child.fileName);
-              }
-            },
-            onChildMenu: (child, action) =>
-                _handleChildMenu(context, child, action),
-          ),
-          const SizedBox(height: 12),
-        ],
-      ],
     );
   }
 }
