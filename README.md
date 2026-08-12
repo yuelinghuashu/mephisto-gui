@@ -207,7 +207,7 @@ flutter test
 
 - **iOS ATS 明文 HTTP**：已添加 `NSAllowsLocalNetworking` 放行本地 Ollama（未真机验证）
 - **macOS 窗口居中**：Swift 实现已就绪，未在真机验证
-- **Android 正式签名**：配置 `key.properties` 后同一密钥可直接覆盖安装
+- **Android 正式签名**：本地配置 `android/key.properties` 后同一密钥可直接覆盖安装；GitHub Actions 发布时从仓库 Secrets（`ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`）还原同一正式密钥，保证 CI 产物与本地 release 签名一致
 - **卸载前备份**：卸载会清除全部契约与存档，建议先使用首页「导出（ZIP）」备份
 
 > 提交 Issue 时请注明平台/系统版本/复现步骤/是否使用 Ollama。

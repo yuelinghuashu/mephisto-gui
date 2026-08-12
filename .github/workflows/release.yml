@@ -64,6 +64,28 @@ jobs:
       # 构建各平台
       # ============================================================
 
+      # Android 正式签名：从 GitHub Secrets 还原密钥库并生成 key.properties，
+      # 使 CI 构建的 APK 与本地 release 使用同一正式密钥，覆盖安装不报签名不一致。
+      # 若 Secrets 未配置（ANDROID_KEYSTORE_BASE64 为空），build.gradle.kts
+      # 会自动回落 debug 签名，构建不中断（仅无法覆盖安装已签名版本）。
+      - name: Configure Android signing
+        if: matrix.artifact == 'mephisto-android'
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/android/app/mephisto.jks"
+            # storeFile 相对路径基于 android/app/ 模块目录解析（build.gradle.kts 中 file() 的基路径）
+            cat > "$GITHUB_WORKSPACE/android/key.properties" << EOF
+            storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+            keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+            keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+            storeFile=./mephisto.jks
+            EOF
+            echo "✅ 正式签名已配置"
+          else
+            echo "⚠️ 未配置 ANDROID_KEYSTORE_BASE64，使用 debug 签名（仅开发/测试分发）"
+          fi
+
       - name: Build Linux
         if: matrix.artifact == 'mephisto-linux'
         run: flutter build linux --release

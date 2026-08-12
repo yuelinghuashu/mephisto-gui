@@ -207,7 +207,7 @@ flutter test
 
 - **iOS ATS plaintext HTTP**: `NSAllowsLocalNetworking` added for local Ollama (not verified on real device)
 - **macOS window centering**: Swift implementation ready, not verified on real device
-- **Android production signing**: configure `key.properties` to enable in-place upgrades with the same keystore
+- **Android production signing**: configure `android/key.properties` locally to enable in-place upgrades with the same keystore; GitHub Actions publishes using the same release key restored from repository Secrets (`ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD` / `ANDROID_KEY_ALIAS` / `ANDROID_KEY_PASSWORD`), ensuring CI artifacts and local releases share a consistent signature
 - **Back up before uninstall**: uninstalling clears all contracts and saves; use the home page "Export (ZIP)" feature first
 
 > When filing an issue, please note platform/OS version/reproduction steps/whether using Ollama.
