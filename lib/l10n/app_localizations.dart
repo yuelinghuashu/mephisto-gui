@@ -917,7 +917,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsRulesDescription.
   ///
   /// In zh, this message translates to:
-  /// **'自定义叙事风格，整体替换默认约束。风格描述越精确，输出越贴合预期（明确写出\"以什么风格/诗体/对白方式\"）。'**
+  /// **'自定义叙事风格，整体替换默认约束。风格描述越精确，输出越贴合预期（明确写出\"以什么风格/诗体/对白方式\"）。\n\n💡 最佳实践：在规则末尾附上一段你期望格式的「正确示例」——LLM 有了可逐字参照的完整范本，格式就不会跑偏（仅描述风格而不给示例，容易让模型自由发挥而偏离格式）。'**
   String get settingsRulesDescription;
 
   /// No description provided for @settingsRulesHint.

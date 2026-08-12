@@ -9,7 +9,7 @@ import 'test_helpers.dart';
 /// 覆盖：
 ///   - 纯文本（无标记）→ 直接渲染 [Text]（无 RichText，兼容无障碍/文本选择）
 ///   - 行内样式：粗体 / 斜体 / 行内代码 / 粗斜体
-///   - 块级样式：三级标题 / 引用块 / 无序列表
+///   - 块级样式：多级标题（`#` ~ `######`）/ 引用块 / 无序列表
 ///   - 多段落拆分（`\n\n` 分隔段间距）
 ///   - 纯文本混合行内标记 → RichText 渲染
 void main() {
@@ -145,6 +145,28 @@ void main() {
   // 块级标记
   // ============================================================
 
+  testWidgets('一级标题：# 标题 → 最大字号标题', (tester) async {
+    await tester.pumpWidget(buildParagraph('# 第一幕'));
+
+    // 标题文本存在且唯一（不含 # 前缀）
+    expect(find.text('第一幕'), findsOneWidget);
+    // 一级标题字号放大约 1.5 倍且加粗
+    final textWidget = tester.widget<Text>(find.text('第一幕'));
+    expect(textWidget.style?.fontWeight, FontWeight.bold);
+    expect(textWidget.style?.fontSize, 14 * 1.5); // 默认 14 → × 1.5
+  });
+
+  testWidgets('二级标题：## 标题 → 居中字号标题', (tester) async {
+    await tester.pumpWidget(buildParagraph('## 第一幕 · 书斋'));
+
+    // 标题文本存在且唯一，## 前缀被剥离
+    expect(find.text('第一幕 · 书斋'), findsOneWidget);
+    // 二级标题字号放大约 1.4 倍且加粗
+    final textWidget = tester.widget<Text>(find.text('第一幕 · 书斋'));
+    expect(textWidget.style?.fontWeight, FontWeight.bold);
+    expect(textWidget.style?.fontSize, 14 * 1.4); // 默认 14 → × 1.4
+  });
+
   testWidgets('三级标题：### 标题 → 加粗放大标题', (tester) async {
     await tester.pumpWidget(buildParagraph('### 命运的转折'));
 
@@ -154,6 +176,17 @@ void main() {
     final textWidget = tester.widget<Text>(find.text('命运的转折'));
     expect(textWidget.style?.fontWeight, FontWeight.bold);
     expect(textWidget.style?.fontSize, 14 * 1.3); // 默认 14 → × 1.3
+  });
+
+  testWidgets('四级标题：#### 标题 → 较小字号标题', (tester) async {
+    await tester.pumpWidget(buildParagraph('#### 细节设定'));
+
+    // 标题文本存在且唯一
+    expect(find.text('细节设定'), findsOneWidget);
+    // 四级及以下标题字号统一放大约 1.2 倍且加粗
+    final textWidget = tester.widget<Text>(find.text('细节设定'));
+    expect(textWidget.style?.fontWeight, FontWeight.bold);
+    expect(textWidget.style?.fontSize, 14 * 1.2); // 默认 14 → × 1.2
   });
 
   testWidgets('引用块：> 引用 → 引用文本可被渲染', (tester) async {

@@ -481,7 +481,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsRulesDescription =>
-      'Customize the narrative style, fully replacing the default constraints. The more precise the style description, the closer the output matches expectations (explicitly state the style/poetic form/dialogue approach).';
+      'Customize the narrative style, fully replacing the default constraints. The more precise the style description, the closer the output matches expectations (explicitly state the style/poetic form/dialogue approach).\n\n💡 Best practice: end your rules with a 「correct example」 in the format you expect—once the LLM has a complete, word-for-word reference, the format won\'t drift (describing style without an example can let the model improvise and deviate).';
 
   @override
   String get settingsRulesHint => 'Enter narrative rules...';

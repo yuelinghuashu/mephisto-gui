@@ -1,0 +1,12 @@
+ README.en.md                              |  10 [32m+++++++[m
+ README.md                                 |  10 [32m+++++++[m
+ lib/l10n/app_en.arb                       |   2 [32m+[m[31m-[m
+ lib/l10n/app_localizations.dart           |   2 [32m+[m[31m-[m
+ lib/l10n/app_localizations_en.dart        |   2 [32m+[m[31m-[m
+ lib/l10n/app_localizations_zh.dart        |   2 [32m+[m[31m-[m
+ lib/l10n/app_zh.arb                       |   2 [32m+[m[31m-[m
+ lib/widgets/narrative/paragraph_text.dart |  22 [32m++++++++++[m[31m----[m
+ pubspec.lock                              | 248 [32m++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++[m[31m------------------------------------------------------------------------------[m
+ pubspec.yaml                              |   4 [32m++[m[31m-[m
+ test/widgets/paragraph_text_test.dart     |  35 [32m+++++++++++++++++++++[m[31m-[m
+ 11 files changed, 202 insertions(+), 137 deletions(-)

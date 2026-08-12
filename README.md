@@ -50,6 +50,16 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 - **多角色舞台**：契约目录下的一层子目录 = 舞台，多位角色可同场互动、独立存档
 - **跨平台**：Windows / macOS / Linux / Android / iOS，内置契约含浮士德、基督山伯爵、贞德、少年亚瑟、吉尔伽美什；另有俱卢之野、卡美洛之陨两个多角色舞台
 
+## ✨ 界面预览
+
+<p align="center">
+  <img src="assets/screenshots/home.png" width="280" alt="首页 - 契约列表" />
+  <img src="assets/screenshots/narrative.png" width="280" alt="叙事 - 命运指引与 AI 回复" />
+  <img src="assets/screenshots/settings.png" width="280" alt="设置 - LLM 配置" />
+  <br/>
+  <sub>📜 首页契约列表 &nbsp;·&nbsp; 📖 叙事对话 &nbsp;·&nbsp; ⚙️ LLM 配置</sub>
+</p>
+
 ## 📥 下载正式版
 
 已打包好的多平台安装程序（Windows / Linux / Android / macOS / iOS）可在

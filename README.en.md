@@ -50,6 +50,16 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
 - **Multi-Character Stage**: A subdirectory under the contracts folder = a stage, where multiple characters interact and save independently
 - **Cross-Platform**: Windows / macOS / Linux / Android / iOS, with built-in contracts including Faust, Edmond Dantès, Joan of Arc, Young Arthur, and Gilgamesh; plus two multi-character stages: Kurukshetra and Camlann
 
+## ✨ Screenshots
+
+<p align="center">
+  <img src="assets/screenshots/home.png" width="280" alt="Home - Contract List" />
+  <img src="assets/screenshots/narrative.png" width="280" alt="Narrative - Fate Guidance & AI Reply" />
+  <img src="assets/screenshots/settings.png" width="280" alt="Settings - LLM Configuration" />
+  <br/>
+  <sub>📜 Contract List &nbsp;·&nbsp; 📖 Narrative Dialogue &nbsp;·&nbsp; ⚙️ LLM Configuration</sub>
+</p>
+
 ## 📥 Download Releases
 
 Pre-built multi-platform installers (Windows / Linux / Android / macOS / iOS) are available

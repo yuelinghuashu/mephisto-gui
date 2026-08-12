@@ -46,6 +46,8 @@ flutter:
     - assets/contracts/Camlann/
     # 品牌图标 / Logo
     - assets/images/
+    # README 界面预览截图
+    - assets/screenshots/
   fonts:
     - family: NotoSerifSc
       fonts:

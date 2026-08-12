@@ -5,7 +5,7 @@ import '../../app/theme.dart';
 /// 轻量 Markdown 段落渲染器
 ///
 /// 支持语法（自研，保持轻量不引入外部依赖）：
-///   - `### 标题`：三级标题（行首 `### ` 前缀）
+///   - 标题：`# ` ~ `###### `（1~6 级，按级别放大字号）
 ///   - `> 引用`：引用块（行首 `> ` 前缀，支持连续引用行）
 ///   - `- 列表` / `* 列表`：无序列表（行首 `- `/`* ` 前缀）
 ///   - `**粗体**`：行内粗体
@@ -65,12 +65,22 @@ class ParagraphText extends StatelessWidget {
 
     final firstLine = nonEmptyLines.first.trim();
 
-    // ---- 三级标题：`### 标题` ----
-    // 标题行的字体大小 × 1.3，不随正文换行
-    if (firstLine.startsWith('### ')) {
-      final titleText = firstLine.substring(4).trim();
+    // ---- 标题：`# ` ~ `###### `（1~6 级） ----
+    // 标题行的字体大小按级别放大，不随正文换行。
+    // 三级标题（×1.3）与旧版行为完全一致，保持向后兼容。
+    final headingMatch = RegExp(r'^(#{1,6})\s+(.+)$').firstMatch(firstLine);
+    if (headingMatch != null) {
+      final level = headingMatch.group(1)!.length;
+      final titleText = headingMatch.group(2)!.trim();
+      // 级别越大字号越小：一级 ×1.5 → 六级 ×1.2
+      final scale = switch (level) {
+        1 => 1.5,
+        2 => 1.4,
+        3 => 1.3,
+        _ => 1.2,
+      };
       final titleStyle = (baseStyle ?? const TextStyle()).copyWith(
-        fontSize: (baseStyle?.fontSize ?? 14) * 1.3,
+        fontSize: (baseStyle?.fontSize ?? 14) * scale,
         fontWeight: FontWeight.bold,
         height: 1.3,
       );
