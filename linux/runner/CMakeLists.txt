@@ -26,7 +26,12 @@ target_link_libraries(${BINARY_NAME} PRIVATE PkgConfig::GTK)
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Install the .desktop file and icon for desktop environment integration.
-install(FILES "mephisto.desktop"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications")
-install(FILES "mephisto.png"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/256x256/apps")
+# 仅当安装前缀指向构建输出 bundle 目录时才安装（本地开发/打包）。
+# CI 环境（如 GitHub Actions）没有 /usr/local 写入权限，且 .deb 打包流程已
+# 手动生成系统级 .desktop 与图标，此处跳过以避免 Permission denied。
+if(CMAKE_INSTALL_PREFIX MATCHES "bundle$")
+  install(FILES "mephisto.desktop"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/share/applications")
+  install(FILES "mephisto.png"
+    DESTINATION "${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/256x256/apps")
+endif()
