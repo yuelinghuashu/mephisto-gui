@@ -18,10 +18,8 @@ import '../services/storage/meph_file_name.dart' as meph_file_name;
 import '../services/stream_throttle.dart';
 import 'contract_provider.dart';
 import 'generation_coordinator.dart';
+import 'generation_settings_provider.dart';
 import 'llm_settings_provider.dart';
-import 'narrative_memory_provider.dart';
-import 'narrative_rule_provider.dart';
-import 'narrative_window_provider.dart';
 
 // ============================================================
 // 叙事状态管理器（Notifier）
@@ -140,16 +138,8 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   Future<void> _generateCore(String userInput) async {
     // 复用全局 [NarrativeTurnService] 单例（轻量无状态，共享 HTTP 连接池）
     final service = ref.read(narrativeTurnServiceProvider);
-    // 每次发消息都强制 refresh（重新读 SharedPreferences），
-    // 确保改 key 后不重启也能立即用新配置；llmConfigProvider 是 autoDispose
-    final config = await ref.refresh(llmConfigProvider.future);
-    final narrativeRules = ref.read(narrativeRuleProvider);
-    // 上下文窗口：保留最近 N 条历史消息（用户可在设置页调整；null = 全部发送）
-    final maxHistoryMessages = ref
-        .read(narrativeWindowProvider)
-        .maxHistoryMessages;
-    // 记忆注入灌窗：每轮最多带入 N 条记忆（用户可在设置页调整；null = 全部注入）
-    final maxMemories = ref.read(narrativeMemoryLimitProvider).maxMemories;
+    // 统一读取生成所需配置（配置变更后 force refresh 确保拿到最新值）
+    final settings = await ref.refresh(generationSettingsProvider.future);
 
     final result = await service.generate(
       userInput: userInput,
@@ -163,17 +153,17 @@ class NarrativeNotifier extends Notifier<NarrativeState>
           ? state.messages.take(state.messages.length - 1).toList()
           : const [],
       attachedContexts: state.attachedContexts,
-      narrativeRules: narrativeRules,
-      config: config,
+      narrativeRules: settings.narrativeRules,
+      config: settings.llmConfig,
       onChunk: _appendStreamChunk,
       // 当前生成任务的取消信号（停止生成时触发）
       cancelSignal: generationCancelSignal,
       // 上下文窗口上限（保留最近 N 条历史消息，控制 token 消耗）
-      maxHistoryMessages: maxHistoryMessages,
+      maxHistoryMessages: settings.maxHistoryMessages,
       // 记忆注入灌窗：每轮最多带入 N 条记忆（用户可配置；null = 全部注入），
       // 超过时高权重（≥4）全部保留 + 其余按权重降序补足，
       // 防止超长记忆列表无条件灌入导致 token 膨胀
-      maxMemories: maxMemories,
+      maxMemories: settings.maxMemories,
     );
 
     // 流式输出结束：先 flush 缓冲中的剩余 chunk，再聚合提交
@@ -197,7 +187,12 @@ class NarrativeNotifier extends Notifier<NarrativeState>
     // 生成本轮的完成（避免 `_isGeneratingInFlight` 长时间占位导致用户无法发下一条）。
     // 提取成功更新 state.memories 后，下次自动保存自然包含新记忆。
     await _autoSaveChild();
-    unawaited(_maybeExtractMemories(config: config));
+    unawaited(
+      _maybeExtractMemories(
+        config: settings.llmConfig,
+        auxConfig: settings.auxLlmConfig,
+      ),
+    );
   }
 
   /// 生成回复的全局兜底包装：任何未预期异常都重置生成状态，避免卡死。
@@ -351,7 +346,10 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   /// 应用即丢失。这里的二次保存确保新记忆立即持久化。文件监听 mtime 抑制
   /// 已避免自触发死循环；保存失败时 [_performSave] 内部设置 `lastError` 由
   /// UI 提示（数据安全值得告知）。
-  Future<void> _maybeExtractMemories({LlmConfig? config}) async {
+  Future<void> _maybeExtractMemories({
+    LlmConfig? config,
+    LlmAuxConfig? auxConfig,
+  }) async {
     // 提取时快照 history 长度，用于检测提取期间是否发生了新对话
     final historyLengthAtStart = state.history.length;
 
@@ -369,6 +367,7 @@ class NarrativeNotifier extends Notifier<NarrativeState>
         historyLengthAtStart: historyLengthAtStart,
       ),
       config: config,
+      auxConfig: auxConfig,
     );
     if (updated == null) return;
 
@@ -388,6 +387,35 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   /// 且旧实现仅取母版根，多级分支下无法正确定位存档）。
   static String defaultChildFileName(String masterFileName) =>
       meph_file_name.defaultChildFileName(masterFileName);
+
+  /// 重新生成指定 assistant 回复。
+  ///
+  /// 流程：删除该回复 + 其前一条命运指引（`cascadeFate: true`）
+  /// → 再以同一条指引内容重新发送，触发新一轮生成。
+  Future<void> regenerateMessage(int index) async {
+    if (state.isGenerating) return;
+    if (index < 0 || index >= state.messages.length) return;
+    final message = state.messages[index];
+    if (message.role != MessageRole.assistant) return;
+
+    // 找到其前一条 fate 指引的内容（用于重新发送）
+    String? fateContent;
+    for (var i = index - 1; i >= 0; i--) {
+      if (state.messages[i].role == MessageRole.fate) {
+        fateContent = state.messages[i].content;
+        break;
+      }
+    }
+    if (fateContent == null) return;
+
+    // 删除回复 + 指引（级联）
+    _dispatch(MessageDeleted(index, cascadeFate: true));
+    // 删除后更新当前状态引用（_dispatch 已更新 state）
+    await _autoSaveChild();
+
+    // 重新发送同一条命运指引
+    sendMessage(fateContent);
+  }
 
   /// 附加上下文（会话级，支持多选追加）。
   void attachContext(String fileName, String content) {

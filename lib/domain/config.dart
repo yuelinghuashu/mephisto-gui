@@ -1,6 +1,6 @@
 /// Mephisto 叙事引擎 - 配置模型
 ///
-/// 包含骰子结果 [DiceResult] 和 LLM 配置 [LlmConfig]。
+/// 包含骰子结果 [DiceResult]、主 LLM 配置 [LlmConfig] 和辅助任务配置 [LlmAuxConfig]。
 /// 这些类型管理引擎的运行时行为和用户偏好。
 library;
 
@@ -210,5 +210,81 @@ class LlmConfig extends Equatable {
     maxTokens,
     timeoutSeconds,
     maxRetries,
+  ];
+}
+
+// ============================================================
+// 辅助任务 LLM 配置
+// ============================================================
+
+/// 辅助任务 LLM 配置（多模型路由）
+///
+/// 用于将「记忆提取 / 压缩」等后台辅助任务分流到独立模型，
+/// 使主叙事可使用更强（更贵）的模型，辅助任务使用轻量（更便宜）的模型，
+/// 在保证叙事质量的同时降低长对话的使用成本。
+///
+/// 设计要点：
+///   - [enabled] 为 `false`（默认值）时**不启用独立辅助模型**——
+///     所有任务继续共用主配置 [LlmConfig]，老用户零感知
+///   - `apiKey` 允许留空——调用 [resolve] 时会自动继承主配置的 API Key
+///   - `baseUrl` 为空时继承主配置的 Base URL
+///   - 辅助任务仍使用主配置的 `backend` / `maxRetries`
+@immutable
+class LlmAuxConfig extends Equatable {
+  /// 是否启用独立辅助模型（false = 所有任务共用主配置）
+  final bool enabled;
+
+  /// 辅助模型名称（为空时继承主配置模型）
+  final String model;
+
+  /// 辅助模型 Base URL（为空时继承主配置 Base URL）
+  final String baseUrl;
+
+  /// 辅助模型 API Key（为空时继承主配置 API Key）
+  final String apiKey;
+
+  /// 辅助模型最大生成 Token 数
+  final int maxTokens;
+
+  /// 辅助模型请求超时秒数
+  final int timeoutSeconds;
+
+  /// 构造函数
+  const LlmAuxConfig({
+    this.enabled = false,
+    this.model = '',
+    this.baseUrl = '',
+    this.apiKey = '',
+    this.maxTokens = 4096,
+    this.timeoutSeconds = LlmConfig.defaultTimeoutSeconds,
+  });
+
+  /// 依据主配置解析最终生效的辅助 [LlmConfig]。
+  ///
+  /// 继承规则：
+  ///   - model 为空 → 用主配置的 model
+  ///   - baseUrl 为空 → 用主配置的 baseUrl
+  ///   - apiKey 为空 → 用主配置的 apiKey
+  ///   - backend / maxRetries 始终继承主配置
+  LlmConfig resolve(LlmConfig main) {
+    return LlmConfig(
+      backend: main.backend,
+      model: model.isEmpty ? main.model : model,
+      apiKey: apiKey.isEmpty ? main.apiKey : apiKey,
+      baseUrl: baseUrl.isEmpty ? main.baseUrl : baseUrl,
+      maxTokens: maxTokens,
+      timeoutSeconds: timeoutSeconds,
+      maxRetries: main.maxRetries,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    enabled,
+    model,
+    baseUrl,
+    apiKey,
+    maxTokens,
+    timeoutSeconds,
   ];
 }

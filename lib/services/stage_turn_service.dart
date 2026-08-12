@@ -22,6 +22,7 @@ import '../domain/models.dart';
 import 'engine/local_reply.dart';
 import 'engine/rule_engine.dart';
 import 'llm/client.dart';
+import 'llm/llm_invoker.dart';
 import 'parser/stage_section_parser.dart';
 import 'prompt/stage_system_prompt.dart';
 import 'storage/stage_repo.dart';
@@ -154,34 +155,17 @@ class StageTurnService {
     );
 
     // 3. 单次调用 LLM（流式）；空响应或异常时回退本地多角色回复
-    final llmClient =
-        _clientFactory?.call(config) ??
-        LlmClient(
-          apiKey: config.apiKey,
-          baseUrl: config.baseUrl,
-          model: config.model,
-          maxTokens: config.maxTokens,
-          client: client,
-        );
-
-    var reply = '';
-    var lastError = '';
-    try {
-      final streamed = await llmClient.generateStream(
-        messages: messages,
-        onChunk: onChunk,
-        cancelSignal: cancelSignal,
-        timeout: Duration(seconds: config.timeoutSeconds),
-        maxRetries: config.maxRetries,
-      );
-      reply = streamed.trim().isEmpty
-          ? _buildLocalStageReply(userInput, stage)
-          : streamed;
-    } catch (e) {
-      debugPrint('舞台 LLM 调用失败，回退到本地回复: $e');
-      reply = _buildLocalStageReply(userInput, stage);
-      lastError = 'LLM 调用失败: $e';
-    }
+    final invoker = LlmInvoker(
+      clientFactory: _clientFactory,
+      client: client,
+    );
+    final (reply, lastError) = await invoker.generate(
+      messages: messages,
+      config: config,
+      onChunk: onChunk,
+      cancelSignal: cancelSignal,
+      fallback: () async => _buildLocalStageReply(userInput, stage),
+    );
 
     // 4. 解析：优先旧分节格式（`【角色名】`，每位角色各归其段）；
     //    仅当 LLM 输出不分节（v2 全景叙事小说）时，回退「提及归属」——
@@ -201,8 +185,49 @@ class StageTurnService {
     // 注意：parseStageSections 返回的 map 可能为 const 空 map，不能原地修改，
     // 因此始终构建新 map。
     final replies = Map<String, String>.from(sections.sections);
-    // 极端情况（既无提及也无分节，overflow 非空）→ 归入首个角色，保证可见
+    // 极端情况（既无提及也无分节，overflow 非空）→ 降级处理
     if (replies.isEmpty && sections.overflow.isNotEmpty) {
+      // 最小长度阈值（30 字符）：过短的 overflow（如"好的"、"……"）大概率是
+      // LLM 前言/停顿，触发逐角色调用不划算；直接归入首角色即可。
+      const minFallbackLength = 30;
+      if (sections.overflow.length > minFallbackLength) {
+        // 长文本降级路径：LLM 输出既无法分节也无法按提及归属时，
+        // 为每个角色分别调用一次单角色生成管线（角色上下文隔离），
+        // 将 N 次结果拼接为分节格式——保证每位角色都有独立回应。
+        // 仅在罕见情况下触发（LLM 输出完全无格式/无角色名），
+        // 不增加正常路径的 LLM 调用成本。
+        debugPrint(
+          '⚠️ 舞台 LLM 输出无法分节/提及归属，降级为逐角色独立生成。'
+          'overflow 长度: ${sections.overflow.length}',
+        );
+        final perRoleReplies = await _generatePerRoleFallback(
+          userInput: userInput,
+          stage: stage,
+          roleStates: newStates,
+          roleMemories: roleMemories,
+          historyMessages: effectiveHistory,
+          attachedContexts: attachedContexts,
+          narrativeRules: narrativeRules,
+          config: config,
+          maxMemories: maxMemories,
+        );
+        if (perRoleReplies.isNotEmpty) {
+          return StageTurnResult(
+            replies: perRoleReplies,
+            newStates: newStates,
+            injectedMemories: injectedMemories,
+            overflow: '',
+            rollInfo: allDiceResults.isEmpty
+                ? ''
+                : allDiceResults.map((d) => d.displayString).join('\n'),
+            diceResults: allDiceResults,
+            lastError: lastError.isEmpty
+                ? '已降级为逐角色独立生成'
+                : '$lastError；已降级为逐角色独立生成',
+          );
+        }
+      }
+      // 短文本或逐角色降级也失败（如 LLM 又异常）→ 兜底归入首个角色
       replies[stage.characters.first.roleName] = sections.overflow;
     }
 
@@ -217,6 +242,74 @@ class StageTurnService {
       diceResults: allDiceResults,
       lastError: lastError,
     );
+  }
+
+  /// 降级路径：为舞台中每位角色逐次调用单角色生成管线。
+  ///
+  /// 当 LLM 输出完全无法分节/提及归属时（罕见），逐个角色独立调用
+  /// 一次 LLM（角色上下文隔离），把结果拼接为 `【角色名】\n正文` 分节
+  /// 格式，保证每一位角色都有独立回应而非全部丢失。
+  ///
+  /// 注意：每次调用都会消耗一次 LLM 往返，仅作为极端情况兜底。
+  Future<Map<String, String>> _generatePerRoleFallback({
+    required String userInput,
+    required StageLoaded stage,
+    required Map<String, Map<String, StateValue>> roleStates,
+    required Map<String, List<Memory>> roleMemories,
+    required List<Message> historyMessages,
+    required List<String> attachedContexts,
+    required String narrativeRules,
+    required LlmConfig config,
+    int? maxMemories,
+  }) async {
+    final invoker = LlmInvoker(
+      clientFactory: _clientFactory,
+      client: client,
+    );
+
+    // 逐角色独立生成（可并发执行缩短总等待）
+    final replies = await Future.wait(
+      stage.characters.map((character) async {
+        final roleName = character.roleName;
+        final currentState =
+            roleStates[roleName] ?? const <String, StateValue>{};
+        // 使用单角色提示词构建（复用 NarrativeTurnService 的管线）
+        final messages = _buildLlmMessages(
+          userInput: userInput,
+          stage: StageLoaded(
+            info: stage.info,
+            characters: [character],
+          ),
+          roleStates: {roleName: currentState},
+          roleMemories: {
+            roleName: roleMemories[roleName] ?? const <Memory>[],
+          },
+          historyMessages: historyMessages,
+          attachedContexts: attachedContexts,
+          narrativeRules: narrativeRules,
+          maxMemories: maxMemories,
+        );
+        final (reply, _) = await invoker.generate(
+          messages: messages,
+          config: config,
+          onChunk: (_) {}, // 降级路径不流式输出（避免 UI 混乱）
+          fallback: () async =>
+              '【$roleName】\n${localReply(userInput, contract: character.contract)}',
+        );
+        return (roleName, reply.trim());
+      }),
+    );
+
+    final result = <String, String>{};
+    for (final (roleName, reply) in replies) {
+      if (reply.isNotEmpty) {
+        // 以分节格式写入，使前端按标准流程渲染
+        result[roleName] = reply.startsWith('【$roleName】')
+            ? reply
+            : '【$roleName】\n$reply';
+      }
+    }
+    return result;
   }
 
   /// 构建 LLM 消息列表（多角色系统提示词 + 历史 + 当前输入）。

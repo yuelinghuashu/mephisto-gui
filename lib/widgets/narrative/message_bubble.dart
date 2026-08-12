@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
 import '../../domain/models.dart';
@@ -11,6 +13,10 @@ import 'paragraph_text.dart';
 ///   - 系统消息：居中金色标签样式
 ///   - 命运消息（用户）：右对齐金色气泡
 ///   - 角色消息（AI）：左对齐卡片色气泡（支持流式输出光标）
+///
+/// 长按（桌面端右键）角色/命运消息弹出操作菜单：
+///   - 复制：复制消息内容
+///   - 重新生成：删除该回复 + 其前一条命运指引，再以同一条指引重新发送
 class MessageBubble extends StatelessWidget {
   /// 消息数据
   final Message message;
@@ -18,10 +24,14 @@ class MessageBubble extends StatelessWidget {
   /// 是否为流式输出中的消息
   final bool isStreaming;
 
+  /// 重新生成回调（仅角色消息且非流式输出时可用）
+  final VoidCallback? onRegenerate;
+
   const MessageBubble({
     super.key,
     required this.message,
     this.isStreaming = false,
+    this.onRegenerate,
   });
 
   @override
@@ -30,7 +40,7 @@ class MessageBubble extends StatelessWidget {
     final isFate = message.role == MessageRole.fate;
     final isSystem = message.role == MessageRole.system;
 
-    // ---- 系统消息：特殊样式 ----
+    // ---- 系统消息：特殊样式（不支持长按菜单） ----
     if (isSystem) {
       // 骰子判定结果：渲染「命运结算」卡片
       final diceResults = message.diceResults;
@@ -67,18 +77,21 @@ class MessageBubble extends StatelessWidget {
 
     // ---- 命运消息（用户）：右对齐金色气泡 ----
     if (isFate) {
-      return _MessageContainer(
-        alignment: Alignment.centerRight,
-        color: AppTheme.gold.withValues(alpha: 0.15),
-        child: ParagraphText(
-          message.content,
-          style: theme.textTheme.bodyMedium,
+      return _withMessageMenu(
+        context,
+        _MessageContainer(
+          alignment: Alignment.centerRight,
+          color: AppTheme.gold.withValues(alpha: 0.15),
+          child: ParagraphText(
+            message.content,
+            style: theme.textTheme.bodyMedium,
+          ),
         ),
       );
     }
 
     // ---- 角色消息（AI）：左对齐卡片色气泡 ----
-    return _MessageContainer(
+    final assistantBubble = _MessageContainer(
       alignment: Alignment.centerLeft,
       color: theme.cardColor.withValues(alpha: 0.3),
       child: Column(
@@ -96,6 +109,88 @@ class MessageBubble extends StatelessWidget {
         ],
       ),
     );
+
+    // 流式输出中不弹出操作菜单（内容仍在变化）
+    if (isStreaming) return assistantBubble;
+    return _withMessageMenu(context, assistantBubble);
+  }
+
+  /// 包裹消息气泡并附加长按/右键操作菜单。
+  ///
+  /// 菜单项根据消息角色动态生成：
+  ///   - 复制：所有非系统消息
+  ///   - 重新生成：仅角色消息（assistant）
+  Widget _withMessageMenu(BuildContext context, Widget child) {
+    final l10n = AppLocalizations.of(context);
+    final items = <PopupMenuEntry<String>>[
+      PopupMenuItem(
+        value: 'copy',
+        child: ListTile(
+          leading: const Icon(Icons.copy, size: 20),
+          title: Text(l10n.messageMenuCopy),
+          dense: true,
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
+      // 重新生成：仅角色消息（assistant）可用
+      if (message.role == MessageRole.assistant && onRegenerate != null) ...[
+        const PopupMenuDivider(),
+        PopupMenuItem(
+          value: 'regenerate',
+          child: ListTile(
+            leading: const Icon(Icons.refresh, size: 20),
+            title: Text(l10n.messageMenuRegenerate),
+            dense: true,
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ],
+    ];
+
+    return GestureDetector(
+      // 桌面端右键亦触发菜单
+      onSecondaryTapDown: (details) =>
+          _showMenu(context, items, details.globalPosition),
+      onLongPress: () => _showMenu(context, items),
+      child: child,
+    );
+  }
+
+  /// 弹出操作菜单（优先使用触发位置，否则居中显示）。
+  void _showMenu(
+    BuildContext context,
+    List<PopupMenuEntry<String>> items,
+    [Offset? position,
+  ]) async {
+    if (items.isEmpty) return;
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        position?.dx ?? 0,
+        position?.dy ?? 0,
+        position?.dx ?? 0,
+        position?.dy ?? 0,
+      ),
+      items: items,
+    );
+
+    if (result == null) return;
+
+    switch (result) {
+      case 'copy':
+        await Clipboard.setData(ClipboardData(text: message.content));
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(content: Text(AppLocalizations.of(context).messageMenuCopied)),
+            );
+        }
+        break;
+      case 'regenerate':
+        onRegenerate?.call();
+        break;
+    }
   }
 }
 

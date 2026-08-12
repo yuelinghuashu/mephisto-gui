@@ -111,6 +111,7 @@ Mephisto（梅菲斯特）是一个基于「命运指引」的 AI 叙事引擎�
 | [规则引擎详解](docs/rule-engine.md)      | 条件、动作、骰子（1d2 / 1d100）、互斥组 |
 | [记忆系统](docs/memory-system.md)        | 记忆提取、去重、压缩                    |
 | [存档系统](docs/save-system.md)          | 母版只读、子版快照、分支                |
+| [舞台系统](docs/stage-system.md)         | 多角色舞台的目录约定、创建与叙事机制    |
 | [平台存储策略](docs/platform-storage.md) | 各平台契约目录与沙盒限制                |
 
 ## 🔥 规则热重载

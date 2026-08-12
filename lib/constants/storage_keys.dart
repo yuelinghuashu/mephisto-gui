@@ -52,3 +52,14 @@ const String llmMaxTokensKey = 'llm_max_tokens';
 const String llmBackendKey = 'llm_backend';
 const String llmTimeoutSecondsKey = 'llm_timeout_seconds';
 const String llmMaxRetriesKey = 'llm_max_retries';
+
+// ============================================================
+// 辅助任务模型配置键（`llm_settings_provider.dart`）
+// ============================================================
+
+const String llmAuxEnabledKey = 'llm_aux_enabled';
+const String llmAuxModelKey = 'llm_aux_model';
+const String llmAuxBaseUrlKey = 'llm_aux_base_url';
+const String llmAuxMaxTokensKey = 'llm_aux_max_tokens';
+const String llmAuxTimeoutSecondsKey = 'llm_aux_timeout_seconds';
+const String llmAuxApiKeyKey = 'llm_aux_api_key';

@@ -141,3 +141,5 @@
 | `lib/services/engine/executor.dart`    | 动作执行             |
 | `lib/services/engine/rule_engine.dart` | 规则引擎主入口       |
 | `lib/services/parser/meph_dsl.dart`    | 规则语法解析与校验   |
+
+> 📖 **如何把规则写得高效、正确、可持续？** 语法参考只回答「怎么写合法」；实践方法论见 **[规则书写指南](rule-writing-guide.md)**——七项检查清单、七大反模式、场景链模式与「规则 vs LLM」分工边界。

@@ -91,14 +91,168 @@ class MemoryManager {
   }
 
   /// 每 N 轮提取记忆；返回更新后的记忆（null 表示未触发）。
+  ///
+  /// [config] 为主配置；[auxConfig] 为辅助任务独立模型配置（可空）。
   Future<List<Memory>?> maybeExtract({
     required List<HistoryEntry> history,
     required List<Memory> memories,
     LlmConfig? config,
+    LlmAuxConfig? auxConfig,
   }) async {
     final round = history.where((h) => h.role == MessageRole.fate).length;
     if (round <= 0 || round % extractInterval != 0) return null;
-    return extract(history: history, memories: memories, config: config);
+    return extract(
+      history: history,
+      memories: memories,
+      config: config,
+      auxConfig: auxConfig,
+    );
+  }
+
+  /// 多角色批量记忆提取。
+  ///
+  /// 输入：角色名 → 该角色的历史与现有记忆。
+  /// 输出：`角色名 → 该角色新提取的记忆列表`（已去重）。
+  ///
+  /// 设计要点：
+  ///   - **单次 LLM 调用**：将所有角色的对话与记忆合并到一个 prompt，
+  ///     让模型一次性为所有角色提取记忆。相较于每个角色独立调用
+  ///     LLM（N 次调用），5 角色舞台可减少 4 次 LLM 往返。
+  ///   - **输出格式**：每行以 `【角色名】` 开头标记归属，后续行为该角色的
+  ///     提取结果（`- [权重] 内容`）。
+  ///   - **去重**：与单角色 [extract] 相同的「按内容精确去重 + 权重升级」逻辑。
+  ///   - **失败回退**：LLM 异常时返回空 map（调用方跳过，静默）。
+  ///
+  /// 参数：
+  ///   - roleHistory: 角色名 → 待提取的历史（提取触发条件由调用方判断）
+  ///   - roleMemories: 角色名 → 该角色现有记忆（去重基底）
+  ///   - config: LLM 配置
+  Future<Map<String, List<Memory>>> extractForRoles({
+    required Map<String, List<HistoryEntry>> roleHistory,
+    required Map<String, List<Memory>> roleMemories,
+    LlmConfig? config,
+    LlmAuxConfig? auxConfig,
+  }) async {
+    if (roleHistory.isEmpty) return const {};
+
+    final effectiveConfig = config ?? const LlmConfig();
+
+    // 组装跨角色 prompt：每位角色的历史与现有记忆并排展示
+    final buffer = StringBuffer();
+    final orderedRoles = roleHistory.keys.toList();
+    for (final roleName in orderedRoles) {
+      final history = roleHistory[roleName]!;
+      final memories = roleMemories[roleName] ?? const <Memory>[];
+
+      final recent = history.length > extractWindow * 2
+          ? history.sublist(history.length - extractWindow * 2)
+          : history;
+      final historyText = recent
+          .map((h) => '${h.role == MessageRole.fate ? '命运' : '角色'}: ${h.content}')
+          .join('\n');
+      final existingText = memories.isEmpty
+          ? '（无）'
+          : memories.map((m) => '- ${m.content}').join('\n');
+
+      buffer.writeln('【$roleName】');
+      buffer.writeln('现有记忆:');
+      buffer.writeln(existingText);
+      buffer.writeln('对话历史 ($roleName):');
+      buffer.writeln(historyText);
+      buffer.writeln();
+    }
+
+    final prompt =
+        '''
+从以下各角色的对话中，为每位角色提取关键事件摘要。
+
+角色列表：${orderedRoles.join('、')}
+
+要求：
+1. 每个角色提取 1-3 条对角色产生重大影响的核心事件
+2. 如果角色的对话历史中没有值得记录的内容，该角色可以输出空（不输出该角色区块）
+3. 每条摘要 20-60 个字
+4. 忽略日常寒暄和无意义对话
+5. 如果事件已经存在于现有记忆中，不要重复提取
+6. 禁止修改角色的核心设定（角色名、锚点内容、状态值等）
+7. 输出格式：每行以「【角色名】」开头标记段落，其下每行一条，以 "- [权重] 内容" 开头
+   - 权重为 1-5 的整数，表示这条记忆对角色塑造的重要性
+   - 如果无法判断权重，使用默认 3
+
+$buffer
+
+请输出新提取的记忆：''';
+
+    try {
+      final lines = await _callLLM(
+        prompt,
+        config: effectiveConfig,
+        auxConfig: auxConfig,
+      );
+      if (lines.isEmpty) return const {};
+
+      // 解析跨角色输出：按「【角色名】」段落切分，每行 `- [权重] 内容`
+      final result = <String, List<Memory>>{};
+      String? currentRole;
+      for (final line in lines) {
+        // 角色段落标题
+        if (line.startsWith('【') && line.endsWith('】')) {
+          final roleName = line.substring(1, line.length - 1).trim();
+          // 只接受已知角色名
+          if (roleHistory.containsKey(roleName)) {
+            currentRole = roleName;
+            result.putIfAbsent(roleName, () => []);
+          } else {
+            currentRole = null; // 未知角色段落 → 忽略
+          }
+          continue;
+        }
+        if (currentRole == null) continue;
+
+        // 解析权重前缀 [N]
+        final match = _weightPrefixPattern.firstMatch(line);
+        if (match == null) {
+          result[currentRole]!.add(Memory(content: line));
+          continue;
+        }
+        final importance =
+            int.tryParse(match[1]!)?.clamp(1, Memory.maxImportance) ??
+            Memory.defaultImportance;
+        result[currentRole]!.add(
+          Memory(content: match[2]!.trim(), importance: importance),
+        );
+      }
+
+      // 去重 + 权重升级（每个角色基于其现有记忆去重）
+      final cleaned = <String, List<Memory>>{};
+      for (final roleName in result.keys) {
+        final parsed = result[roleName]!;
+        if (parsed.isEmpty) continue;
+
+        final existingByContent = <String, int>{
+          for (final m in roleMemories[roleName] ?? const <Memory>[])
+            m.content: m.importance,
+        };
+        final fresh = <Memory>[];
+        for (final m in parsed) {
+          final existingImportance = existingByContent[m.content];
+          if (existingImportance == null) {
+            existingByContent[m.content] = m.importance;
+            fresh.add(m);
+          } else if (m.importance > existingImportance) {
+            existingByContent[m.content] = m.importance;
+            fresh.add(m);
+          }
+        }
+        if (fresh.isNotEmpty) {
+          cleaned[roleName] = fresh;
+        }
+      }
+      return cleaned;
+    } catch (e) {
+      debugPrint('多角色记忆提取失败（静默跳过）: $e');
+      return const {};
+    }
   }
 
   /// 从最近对话提取记忆；返回新记忆列表（已去重/压缩）。
@@ -108,6 +262,7 @@ class MemoryManager {
     required List<HistoryEntry> history,
     required List<Memory> memories,
     LlmConfig? config,
+    LlmAuxConfig? auxConfig,
   }) async {
     if (history.isEmpty) return memories;
 
@@ -151,7 +306,11 @@ $historyText
 请输出新提取的记忆：''';
 
     try {
-      final lines = await _callLLM(prompt, config: effectiveConfig);
+      final lines = await _callLLM(
+        prompt,
+        config: effectiveConfig,
+        auxConfig: auxConfig,
+      );
       if (lines.isEmpty) return memories;
 
       // 解析 LLM 返回的权重前缀（[N] 内容），无前缀时兜底默认权重
@@ -212,7 +371,11 @@ $historyText
 
       // 压缩
       if (updated.length > maxLimit) {
-        updated = await compress(updated, config: effectiveConfig);
+        updated = await compress(
+          updated,
+          config: effectiveConfig,
+          auxConfig: auxConfig,
+        );
       }
       return updated;
     } catch (e) {
@@ -227,6 +390,7 @@ $historyText
   Future<List<Memory>> compress(
     List<Memory> allMemories, {
     LlmConfig? config,
+    LlmAuxConfig? auxConfig,
   }) async {
     if (allMemories.length <= maxLimit) return allMemories;
 
@@ -288,7 +452,11 @@ $compressText
 请输出压缩后的记忆：''';
 
     try {
-      final lines = await _callLLM(prompt, config: effectiveConfig);
+      final lines = await _callLLM(
+        prompt,
+        config: effectiveConfig,
+        auxConfig: auxConfig,
+      );
       if (lines.isEmpty) return allMemories;
       return [...lines.map((c) => Memory(content: c)), ...protectedHigh, ...recentCompressible];
     } catch (e) {
@@ -298,15 +466,23 @@ $compressText
   }
 
   /// 调用 LLM 并解析输出为记忆行列表。
+  ///
+  /// [config] 为主配置；[auxConfig] 非空且启用时使用独立辅助模型
+  ///（通过 [LlmAuxConfig.resolve] 继承主配置缺省字段）。
   Future<List<String>> _callLLM(
     String prompt, {
     required LlmConfig config,
+    LlmAuxConfig? auxConfig,
   }) async {
+    // 多模型路由：启用独立辅助模型时，用其配置覆盖主配置
+    final effective = (auxConfig != null && auxConfig.enabled)
+        ? auxConfig.resolve(config)
+        : config;
     final llmClient = LlmClient(
-      apiKey: config.apiKey,
-      baseUrl: config.baseUrl,
-      model: config.model,
-      maxTokens: config.maxTokens,
+      apiKey: effective.apiKey,
+      baseUrl: effective.baseUrl,
+      model: effective.model,
+      maxTokens: effective.maxTokens,
       client: client,
     );
 

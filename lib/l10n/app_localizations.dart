@@ -662,6 +662,24 @@ abstract class AppLocalizations {
   /// **'梅菲斯特正在执笔...'**
   String get messageBubbleThinking;
 
+  /// No description provided for @messageMenuCopy.
+  ///
+  /// In zh, this message translates to:
+  /// **'复制'**
+  String get messageMenuCopy;
+
+  /// No description provided for @messageMenuRegenerate.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新生成'**
+  String get messageMenuRegenerate;
+
+  /// No description provided for @messageMenuCopied.
+  ///
+  /// In zh, this message translates to:
+  /// **'✦ 已复制到剪贴板'**
+  String get messageMenuCopied;
+
   /// No description provided for @inputBarAttachTooltip.
   ///
   /// In zh, this message translates to:
@@ -1243,6 +1261,78 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'╳ 连接失败: {error}'**
   String settingsTestFail(Object error);
+
+  /// No description provided for @settingsAuxLlmEnabled.
+  ///
+  /// In zh, this message translates to:
+  /// **'使用独立辅助模型'**
+  String get settingsAuxLlmEnabled;
+
+  /// No description provided for @settingsAuxLlmDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'记忆提取/压缩等后台任务使用独立模型，主叙事不受影响。适合用轻量模型降低长对话使用成本。开启后需填写辅助模型参数（可复用主配置的 API Key / Base URL）。'**
+  String get settingsAuxLlmDescription;
+
+  /// No description provided for @settingsAuxModelLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'辅助模型名称'**
+  String get settingsAuxModelLabel;
+
+  /// No description provided for @settingsAuxModelHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'如 deepseek-chat / qwen2.5:7b（留空继承主模型）'**
+  String get settingsAuxModelHint;
+
+  /// No description provided for @settingsAuxBaseUrlLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'辅助模型 Base URL（留空继承主配置）'**
+  String get settingsAuxBaseUrlLabel;
+
+  /// No description provided for @settingsAuxApiKeyLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'辅助模型 API Key（留空继承主配置）'**
+  String get settingsAuxApiKeyLabel;
+
+  /// No description provided for @settingsAuxMaxTokensLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'辅助模型 Max Tokens'**
+  String get settingsAuxMaxTokensLabel;
+
+  /// No description provided for @settingsAuxTimeoutLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'辅助模型超时（秒）'**
+  String get settingsAuxTimeoutLabel;
+
+  /// No description provided for @settingsAuxSaveConfig.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存辅助配置'**
+  String get settingsAuxSaveConfig;
+
+  /// No description provided for @settingsAuxSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'✦ 辅助模型配置已保存'**
+  String get settingsAuxSaved;
+
+  /// No description provided for @settingsAuxReset.
+  ///
+  /// In zh, this message translates to:
+  /// **'⇄ 已清除辅助模型配置（回退共用主配置）'**
+  String get settingsAuxReset;
+
+  /// No description provided for @settingsAuxDivide.
+  ///
+  /// In zh, this message translates to:
+  /// **'辅助任务模型'**
+  String get settingsAuxDivide;
 
   /// No description provided for @contractEditorNewTitle.
   ///

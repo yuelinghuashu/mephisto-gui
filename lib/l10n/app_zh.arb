@@ -101,6 +101,9 @@
   "narrativeEmptyHint": "写下命运的指引，叙事将在契约中生长...",
 
   "messageBubbleThinking": "梅菲斯特正在执笔...",
+  "messageMenuCopy": "复制",
+  "messageMenuRegenerate": "重新生成",
+  "messageMenuCopied": "✦ 已复制到剪贴板",
 
   "inputBarAttachTooltip": "附加上下文（文本，可多选）",
   "inputBarHintGenerating": "梅菲斯特正在编织故事...",
@@ -204,6 +207,18 @@
   "settingsTestNeedBaseUrlModel": "╳ 请先填写 Base URL 和 Model",
   "settingsTestSuccess": "✦ 连接成功，模型可用",
   "settingsTestFail": "╳ 连接失败: {error}",
+  "settingsAuxLlmEnabled": "使用独立辅助模型",
+  "settingsAuxLlmDescription": "记忆提取/压缩等后台任务使用独立模型，主叙事不受影响。适合用轻量模型降低长对话使用成本。开启后需填写辅助模型参数（可复用主配置的 API Key / Base URL）。",
+  "settingsAuxModelLabel": "辅助模型名称",
+  "settingsAuxModelHint": "如 deepseek-chat / qwen2.5:7b（留空继承主模型）",
+  "settingsAuxBaseUrlLabel": "辅助模型 Base URL（留空继承主配置）",
+  "settingsAuxApiKeyLabel": "辅助模型 API Key（留空继承主配置）",
+  "settingsAuxMaxTokensLabel": "辅助模型 Max Tokens",
+  "settingsAuxTimeoutLabel": "辅助模型超时（秒）",
+  "settingsAuxSaveConfig": "保存辅助配置",
+  "settingsAuxSaved": "✦ 辅助模型配置已保存",
+  "settingsAuxReset": "⇄ 已清除辅助模型配置（回退共用主配置）",
+  "settingsAuxDivide": "辅助任务模型",
 
   "contractEditorNewTitle": "✏️ 新建契约",
   "contractEditorEditTitle": "✏️ 编辑契约",

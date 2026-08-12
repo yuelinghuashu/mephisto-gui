@@ -5,48 +5,47 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.4.0] - 首页信息密度优化 · 流式性能提升 · 代码精简
+## [1.4.0] - 多模型路由 · 首页信息密度优化 · 消息操作 · Markdown 渲染 · 流式性能提升
 
 ### ✨ 新特性
 
-- 单角色契约改单行紧凑卡片，树形嵌套 → 角色名 + 「分支 · N」入口 + 文件名
-- 「分支 · N」弹出分支选择器，列出全部子版，点选直达对应叙事
-- 多角色舞台改单行卡片 + 角色芯片，色点 + 角色名 + 💾 存档徽标，点芯片直达
-- 角色级操作收敛，长按角色芯片弹出快捷菜单，替代逐角色 ⋮ 菜单
-- 新增 `RoleChip` 组件，首页角色芯片小组件
-- 首页信息密度提升约 2-3 倍
+- 辅助任务模型（多模型路由）：设置页新增「⚙ 辅助任务模型」分区，可独立配置记忆提取 / 压缩使用的模型，默认关闭（所有任务共用主配置），API Key / Base URL 留空时继承主配置，API Key 安全存储到系统密钥链，主叙事不受影响
+- 消息长按/右键操作菜单：复制 / 重新生成（「重新生成」自动以原指引重新发送）
+- 叙事文本自研轻量 Markdown 渲染：**粗体**、_斜体_、标题、引用、列表、`行内代码`（零外部依赖）
+- 单角色契约改单行紧凑卡片，树形嵌套 → 角色名 + 「分支 · N」入口 + 文件名，分支选择器点选直达
+- 多角色舞台改单行卡片 + 角色芯片，色点 + 角色名 + 💾 存档徽标，点芯片直达，长按芯片弹出快捷菜单
 
 ### 🐛 修复
 
-- 孤儿链深层子版丢失，深层子版在占位根下丢失，通过「中间前缀父子关系」推导修复
-- 超深文件名链栈溢出，递归截断产生无限递归，改为截断后直接返回叶子节点
+- 孤儿链深层子版丢失：通过「中间前缀父子关系」推导修复
+- 超深文件名链栈溢出：递归截断改为直接返回叶子节点
 
 ### 🚀 增强
 
+- 多模型路由：`MemoryManager.extract / compress / extractForRoles` 增加 `auxConfig` 参数，经 `LlmAuxConfig.resolve(mainConfig)` 合并缺省字段，单角色与多角色 Notifier 均已透传，记忆提取 / 压缩自动走独立模型
+- 消息菜单收敛：移除「删除」项（「重新生成」仍通过 `MessageDeleted(cascadeFate: true)` 复用删除式状态迁移）
 - 流式输出 StringBuffer 优化，消除长叙事下 O(n²) 字符串拼接开销
-- 首页「最近编辑」抽成 memoized Provider，仅在数据变化时重算，避免重复 IO
-- 同步文件 IO 改异步，`contract_repo.dart` / `child_save_store.dart` 的 `existsSync()` → `await exists()`
-- RegExp 预编译，`stage_narrative_state.dart` 角色分节匹配正则提取为 `static final`
+- 系统提示词末尾去重：单角色与舞台不再完整重复约束全文，每轮节省约 200-300 token
+- 舞台分节失败自动降级：LLM 输出无法分节/提及归属时，逐角色独立调用生成，保障多角色回复不丢失
+- 首页「最近编辑」抽成 memoized Provider，避免重复 IO；同步文件 IO 改异步；RegExp 预编译
 
 ### 🧹 重构
 
+- 新增 `LlmAuxConfig` 模型类（enabled / model / baseUrl / apiKey / maxTokens / timeoutSeconds），含 `resolve()` 便捷继承方法
+- `GenerationSettings` 聚合新增 `auxLlmConfig` 字段，与主配置统一传给 Notifier
+- 共享 API Key 读取逻辑（`_readApiKey`）抽为可复用方法，主/辅助 Key 统一处理迁移
 - `SessionSaver` 与 `ChildSaveStore` 合并，删除过度封装层，存档逻辑直接并入 `ChildSaveStore`
-- 存储键统一收敛，新增 `constants/storage_keys.dart` 集中管理所有存储键
-- 跨平台路径分隔符统一，改用 `path` 包 `p.basename()`，修复 Windows 混合分隔符解析风险
-- 舞台角色 key 重构，分隔符改为 `\u001F`，防止文件名含 `|` 导致解析错误
-- 契约树构建抽离独立模块，新增 `contract_tree_builder.dart`，纯函数从 `contract_provider.dart` 迁出
-- `Contract` / `StateItem` / `Rule` / `HistoryEntry` 迁移 `@freezed`，消除手写样板约 150 行，自动生成 `copyWith` / `==` / `hashCode`
-- `Message` / `Memory` 保持手写 Equatable，id/timestamp 需排除在等值比较外
-- `build_runner` 重新生成 `entities.freezed.dart` / `contract.freezed.dart`，并支持 `Contract` 嵌套 copyWith 级联
+- 存储键统一收敛，新增 `constants/storage_keys.dart` 集中管理
+- 跨平台路径分隔符统一，改用 `path` 包 `p.basename()`；舞台角色 key 分隔符改为 `\u001F`
+- 契约树构建抽离独立模块 `contract_tree_builder.dart`，纯函数从 `contract_provider.dart` 迁出
+- `Contract` / `StateItem` / `Rule` / `HistoryEntry` 迁移 `@freezed`，消除手写样板约 150 行，支持嵌套 copyWith 级联
 
 ### 🔧 工程化
 
-- 新增 3 条 lint 规则，`prefer_single_quotes` / `unnecessary_brace_in_string_interps` / `avoid_types_on_closure_parameters`
+- 新增 3 条 lint 规则：`prefer_single_quotes` / `unnecessary_brace_in_string_interps` / `avoid_types_on_closure_parameters`
+- 测试新增：辅助配置持久化 round-trip（未设置 null / 保存读取 / 清除回退）、`LlmAuxConfig.resolve` 字段继承与覆盖规则
 - `StateValue` 四子类添加 `toString()`，调试打印显示实际值
-- `pubspec.yaml` assets 分类注释补充
-- `home_screen_test.dart` 重写匹配新 UI，10 用例全部通过
-- `rename_contract_dialog_test.dart` 适配 FakeAsync 真实异步 IO，8 用例全部通过
-- `contract_provider_test.dart` 新增孤儿节点 + 深度守卫边界用例
+- `home_screen_test.dart` 重写匹配新 UI（10 用例）；`rename_contract_dialog_test.dart` 适配真实异步 IO（8 用例）；`contract_provider_test.dart` 新增孤儿节点 + 深度守卫边界用例
 
 <details>
 <summary>## [1.3.0] - 新内置契约 · Android 正式签名 · 多角色舞台 · 界面与代码精简</summary>

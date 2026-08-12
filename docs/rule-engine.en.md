@@ -2,7 +2,7 @@
 
 > The rule engine is the "behavior dispatcher" of Mephisto's contracts: it reads the 【规则】(Rules) section,
 > checks player input and current state in each narrative round, and executes the corresponding action when a condition matches, driving continuous state evolution.
-
+>
 > **中文版：[简体中文](rule-engine.md)**
 
 ## 1. Rule Lifecycle
@@ -143,3 +143,5 @@ Within each phase, rules are evaluated in file appearance order; mutual exclusio
 | `lib/services/engine/executor.dart`    | Action execution                            |
 | `lib/services/engine/rule_engine.dart` | Rule engine main entry                      |
 | `lib/services/parser/meph_dsl.dart`    | Rule syntax parsing and validation          |
+
+> 📖 **How do you write rules that are efficient, correct, and sustainable?** The syntax reference only answers "what is valid"; the practical methodology—seven-question checklist, seven anti-patterns, the scene-chain pattern, and the "Rules vs LLM" boundary—lives in the **[Rule Writing Guide](rule-writing-guide.en.md)**.

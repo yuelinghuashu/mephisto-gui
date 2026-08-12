@@ -5,6 +5,7 @@
 library;
 
 export 'contract_provider.dart';
+export 'generation_settings_provider.dart';
 export 'llm_settings_provider.dart';
 export 'narrative_memory_provider.dart';
 export 'narrative_provider.dart';

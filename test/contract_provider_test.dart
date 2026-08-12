@@ -41,13 +41,14 @@ void main() {
     expect(contract.roleName, '浮士德');
     expect(contract.anchor, hasLength(4));
     expect(contract.state, hasLength(3));
-    expect(contract.rules, hasLength(12));
+    // 纯状态机化后共 8 条规则
+    expect(contract.rules, hasLength(8));
     expect(contract.worldview, isNotEmpty);
     expect(contract.opening, isNotEmpty);
     // 规则带行号
     expect(contract.rules.first.line, greaterThan(0));
-    // 互斥组规则被正确提取
-    expect(contract.rules.last.group, '侵蚀');
+    // 互斥组规则被正确提取（「侵蚀」组含暗影缠身与烛火映心）
+    expect(contract.rules.any((r) => r.group == '侵蚀'), isTrue);
   });
 
   group('contractProvider - 用户目录文件损坏时 assets 兜底', () {
@@ -81,8 +82,8 @@ void main() {
       addTearDown(container.dispose);
 
       final contract = await container.read(contractProvider.future);
-      // assets 内置 dantes.meph：角色名埃德蒙·唐泰斯
-      expect(contract.roleName, '埃德蒙·唐泰斯');
+      // assets 内置 dantes.meph：角色名基督山伯爵
+      expect(contract.roleName, '基督山伯爵');
       expect(contract.opening, isNotEmpty);
       expect(
         container.read(contractFallbackNoticeProvider),

@@ -332,6 +332,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageBubbleThinking => '梅菲斯特正在执笔...';
 
   @override
+  String get messageMenuCopy => '复制';
+
+  @override
+  String get messageMenuRegenerate => '重新生成';
+
+  @override
+  String get messageMenuCopied => '✦ 已复制到剪贴板';
+
+  @override
   String get inputBarAttachTooltip => '附加上下文（文本，可多选）';
 
   @override
@@ -642,6 +651,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String settingsTestFail(Object error) {
     return '╳ 连接失败: $error';
   }
+
+  @override
+  String get settingsAuxLlmEnabled => '使用独立辅助模型';
+
+  @override
+  String get settingsAuxLlmDescription =>
+      '记忆提取/压缩等后台任务使用独立模型，主叙事不受影响。适合用轻量模型降低长对话使用成本。开启后需填写辅助模型参数（可复用主配置的 API Key / Base URL）。';
+
+  @override
+  String get settingsAuxModelLabel => '辅助模型名称';
+
+  @override
+  String get settingsAuxModelHint => '如 deepseek-chat / qwen2.5:7b（留空继承主模型）';
+
+  @override
+  String get settingsAuxBaseUrlLabel => '辅助模型 Base URL（留空继承主配置）';
+
+  @override
+  String get settingsAuxApiKeyLabel => '辅助模型 API Key（留空继承主配置）';
+
+  @override
+  String get settingsAuxMaxTokensLabel => '辅助模型 Max Tokens';
+
+  @override
+  String get settingsAuxTimeoutLabel => '辅助模型超时（秒）';
+
+  @override
+  String get settingsAuxSaveConfig => '保存辅助配置';
+
+  @override
+  String get settingsAuxSaved => '✦ 辅助模型配置已保存';
+
+  @override
+  String get settingsAuxReset => '⇄ 已清除辅助模型配置（回退共用主配置）';
+
+  @override
+  String get settingsAuxDivide => '辅助任务模型';
 
   @override
   String get contractEditorNewTitle => '✏️ 新建契约';

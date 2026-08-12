@@ -24,18 +24,16 @@ import '../domain/stage_models.dart';
 import '../domain/stage_narrative_event.dart';
 import '../domain/stage_narrative_reducer.dart';
 import '../domain/stage_narrative_state.dart';
-import '../services/memory/memory_extraction_service.dart';
+import '../services/memory/memory_manager.dart';
 import '../services/session/child_save_store.dart';
 import '../services/stage_turn_service.dart';
 import '../services/storage/meph_file_name.dart' as meph_file_name;
 import '../services/storage/stage_repo.dart' as stage_repo;
 import '../services/stream_throttle.dart';
 import 'generation_coordinator.dart';
+import 'generation_settings_provider.dart';
 import 'llm_settings_provider.dart';
-import 'narrative_memory_provider.dart';
 import 'narrative_provider.dart';
-import 'narrative_rule_provider.dart';
-import 'narrative_window_provider.dart';
 
 /// 舞台叙事状态管理器
 class StageNarrativeNotifier extends Notifier<StageNarrativeState>
@@ -224,10 +222,8 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   /// 生成舞台回复（委托 [StageTurnService]，结果按角色写回状态）。
   Future<void> _generateCore(String userInput) async {
     final service = ref.read(stageTurnServiceProvider);
-    final config = await ref.refresh(llmConfigProvider.future);
-    final narrativeRules = ref.read(narrativeRuleProvider);
-    final maxHistoryMessages = ref.read(narrativeWindowProvider).maxHistoryMessages;
-    final maxMemories = ref.read(narrativeMemoryLimitProvider).maxMemories;
+    // 统一读取生成所需配置（配置变更后 force refresh 确保拿到最新值）
+    final settings = await ref.refresh(generationSettingsProvider.future);
 
     final stage = state.stage;
     if (stage == null) {
@@ -257,12 +253,12 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
           ? state.messages.take(state.messages.length - 1).toList()
           : const [],
       attachedContexts: state.attachedContexts,
-      narrativeRules: narrativeRules,
-      config: config,
+      narrativeRules: settings.narrativeRules,
+      config: settings.llmConfig,
       onChunk: _appendStreamChunk,
       cancelSignal: generationCancelSignal,
-      maxHistoryMessages: maxHistoryMessages,
-      maxMemories: maxMemories,
+      maxHistoryMessages: settings.maxHistoryMessages,
+      maxMemories: settings.maxMemories,
     );
 
     _flushStreamBuffer();
@@ -283,33 +279,45 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     await _autoSaveStage();
     // 异步记忆提取：各角色历史中命运+其段落均可自动摘记；
     // 用 unawaited 不阻塞下一轮发送（对齐单角色版 `_maybeExtractMemories` 语义）
-    unawaited(_maybeExtractStageMemories(config: config));
+    unawaited(
+      _maybeExtractStageMemories(
+        config: settings.llmConfig,
+        auxConfig: settings.auxLlmConfig,
+      ),
+    );
   }
 
   /// 为每个角色执行记忆提取（对齐单角色版的 [_maybeExtractMemories] 语义）。
   ///
-  /// 各角色独立调用 [MemoryManager.maybeExtract]：使用该角色自己的历史与记忆，
-  /// 提取结果安全合并回该角色（不覆盖提取期间新产生的记忆）。
-  ///
-  /// **并发优化**：各角色的记忆提取互不依赖（各自的历史/记忆/LLM 调用独立），
-  /// 因此使用 [Future.wait] 并发执行，避免 N 个角色串行等待 N 次 LLM 调用
-  /// （5 角色舞台最多可减少约 4 次 LLM 往返的等待时间）。
+  /// **批量提取优化**：所有候选角色合并为**单次 LLM 调用**提取记忆
+  /// （通过 [MemoryManager.extractForRoles]），而非每个角色独立调用
+  /// LLM（N 次调用）——5 角色舞台最多减少 4 次 LLM 往返的等待时间。
   ///
   /// **安全合并**：提取是异步后台任务，期间用户可能继续发消息（新对话产生
-  /// 新记忆/规则注入新记忆）。与单角色版 [_maybeExtractMemories] 相同的取舍：
-  ///   - 提取期间该角色 history 长度未变 → 直接采用提取结果
+  /// 新记忆/规则注入新记忆）。与单角色版相同的取舍：
+  ///   - 提取期间该角色 history 长度未变 → 直接追加提取结果
   ///   - 长度变化（有新对话）→ 以「当前 memories」为基底，仅将新提取结果
   ///     中**当前不存在**的新条目追加到末尾——保证新记忆不被旧结果覆盖
-  Future<void> _maybeExtractStageMemories({LlmConfig? config}) async {
+  ///   - 合并后若超过上限，触发压缩（高权重记忆保护不丢）
+  Future<void> _maybeExtractStageMemories({
+    LlmConfig? config,
+    LlmAuxConfig? auxConfig,
+  }) async {
     final stage = state.stage;
     if (stage == null) return;
     final manager = ref.read(memoryManagerProvider);
-    final extractionService = ref.read(memoryExtractionServiceProvider);
     final effectiveConfig = config ?? const LlmConfig();
 
-    // 只对「有历史」的角色发起记忆提取（无历史角色跳过）
+    // 只对「有历史且到达提取间隔」的角色发起记忆提取
     final candidates = stage.characters
-        .where((c) => state.roles[c.roleName]?.history.isNotEmpty ?? false)
+        .where((c) {
+          final role = state.roles[c.roleName];
+          if (role == null) return false;
+          final round = role.history
+              .where((h) => h.role == MessageRole.fate)
+              .length;
+          return round > 0 && round % MemoryManager.extractInterval == 0;
+        })
         .toList();
     if (candidates.isEmpty) return;
 
@@ -317,38 +325,58 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     final historyLengthsAtStart = <String, int>{
       for (final c in candidates) c.roleName: state.roles[c.roleName]!.history.length,
     };
+    final roleHistory = <String, List<HistoryEntry>>{
+      for (final c in candidates) c.roleName: state.roles[c.roleName]!.history,
+    };
+    final roleMemories = <String, List<Memory>>{
+      for (final c in candidates) c.roleName: state.roles[c.roleName]!.memories,
+    };
 
-    // 并发执行所有角色的记忆提取（角色间无共享可变状态，天然安全）。
-    // 每个角色复用 [MemoryExtractionService.extractWithSafeMerge]：
-    // 内部处理「提取期间无新对话 → 直接采用；有新对话 → 安全合并」的公共逻辑，
-    // 与单角色版 [_maybeExtractMemories] 完全一致（消除约 60 行重复）。
-    final results = await Future.wait(
-      candidates.map((c) async {
-        final roleName = c.roleName;
-        final role = state.roles[roleName]!;
-        final updated = await extractionService.extractWithSafeMerge(
-          manager: manager,
-          input: MemoryExtractionInput(
-            history: role.history,
-            memories: role.memories,
-            historyLengthAtStart: historyLengthsAtStart[roleName] ?? 0,
-          ),
-          config: effectiveConfig,
-        );
-        return (roleName: roleName, updated: updated);
-      }),
+    // 批量提取：单次 LLM 调用为所有候选角色提取记忆
+    //（N 次独立调用 → 1 次批量调用，5 角色舞台最多减少 4 次 LLM 往返）
+    final extracted = await manager.extractForRoles(
+      roleHistory: roleHistory,
+      roleMemories: roleMemories,
+      config: effectiveConfig,
+      auxConfig: auxConfig,
     );
+    if (extracted.isEmpty) return;
 
-    // 统一合并回状态 + 自动存档（结果全部就绪后再写回，避免部分更新交错）
+    // 安全合并写回：提取期间若新对话产生（history 长度变化），
+    // 以「当前 memories」为基底仅追加新提取结果中不存在的条目；
+    // 无新对话时直接采用提取结果。合并后超限触发压缩。
     var roles = Map<String, RoleRunState>.from(state.roles);
     var hasChanges = false;
-    for (final r in results) {
-      final updated = r.updated;
-      if (updated == null) continue;
-      final roleName = r.roleName;
-      final role = roles[roleName]!;
-      // 提取期间无新对话且结果长度与当前一致 → 无变化
-      if (updated.length == role.memories.length) continue;
+    for (final entry in extracted.entries) {
+      final roleName = entry.key;
+      final role = roles[roleName];
+      if (role == null) continue;
+      final newMemories = entry.value;
+      if (newMemories.isEmpty) continue;
+
+      final currentMemories = role.memories;
+      List<Memory> updated;
+      // 提取期间无新对话 → 直接追加新记忆
+      if (role.history.length == (historyLengthsAtStart[roleName] ?? 0)) {
+        updated = [...currentMemories, ...newMemories];
+      } else {
+        // 有新对话 → 以当前 memories 为基底，追加不存在的新条目
+        final existingContents = currentMemories.map((m) => m.content).toSet();
+        final fresh = newMemories
+            .where((m) => !existingContents.contains(m.content))
+            .toList();
+        if (fresh.isEmpty) continue;
+        updated = [...currentMemories, ...fresh];
+      }
+      // 超过上限触发压缩（与单角色版一致）
+      if (updated.length > MemoryManager.maxLimit) {
+        updated = await manager.compress(
+          updated,
+          config: effectiveConfig,
+          auxConfig: auxConfig,
+        );
+      }
+      if (updated.length == currentMemories.length) continue;
       roles[roleName] = role.copyWith(memories: updated);
       hasChanges = true;
     }

@@ -35,48 +35,49 @@ void main() {
       expect(contract.background, contains('梅菲斯特签订了契约'));
       expect(contract.opening, contains('烛火摇曳'));
 
-      // 规则（覆盖全语法：注入/状态赋值/复合赋值/复合动作/LLM指令/互斥组/括号/骰子）
-      // 注：已移除不符合人设的 [代价已付] 与 [边界]，保留 12 条
-      expect(contract.rules, hasLength(12));
-      expect(contract.rules.first.name, '灵魂危机');
-      expect(contract.rules.first.condition, '状态.灵魂完整度 < 30');
-      expect(contract.rules.first.action, startsWith('注入 '));
+      // 规则（纯状态机化后：状态变更/骰子/LLM指令/互斥组），共 8 条
+      expect(contract.rules, hasLength(8));
+      expect(contract.rules.first.name, '情绪流转');
+      expect(contract.rules.first.action, '状态.情绪 = "满足"');
       // 行号递增
       expect(contract.rules[0].line, lessThan(contract.rules[1].line));
+      // 「侵蚀」互斥组包含两条规则（暗影缠身 + 烛火映心）
+      final erosionRules =
+          contract.rules.where((r) => r.group == '侵蚀').toList();
+      expect(erosionRules, hasLength(2));
     });
 
-    test('解析 dantes.meph（互斥组 + 数值状态 + 复合动作）', () async {
+    test('解析 dantes.meph（基督山伯爵：复仇 + 互斥组 + 骰子）', () async {
       final text = await rootBundle.loadString('assets/contracts/dantes.meph');
       final contract = parseMeph(text);
 
-      expect(contract.roleName, '埃德蒙·唐泰斯');
+      expect(contract.roleName, '基督山伯爵');
       expect(contract.anchor, hasLength(6));
 
       // 数值类型推断
-      expect(contract.state, hasLength(4));
-      final hp = contract.state.firstWhere((s) => s.key == '生命值');
+      expect(contract.state, hasLength(5));
+      final hp = contract.state.firstWhere((s) => s.key == '生命');
       expect(hp.value, const IntValue(100));
-      final alert = contract.state.firstWhere((s) => s.key == '警惕度');
-      expect(alert.value, const IntValue(30));
-      final mood = contract.state.firstWhere((s) => s.key == '心绪');
-      expect(mood.value, const StringValue('期待'));
+      final hatred = contract.state.firstWhere((s) => s.key == '仇恨');
+      expect(hatred.value, const IntValue(80));
+      final plan = contract.state.firstWhere((s) => s.key == '谋划');
+      expect(plan.value, const IntValue(70));
+      final forgiveness = contract.state.firstWhere((s) => s.key == '宽恕');
+      expect(forgiveness.value, const IntValue(0));
 
-      // 互斥组剥离
-      final dream = contract.rules.firstWhere((r) => r.name == '船长之梦');
-      expect(dream.group, '答话');
-      expect(dream.action, contains('谦逊地笑道'));
-      expect(dream.condition, contains('包含 "船长"'));
+      // 互斥组「终局」：放下与毁灭互斥
+      final release = contract.rules.firstWhere((r) => r.name == '放下');
+      expect(release.group, '终局');
+      final destroy = contract.rules.firstWhere((r) => r.name == '毁灭');
+      expect(destroy.group, '终局');
 
-      // 状态变更动作（复合赋值 + 简单赋值）
-      final wind = contract.rules.firstWhere((r) => r.name == '风声');
-      expect(wind.action, '状态.警惕度 += 15');
-      final safe = contract.rules.firstWhere((r) => r.name == '平安');
-      expect(safe.action, '状态.警惕度 = 30');
+      // 骰子判定（棋局）
+      final chess = contract.rules.firstWhere((r) => r.name == '棋局');
+      expect(chess.condition, contains('roll(1d100)'));
 
-      // 掷骰条件保留原样
-      final omen = contract.rules.firstWhere((r) => r.name == '吉兆');
-      expect(omen.condition, contains('roll(1d100)'));
-      expect(omen.action, startsWith('注入 '));
+      // 仇恨巅峰终局
+      final judgment = contract.rules.firstWhere((r) => r.name == '天平方正');
+      expect(judgment.action, contains('注入'));
     });
 
     test('解析 dantes.bonapart.meph（官方示范子版：波拿巴党卧底线）', () async {
@@ -96,9 +97,7 @@ void main() {
       // 波拿巴线核心规则
       final shake = contract.rules.firstWhere((r) => r.name == '身份动摇');
       expect(shake.condition, contains('波拿巴'));
-      // 互斥组「抉择」：答应 = 踏入波拿巴党
-      final agree = contract.rules.firstWhere((r) => r.name == '答允密使');
-      expect(agree.group, '抉择');
+      expect(shake.action, '状态.心绪 = "恐惧"');
     });
 
     test('解析 joan_of_arc.meph（贞德：天启信仰 + 互斥组 + 骰子）', () async {
@@ -118,9 +117,9 @@ void main() {
       final revelation = contract.rules.firstWhere((r) => r.name == '天启');
       expect(revelation.condition, contains('圣米迦勒'));
       expect(revelation.action, contains('状态.信仰 += 5'));
-      // 互斥组「信仰」：动摇与坚定互斥
+      // 状态机：质疑削弱信仰
       final doubt = contract.rules.firstWhere((r) => r.name == '动摇');
-      expect(doubt.group, '信仰');
+      expect(doubt.action, contains('状态.信仰 -= 5'));
       // 骰子判定
       final verdict = contract.rules.firstWhere((r) => r.name == '主之裁决');
       expect(verdict.condition, contains('roll(1d100)'));
@@ -167,16 +166,16 @@ void main() {
       final patricide = contract.rules.firstWhere((r) => r.name == '弑父');
       expect(patricide.condition, contains('亚瑟'));
       expect(patricide.action, contains('状态.怨毒 += 10'));
-      // 互斥组「心病」：阴影与冷笑互斥
+      // 互斥组「心病」：阴影积怨
       final shadow = contract.rules.firstWhere((r) => r.name == '阴影');
       expect(shadow.group, '心病');
-      // 互斥组「心魔」：一瞬犹豫与心魔互斥
-      final hesitation = contract.rules.firstWhere((r) => r.name == '一瞬犹豫');
-      expect(hesitation.group, '心魔');
+      // 互斥组「心魔」：尝试放下的心魔
+      final innerDemon = contract.rules.firstWhere((r) => r.name == '心魔');
+      expect(innerDemon.group, '心魔');
       // 骰子判定
       final arrogance = contract.rules.firstWhere((r) => r.name == '狂傲');
       expect(arrogance.condition, contains('roll(1d100)'));
-      // 复合动作
+      // 状态机
       final obsession = contract.rules.firstWhere((r) => r.name == '王座执念');
       expect(obsession.action, contains('状态.战意 += 10'));
     });
@@ -206,7 +205,8 @@ void main() {
       expect(snake.condition, contains('roll(1d100)'));
       // 复合动作：注入 + 状态变化
       final returnRule = contract.rules.firstWhere((r) => r.name == '归来');
-      expect(returnRule.action, contains('状态.王权 += 10'));
+      expect(returnRule.action, contains('状态.王权 += 15'));
+      expect(returnRule.action, contains('状态.哀恸 -= 20'));
     });
 
     test('解析 arthur_sword.meph（少年亚瑟：石中剑 + 互斥组 + 复合动作）', () async {
@@ -215,15 +215,15 @@ void main() {
       );
       final contract = parseMeph(text);
 
-      expect(contract.roleName, '亚瑟 · 潘德拉贡');
-      // 状态
+      expect(contract.roleName, '亚瑟');
+      // 状态（王者之望：少年亚瑟只有一点正直种子，初始值低）
       expect(contract.state, hasLength(5));
-      final evidence = contract.state.firstWhere((s) => s.key == '王权之证');
-      expect(evidence.value, const IntValue(70));
+      final evidence = contract.state.firstWhere((s) => s.key == '王者之望');
+      expect(evidence.value, const IntValue(10));
       // 核心规则
       final sword = contract.rules.firstWhere((r) => r.name == '王选之剑');
       expect(sword.condition, contains('石中剑'));
-      expect(sword.action, contains('状态.王权之证 += 10'));
+      expect(sword.action, contains('状态.王者之望 += 10'));
       // 互斥组「抉择」：迟疑与担当互斥
       final hesitate = contract.rules.firstWhere((r) => r.name == '迟疑');
       expect(hesitate.group, '抉择');

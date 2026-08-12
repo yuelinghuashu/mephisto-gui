@@ -93,14 +93,17 @@ void main() {
     expect(prompt, contains('禁止只有玩家独角戏'));
   });
 
-  test('约束在开头和结尾各出现一次', () {
+  test('约束只在开头出现，结尾精简收束', () {
     final prompt = buildSystemPrompt(
       contract: baseContract,
       currentState: const {},
       narrativeRules: '以浮士德诗句对白风格输出',
     );
-    // 出现两次：开头【格式要求】+ 结尾【要求】
-    expect(prompt.split('以浮士德诗句对白风格输出').length - 1, 2);
+    // 完整约束文本只在开头出现一次（末尾为精简收束，不再重复全文，节省 token）
+    expect(prompt.split('以浮士德诗句对白风格输出').length - 1, 1);
+    // 末尾【要求】区块仍存在，但使用精简措辞
+    expect(prompt, contains('【要求】'));
+    expect(prompt, contains('严格遵循上述【格式要求】，不得偏离。'));
   });
 
   test('占位符 {角色名} 被替换', () {

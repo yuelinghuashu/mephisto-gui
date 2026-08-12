@@ -356,5 +356,6 @@ void main() {
       final result = engine.run(input: '船已靠上码头', state: const <String, StateValue>{});
       expect(result.activeRule?.action, '大笑');
     });
+
   });
 }

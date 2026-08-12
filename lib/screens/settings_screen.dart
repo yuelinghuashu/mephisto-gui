@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../app/theme.dart';
+import '../widgets/settings/aux_llm_config_section.dart';
 import '../widgets/settings/contracts_dir_section.dart';
 import '../widgets/settings/language_section.dart';
 import '../widgets/settings/llm_config_section.dart';
@@ -85,6 +86,12 @@ class SettingsScreen extends ConsumerWidget {
       title: l10n.settingsLlmConfig,
       subtitle: l10n.settingsLlmDescription,
       builder: (_) => const LlmConfigSection(),
+    ),
+    _SettingsSection(
+      icon: '⚙',
+      title: l10n.settingsAuxDivide,
+      subtitle: l10n.settingsAuxLlmDescription,
+      builder: (_) => const AuxLlmConfigSection(),
     ),
   ];
 

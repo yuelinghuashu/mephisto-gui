@@ -31,6 +31,14 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
   static const String _timeoutSecondsKey = 'llm_timeout_seconds';
   static const String _maxRetriesKey = 'llm_max_retries';
 
+  // ---- 辅助任务模型（多模型路由）----
+  static const String _auxEnabledKey = 'llm_aux_enabled';
+  static const String _auxModelKey = 'llm_aux_model';
+  static const String _auxBaseUrlKey = 'llm_aux_base_url';
+  static const String _auxApiKeyKey = 'llm_aux_api_key';
+  static const String _auxMaxTokensKey = 'llm_aux_max_tokens';
+  static const String _auxTimeoutSecondsKey = 'llm_aux_timeout_seconds';
+
   @override
   LlmConfig? get defaultValue => null;
 
@@ -39,15 +47,43 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
       ref.read(secureKeyValueStoreProvider);
 
   /// 从安全存储读取 API Key；存储不可用时返回 null（由调用方回退明文）。
-  Future<String?> _readApiKeyFromSecureStore() async {
+  ///
+  /// [key] 为主/辅助 API Key 的存储键名。
+  Future<String?> _readApiKeyFromSecureStore(String key) async {
     try {
       final store = await _secureStore();
-      return await store.read(_apiKeyKey);
+      return await store.read(key);
     } catch (_) {
       // 安全存储不可用（测试环境无原生插件 / 系统密钥环不可用）
       // → 返回 null，由调用方回退 SharedPreferences 明文
       return null;
     }
+  }
+
+  /// 从安全存储读取 API Key（带旧明文迁移逻辑）。
+  ///
+  /// [key] 为安全存储键名；[legacyPrefsKey] 为 SharedPreferences 中
+  /// 可能残留的旧明文键名。读取成功时若发现旧明文，自动迁移到安全存储。
+  Future<String?> _readApiKey(String key, String legacyPrefsKey) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 优先从安全存储读取；无则回退旧明文（并触发迁移）
+    var apiKey = await _readApiKeyFromSecureStore(key);
+    if (apiKey == null || apiKey.isEmpty) {
+      final legacyPlainText = prefs.getString(legacyPrefsKey);
+      if (legacyPlainText != null && legacyPlainText.isNotEmpty) {
+        // 旧明文 → 迁移到安全存储，随后删除明文
+        apiKey = legacyPlainText;
+        try {
+          final store = await _secureStore();
+          await store.write(key, legacyPlainText);
+          await prefs.remove(legacyPrefsKey);
+        } catch (_) {
+          // 安全存储写入失败（如密钥环不可用）→ 保留明文，下次仍可重试迁移
+        }
+      }
+    }
+    return apiKey;
   }
 
   /// 从持久化存储读取 LLM 配置（不写回 state）。
@@ -65,21 +101,7 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
     final prefs = await SharedPreferences.getInstance();
 
     // API Key：优先安全存储；无则回退旧明文（并触发迁移）
-    var apiKey = await _readApiKeyFromSecureStore();
-    if (apiKey == null || apiKey.isEmpty) {
-      final legacyPlainText = prefs.getString(_apiKeyKey);
-      if (legacyPlainText != null && legacyPlainText.isNotEmpty) {
-        // 旧明文 → 迁移到安全存储，随后删除明文
-        apiKey = legacyPlainText;
-        try {
-          final store = await _secureStore();
-          await store.write(_apiKeyKey, legacyPlainText);
-          await prefs.remove(_apiKeyKey);
-        } catch (_) {
-          // 安全存储写入失败（如密钥环不可用）→ 保留明文，下次仍可重试迁移
-        }
-      }
-    }
+    final apiKey = await _readApiKey(_apiKeyKey, _apiKeyKey);
 
     final baseUrl = prefs.getString(_baseUrlKey);
     final model = prefs.getString(_modelKey);
@@ -124,6 +146,41 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
     return config;
   }
 
+  /// 从持久化存储读取辅助任务模型配置（不写回 state）。
+  ///
+  /// 无任何辅助配置持久化时返回 `null`（调用方视为「使用主配置」）。
+  Future<LlmAuxConfig?> readAuxConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 辅助 API Key：优先安全存储；无则回退 SharedPreferences（含迁移）
+    final apiKey = await _readApiKey(_auxApiKeyKey, _auxApiKeyKey);
+
+    final enabled = prefs.getBool(_auxEnabledKey);
+    final model = prefs.getString(_auxModelKey);
+    final baseUrl = prefs.getString(_auxBaseUrlKey);
+    final maxTokens = prefs.getInt(_auxMaxTokensKey);
+    final timeoutSeconds = prefs.getInt(_auxTimeoutSecondsKey);
+
+    if (enabled == null &&
+        apiKey == null &&
+        model == null &&
+        baseUrl == null &&
+        maxTokens == null &&
+        timeoutSeconds == null) {
+      return null;
+    }
+
+    return LlmAuxConfig(
+      enabled: enabled ?? false,
+      apiKey: apiKey ?? '',
+      model: model ?? '',
+      baseUrl: baseUrl ?? '',
+      maxTokens: maxTokens ?? 4096,
+      timeoutSeconds:
+          timeoutSeconds ?? LlmConfig.defaultTimeoutSeconds,
+    );
+  }
+
   /// 保存 LLM 配置
   ///
   /// API Key 写入安全存储；其余字段写入 SharedPreferences。
@@ -159,6 +216,37 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
     state = config;
   }
 
+  /// 保存辅助任务模型配置。
+  ///
+  /// API Key 写入安全存储（与主配置一致的降级策略）；
+  /// 其余字段写入 SharedPreferences。
+  Future<void> saveAux(LlmAuxConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 辅助 API Key 写入安全存储；不可用时降级保留明文
+    try {
+      final store = await _secureStore();
+      if (config.apiKey.isNotEmpty) {
+        await store.write(_auxApiKeyKey, config.apiKey);
+      } else {
+        await store.delete(_auxApiKeyKey);
+      }
+      await prefs.remove(_auxApiKeyKey);
+    } catch (_) {
+      if (config.apiKey.isNotEmpty) {
+        await prefs.setString(_auxApiKeyKey, config.apiKey);
+      } else {
+        await prefs.remove(_auxApiKeyKey);
+      }
+    }
+
+    await prefs.setBool(_auxEnabledKey, config.enabled);
+    await prefs.setString(_auxModelKey, config.model);
+    await prefs.setString(_auxBaseUrlKey, config.baseUrl);
+    await prefs.setInt(_auxMaxTokensKey, config.maxTokens);
+    await prefs.setInt(_auxTimeoutSecondsKey, config.timeoutSeconds);
+  }
+
   /// 清除 LLM 配置（回退到默认值）
   Future<void> clear() async {
     final prefs = await SharedPreferences.getInstance();
@@ -177,6 +265,22 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
     await prefs.remove(_timeoutSecondsKey);
     await prefs.remove(_maxRetriesKey);
     state = defaultValue;
+  }
+
+  /// 清除辅助任务模型配置（回退到「不启用独立辅助模型」）。
+  Future<void> clearAux() async {
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      final store = await _secureStore();
+      await store.delete(_auxApiKeyKey);
+    } catch (_) {
+      // 安全存储不可用 → 忽略，靠明文删除兜底
+    }
+    await prefs.remove(_auxEnabledKey);
+    await prefs.remove(_auxModelKey);
+    await prefs.remove(_auxBaseUrlKey);
+    await prefs.remove(_auxMaxTokensKey);
+    await prefs.remove(_auxTimeoutSecondsKey);
   }
 }
 

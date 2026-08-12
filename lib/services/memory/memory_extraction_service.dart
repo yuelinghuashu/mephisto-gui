@@ -56,11 +56,13 @@ class MemoryExtractionService {
     required MemoryManager manager,
     required MemoryExtractionInput input,
     required LlmConfig? config,
+    LlmAuxConfig? auxConfig,
   }) async {
     final updated = await manager.maybeExtract(
       history: input.history,
       memories: input.memories,
       config: config,
+      auxConfig: auxConfig,
     );
     if (updated == null) return null;
 
@@ -82,7 +84,11 @@ class MemoryExtractionService {
     // 遵循权重制取舍：合并后超限触发 compress（低权重优先压缩/舍弃，
     // 高权重保护不丢）——而非无脑追加导致列表膨胀失控
     if (combined.length > MemoryManager.maxLimit) {
-      combined = await manager.compress(combined, config: config);
+      combined = await manager.compress(
+        combined,
+        config: config,
+        auxConfig: auxConfig,
+      );
     }
     return combined;
   }

@@ -111,6 +111,7 @@ For a deeper understanding of Mephisto's mechanics, read the [docs](docs/README.
 | [Rule Engine Deep Dive](docs/rule-engine.md)          | Conditions, actions, dice (1d2 / 1d100), mutual exclusion groups |
 | [Memory System](docs/memory-system.md)                | Memory extraction, deduplication, compression                    |
 | [Save System](docs/save-system.md)                    | Read-only master, child snapshots, branches                      |
+| [Stage System](docs/stage-system.md)                  | Stage directory layout, creation, and narrative mechanics        |
 | [Platform Storage Strategy](docs/platform-storage.md) | Contract directories and sandbox restrictions per platform       |
 
 ## 🔥 Rule Hot-Reload

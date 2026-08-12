@@ -187,6 +187,58 @@ void main() {
       expect(prefs.getString('llm_api_key'), 'kept-as-plain');
     });
 
+    test('辅助配置：未设置时读取返回 null', () async {
+      final container = makeContainer();
+
+      final aux = await container
+          .read(llmSettingsProvider.notifier)
+          .readAuxConfig();
+
+      expect(aux, isNull);
+    });
+
+    test('辅助配置：保存后读取正确（API Key 写入安全存储）', () async {
+      final container = makeContainer();
+
+      const auxConfig = LlmAuxConfig(
+        enabled: true,
+        model: 'aux-model',
+        baseUrl: 'https://aux.example.com/v1',
+        apiKey: 'aux-key',
+        maxTokens: 2048,
+        timeoutSeconds: 120,
+      );
+      await container.read(llmSettingsProvider.notifier).saveAux(auxConfig);
+
+      final read = await container
+          .read(llmSettingsProvider.notifier)
+          .readAuxConfig();
+      expect(read, auxConfig);
+
+      // API Key 存入安全存储
+      expect(secureStore.all, containsPair('llm_aux_api_key', 'aux-key'));
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('llm_aux_api_key'), isNull);
+      expect(prefs.getBool('llm_aux_enabled'), true);
+      expect(prefs.getString('llm_aux_model'), 'aux-model');
+      expect(prefs.getInt('llm_aux_max_tokens'), 2048);
+    });
+
+    test('辅助配置：清除后回退 null', () async {
+      final container = makeContainer();
+
+      await container
+          .read(llmSettingsProvider.notifier)
+          .saveAux(const LlmAuxConfig(enabled: true, model: 'aux'));
+      await container.read(llmSettingsProvider.notifier).clearAux();
+
+      final read = await container
+          .read(llmSettingsProvider.notifier)
+          .readAuxConfig();
+      expect(read, isNull);
+      expect(secureStore.all, isEmpty);
+    });
+
     test('安全存储完全不可用（无原生插件）时优雅降级到明文，功能不受损', () async {
       // 不 override secureKeyValueStoreProvider：真实实现会在纯 Dart 测试中
       // 抛 MissingPluginException。验证 Provider 能捕获并降级，不影响读/写。

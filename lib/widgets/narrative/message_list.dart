@@ -35,6 +35,9 @@ class MessageList extends StatefulWidget {
   /// 单角色叙事不传 → 保持默认行为。
   final Widget Function(Message message, bool isStreaming)? messageBuilder;
 
+  /// 重新生成回调（单角色叙事；index 为消息索引）
+  final void Function(int index)? onRegenerate;
+
   const MessageList({
     super.key,
     required this.messages,
@@ -42,6 +45,7 @@ class MessageList extends StatefulWidget {
     required this.isGenerating,
     this.contentMaxWidth,
     this.messageBuilder,
+    this.onRegenerate,
   });
 
   @override
@@ -230,7 +234,12 @@ class MessageListState extends State<MessageList> {
           final message = widget.messages[index];
           final bubble =
               widget.messageBuilder?.call(message, false) ??
-              MessageBubble(message: message);
+              MessageBubble(
+                message: message,
+                onRegenerate: widget.onRegenerate == null
+                    ? null
+                    : () => widget.onRegenerate!(index),
+              );
           return _wrapBubble(bubble);
         },
       ),

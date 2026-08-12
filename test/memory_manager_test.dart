@@ -129,6 +129,58 @@ void main() {
     });
   });
 
+  group('LlmAuxConfig.resolve 辅助模型路由', () {
+    const mainConfig = LlmConfig(
+      baseUrl: 'https://main.example.com/v1',
+      model: 'main-model',
+      apiKey: 'main-key',
+      maxRetries: 2,
+    );
+
+    test('未启用时 resolve 返回主配置（字段被替换但不生效由调用方控制）', () {
+      const aux = LlmAuxConfig(
+        model: 'aux-model',
+        baseUrl: 'https://aux.example.com/v1',
+        apiKey: 'aux-key',
+      );
+      final resolved = aux.resolve(mainConfig);
+      // resolve 本身只处理字段继承；调用方负责判断 enabled
+      expect(resolved.model, 'aux-model');
+      expect(resolved.baseUrl, 'https://aux.example.com/v1');
+      expect(resolved.apiKey, 'aux-key');
+      expect(resolved.maxRetries, 2); // 继承主配置
+    });
+
+    test('启用时完整继承主配置缺省字段（model/baseUrl/apiKey 留空）', () {
+      const aux = LlmAuxConfig(
+        enabled: true,
+        // model/baseUrl/apiKey 均留空 → 继承主配置
+        maxTokens: 2048,
+        timeoutSeconds: 120,
+      );
+      final resolved = aux.resolve(mainConfig);
+      expect(resolved.model, 'main-model');
+      expect(resolved.baseUrl, 'https://main.example.com/v1');
+      expect(resolved.apiKey, 'main-key');
+      expect(resolved.maxTokens, 2048);
+      expect(resolved.timeoutSeconds, 120);
+      expect(resolved.maxRetries, 2); // 始终继承主配置
+    });
+
+    test('启用时独立字段覆盖主配置', () {
+      const aux = LlmAuxConfig(
+        enabled: true,
+        model: 'aux-model',
+        baseUrl: 'https://aux.example.com/v1',
+      );
+      final resolved = aux.resolve(mainConfig);
+      expect(resolved.model, 'aux-model');
+      expect(resolved.baseUrl, 'https://aux.example.com/v1');
+      // API Key 未填 → 继承主配置
+      expect(resolved.apiKey, 'main-key');
+    });
+  });
+
   group('extract 权重解析', () {
     const llmConfig = LlmConfig(
       baseUrl: 'https://api.test.com/v1',

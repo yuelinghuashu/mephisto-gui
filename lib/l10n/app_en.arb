@@ -1,8 +1,6 @@
 {
   "@@locale": "en",
-
   "appTitle": "Mephisto",
-
   "homeTitle": "📜 Mephisto",
   "homeNewContract": "New Contract",
   "homeImportContract": "Import Contract",
@@ -27,14 +25,12 @@
   "homeRenameFail": "╳ Rename failed: target name already exists or old file is missing",
   "homeContractSaved": "✦ Contract saved",
   "homeNoBranches": "This master has no child branches yet",
-
   "emptyStateNoContract": "The Void of Contracts",
   "emptyStateDescription": "No contracts found yet\nClick the import button at the top right to add a .meph file,\nor configure a contract directory on the settings page",
   "emptyStateRestoring": "Restoring...",
   "emptyStateRestoreBuiltin": "Restore Built-in Characters",
   "emptyStateGoSettings": "Go to Settings",
   "emptyStateLoadFail": "Failed to load contracts",
-
   "homeBrandTitle": "Mephisto Narrative Engine",
   "homeBrandSubtitle": "Sign the contract, write your fate",
   "homeStageSectionTitle": "Multi-Character Stages",
@@ -62,7 +58,6 @@
   "stageDeleteTitle": "Delete Stage",
   "stageDeleteConfirm": "Delete stage {name} and all its characters? This cannot be undone.",
   "stageDeleteMultipleConfirm": "Delete the {count} selected stages? This cannot be undone.",
-
   "contractCardEnter": "Enter",
   "contractCardPreview": "Preview",
   "contractCardEdit": "Edit",
@@ -73,7 +68,6 @@
   "contractCardExpandChildren": "Expand child versions",
   "contractCardCollapseChildren": "Collapse child versions",
   "contractBranchCount": "Branches · {count}",
-
   "narrativeSaveMenu": "Save",
   "narrativeSaveBranch": "Save as Branch...",
   "narrativeDeleteSave": "Delete Save",
@@ -99,27 +93,23 @@
   "narrativeStopGenerating": "Stop Generating",
   "narrativeConfirm": "Save",
   "narrativeEmptyHint": "Write the guidance of fate, and the narrative will grow within the contract...",
-
   "messageBubbleThinking": "Mephisto is writing...",
-
+  "messageMenuCopy": "Copy",
+  "messageMenuRegenerate": "Regenerate",
+  "messageMenuCopied": "✦ Copied to clipboard",
   "inputBarAttachTooltip": "Attach context (text, multi-select)",
   "inputBarHintGenerating": "Mephisto is weaving a story...",
   "inputBarHintIdle": "Write the guidance of fate, the contract will drive the narrative...",
   "inputBarSendTooltip": "Send",
   "inputBarInvalidAttachment": "╳ {fileName} is not valid text, skipped",
-
   "statusBarRuleChip": "Rules",
   "statusBarMemoryChip": "Memory",
   "statusBarHistoryChip": "History",
-
   "diceVerdictTitle": "Fate Verdict · {count} roll(s)",
   "diceVerdictThreshold": "Threshold ≥ {threshold}",
   "diceVerdictTriggered": "Triggered: {action}",
-
   "dashboardTitle": "Dashboard",
-
   "previewSheetClose": "Close",
-
   "settingsTheme": "Theme",
   "settingsThemeDescription": "Light/dark theme mode.",
   "settingsThemeSystem": "Follow System",
@@ -153,7 +143,7 @@
   "settingsRulesSaved": "✦ Narrative rules saved",
   "settingsRulesReset": "⇄ Restored default narrative rules",
   "settingsContractsDir": "Contract Directory",
-  "settingsAndroidDirDescription": "Contracts are stored in the app's private space, unaffected by Android storage permissions. \u201cInternal storage\u201d uses the app-specific partition; \u201cexternal storage\u201d uses the device mass storage partition—both are within the app's private directory and are cleared on uninstall. Android restricts apps from directly reading/writing user public directories (Downloads, Documents, SD card), so contracts cannot be freely assigned to folders like on desktop. To use contracts from elsewhere on your phone, use the import feature on the home page.",
+  "settingsAndroidDirDescription": "Contracts are stored in the app's private space, unaffected by Android storage permissions. “Internal storage” uses the app-specific partition; “external storage” uses the device mass storage partition—both are within the app's private directory and are cleared on uninstall. Android restricts apps from directly reading/writing user public directories (Downloads, Documents, SD card), so contracts cannot be freely assigned to folders like on desktop. To use contracts from elsewhere on your phone, use the import feature on the home page.",
   "settingsIosDirDescription": "Contracts are stored in the app's internal directory (iOS sandbox restriction). Import and default loading both use this directory.",
   "settingsDesktopDirDescription": "The folder containing .meph contract files. Import and default loading both use this directory.",
   "settingsDirLoading": "Loading...",
@@ -204,7 +194,18 @@
   "settingsTestNeedBaseUrlModel": "╳ Please fill in Base URL and Model first",
   "settingsTestSuccess": "✦ Connection successful, model is available",
   "settingsTestFail": "╳ Connection failed: {error}",
-
+  "settingsAuxLlmEnabled": "Use a separate auxiliary model",
+  "settingsAuxLlmDescription": "Background tasks such as memory extraction/compression use an independent model; main narrative is unaffected. Ideal for using a lightweight model to reduce long-conversation costs. When enabled, fill in the auxiliary model parameters (API Key / Base URL can be inherited from the main config).",
+  "settingsAuxModelLabel": "Auxiliary model name",
+  "settingsAuxModelHint": "e.g. deepseek-chat / qwen2.5:7b (empty inherits main model)",
+  "settingsAuxBaseUrlLabel": "Auxiliary model Base URL (empty inherits main config)",
+  "settingsAuxApiKeyLabel": "Auxiliary model API Key (empty inherits main config)",
+  "settingsAuxMaxTokensLabel": "Auxiliary model Max Tokens",
+  "settingsAuxTimeoutLabel": "Auxiliary model timeout (seconds)",
+  "settingsAuxSaveConfig": "Save Auxiliary Config",
+  "settingsAuxSaved": "✦ Auxiliary model configuration saved",
+  "settingsAuxReset": "⇄ Auxiliary model configuration cleared (falling back to main config)",
+  "settingsAuxDivide": "Auxiliary Task Model",
   "contractEditorNewTitle": "✏️ New Contract",
   "contractEditorEditTitle": "✏️ Edit Contract",
   "contractEditorFormatTooltip": "Format text (adjust indentation, blank lines, and fix operator spacing)",
@@ -232,10 +233,8 @@
   "contractEditorConflictReload": "Reload",
   "contractEditorConflictOverwrite": "Overwrite",
   "contractEditorReloaded": "Reloaded the latest on-disk version",
-
   "textInputDialogConfirm": "OK",
   "textInputDialogCancel": "Cancel",
-
   "renameDialogTitle": "✏️ Rename Contract",
   "renameDialogLabel": "New file name",
   "renameDialogHelper": "Must end with .meph",
@@ -243,22 +242,17 @@
   "renameDialogNameExists": "This file name already exists, please choose another",
   "renameDialogBranchTitleLabel": "Fate description",
   "renameDialogBranchTitleHint": "Describe where this branch leads (optional)",
-
   "confirmDeleteCancel": "Cancel",
   "confirmDeleteDelete": "Delete",
-
   "narrativeProviderGenFailed": "An error occurred while generating the reply, please retry",
   "narrativeProviderAutoSaveFail": "Auto-save failed, progress was not written to disk",
   "narrativeProviderSaveFail": "Save failed: check contract directory permissions or disk space",
   "narrativeProviderHotReloadFail": "Contract hot-reload failed, original settings preserved",
-
   "contractFallbackNotice": "The current contract file is missing or corrupted; built-in template loaded",
-
   "relativeTimeJustNow": "Just now",
   "relativeTimeMinutesAgo": "{minutes} min ago",
   "relativeTimeHoursAgo": "{hours} hr ago",
   "relativeTimeDaysAgo": "{days} days ago",
-
   "languageLabel": "Language",
   "languageChinese": "简体中文",
   "languageEnglish": "English"

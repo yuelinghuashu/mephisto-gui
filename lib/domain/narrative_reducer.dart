@@ -54,6 +54,8 @@ NarrativeState narrativeReducer(NarrativeState state, NarrativeEvent event) {
       _onContextAttached(state, fileName, content),
     ContextRemoved(:final index) => _onContextRemoved(state, index),
     ContextsCleared() => _onContextsCleared(state),
+    MessageDeleted(:final index, :final cascadeFate) =>
+      _onMessageDeleted(state, index, cascadeFate),
   };
 }
 
@@ -195,4 +197,66 @@ NarrativeState _onContextRemoved(NarrativeState state, int index) {
 /// 清空所有附加上下文。
 NarrativeState _onContextsCleared(NarrativeState state) {
   return state.copyWith(attachedFileNames: [], attachedContexts: []);
+}
+
+/// 删除指定索引的消息（连同其对应的历史条目）。
+///
+/// 规则：
+///   - 删除 `messages[index]`（越界忽略）
+///   - 同时从 `history` 中移除对应角色的条目（按 MessageRole 匹配）
+///   - `cascadeFate=true` 且被删消息为 assistant 时，同时删除其前一条 fate
+///     消息与对应的历史条目（「重新生成」场景：删回复 + 删指引 → 重新发送）
+///
+/// 消息列表与历史列表的映射关系：
+///   - `messages` 可能包含系统消息（骰子结算卡片），这些不会出现在 `history` 中
+///   - 因此不能直接用索引对应，需按角色 + 内容裁剪
+NarrativeState _onMessageDeleted(
+  NarrativeState state,
+  int index,
+  bool cascadeFate,
+) {
+  if (index < 0 || index >= state.messages.length) return state;
+
+  // 确定要删除的消息索引集合（级联删除时含前一条 fate）
+  final deleteIndices = <int>{index};
+  if (cascadeFate) {
+    // 若删除的是 assistant 消息，向前找最近的 fate 消息一并删除
+    if (state.messages[index].role == MessageRole.assistant) {
+      for (var i = index - 1; i >= 0; i--) {
+        if (state.messages[i].role == MessageRole.fate) {
+          deleteIndices.add(i);
+          break;
+        }
+      }
+    }
+  }
+
+  // 从 messages 中移除
+  final messages = <Message>[
+    for (var i = 0; i < state.messages.length; i++)
+      if (!deleteIndices.contains(i)) state.messages[i],
+  ];
+
+  // 从 history 中同步移除对应的命运/角色条目。
+  // history 不含系统消息，按角色与内容裁剪：
+  //   - 被删除的 fate 消息 → 移除 history 中第一条角色为 fate 且内容相同的条目
+  //   - 被删除的 assistant 消息 → 移除 history 中第一条角色为 assistant 且内容相同的条目
+  var history = state.history;
+  for (final idx in deleteIndices) {
+    final msg = state.messages[idx];
+    if (msg.role == MessageRole.system) continue; // 系统消息不进 history
+    final role = msg.role;
+    final content = msg.content;
+    final entryIndex = history.indexWhere(
+      (h) => h.role == role && h.content == content,
+    );
+    if (entryIndex != -1) {
+      history = [
+        ...history.take(entryIndex),
+        ...history.skip(entryIndex + 1),
+      ];
+    }
+  }
+
+  return state.copyWith(messages: messages, history: history);
 }

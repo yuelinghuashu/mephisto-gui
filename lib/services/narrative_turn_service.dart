@@ -11,13 +11,13 @@
 ///   - [LlmClient] 为纯函数式网络层、无共享可变状态，天然支持多实例并发
 library;
 
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../domain/models.dart';
 import 'engine/local_reply.dart';
 import 'engine/rule_engine.dart';
 import 'llm/client.dart';
+import 'llm/llm_invoker.dart';
 import 'prompt/system_prompt.dart';
 
 /// 单轮叙事生成的结构化结果
@@ -127,35 +127,17 @@ class NarrativeTurnService {
     );
 
     // 4. 调用 LLM（流式）；空响应或异常时回退本地回复
-    final llmClient =
-        _clientFactory?.call(config) ??
-        LlmClient(
-          apiKey: config.apiKey,
-          baseUrl: config.baseUrl,
-          model: config.model,
-          maxTokens: config.maxTokens,
-          client: client,
-        );
-
-    var reply = '';
-    var lastError = '';
-    try {
-      final streamed = await llmClient.generateStream(
-        messages: messages,
-        onChunk: onChunk,
-        cancelSignal: cancelSignal,
-        // 超时/重试来自用户配置（LlmConfig），默认 60s / 1 次重试
-        timeout: Duration(seconds: config.timeoutSeconds),
-        maxRetries: config.maxRetries,
-      );
-      reply = streamed.trim().isEmpty
-          ? localReply(userInput, contract: contract)
-          : streamed;
-    } catch (e) {
-      debugPrint('LLM 调用失败，回退到本地回复: $e');
-      reply = localReply(userInput, contract: contract);
-      lastError = 'LLM 调用失败: $e';
-    }
+    final invoker = LlmInvoker(
+      clientFactory: _clientFactory,
+      client: client,
+    );
+    final (reply, lastError) = await invoker.generate(
+      messages: messages,
+      config: config,
+      onChunk: onChunk,
+      cancelSignal: cancelSignal,
+      fallback: () async => localReply(userInput, contract: contract),
+    );
 
     return NarrativeTurnResult(
       reply: reply,

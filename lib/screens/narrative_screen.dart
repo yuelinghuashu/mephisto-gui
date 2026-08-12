@@ -371,6 +371,12 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                       streamingContent: state.streamingContent,
                       isGenerating: isGenerating,
                       contentMaxWidth: contentMaxWidth,
+                      // 长按/右键操作：重新生成消息
+                      onRegenerate: (index) {
+                        ref
+                            .read(narrativeProvider.notifier)
+                            .regenerateMessage(index);
+                      },
                     ),
             ),
 

@@ -167,8 +167,15 @@ String buildStageSystemPrompt({
   buffer.writeln(stage.characters.map((c) => c.roleName).join('、'));
   buffer.writeln('未在文中被提及的角色视为本回无戏份（不必强行安排出场）。');
   buffer.writeln();
+
+  // ============================================================
+  // 第六层：要求（末尾精简收束）
+  //
+  // 此前在此完整重复一遍 constraints（与第一层完全相同），浪费约 200-300 token。
+  // 改为精简收束：仅提醒保持上述格式要求，用关键词唤起模型记忆而非全文重放。
+  // ============================================================
   buffer.writeln('【要求】');
-  buffer.writeln(constraints);
+  buffer.writeln('严格遵循上述【格式要求】与【全景叙事要求】，不得偏离。');
   buffer.writeln();
 
   return buffer.toString();

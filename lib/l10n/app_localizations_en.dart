@@ -342,6 +342,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageBubbleThinking => 'Mephisto is writing...';
 
   @override
+  String get messageMenuCopy => 'Copy';
+
+  @override
+  String get messageMenuRegenerate => 'Regenerate';
+
+  @override
+  String get messageMenuCopied => '✦ Copied to clipboard';
+
+  @override
   String get inputBarAttachTooltip => 'Attach context (text, multi-select)';
 
   @override
@@ -664,6 +673,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsTestFail(Object error) {
     return '╳ Connection failed: $error';
   }
+
+  @override
+  String get settingsAuxLlmEnabled => 'Use a separate auxiliary model';
+
+  @override
+  String get settingsAuxLlmDescription =>
+      'Background tasks such as memory extraction/compression use an independent model; main narrative is unaffected. Ideal for using a lightweight model to reduce long-conversation costs. When enabled, fill in the auxiliary model parameters (API Key / Base URL can be inherited from the main config).';
+
+  @override
+  String get settingsAuxModelLabel => 'Auxiliary model name';
+
+  @override
+  String get settingsAuxModelHint =>
+      'e.g. deepseek-chat / qwen2.5:7b (empty inherits main model)';
+
+  @override
+  String get settingsAuxBaseUrlLabel =>
+      'Auxiliary model Base URL (empty inherits main config)';
+
+  @override
+  String get settingsAuxApiKeyLabel =>
+      'Auxiliary model API Key (empty inherits main config)';
+
+  @override
+  String get settingsAuxMaxTokensLabel => 'Auxiliary model Max Tokens';
+
+  @override
+  String get settingsAuxTimeoutLabel => 'Auxiliary model timeout (seconds)';
+
+  @override
+  String get settingsAuxSaveConfig => 'Save Auxiliary Config';
+
+  @override
+  String get settingsAuxSaved => '✦ Auxiliary model configuration saved';
+
+  @override
+  String get settingsAuxReset =>
+      '⇄ Auxiliary model configuration cleared (falling back to main config)';
+
+  @override
+  String get settingsAuxDivide => 'Auxiliary Task Model';
 
   @override
   String get contractEditorNewTitle => '✏️ New Contract';

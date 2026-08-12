@@ -73,7 +73,10 @@ class RuleEngine {
     final passiveGroups = <String>{};
     for (final rule in rules) {
       if (!_isPassive(rule.action)) continue;
-      if (rule.group.isNotEmpty && passiveGroups.contains(rule.group)) continue;
+      // 被同组已命中规则锁定：本条不再求值，也不会执行
+      if (rule.group.isNotEmpty && passiveGroups.contains(rule.group)) {
+        continue;
+      }
 
       final rs = RollStore();
       final matched = evalCondition(
@@ -111,8 +114,10 @@ class RuleEngine {
     for (final rule in rules) {
       if (_isPassive(rule.action)) continue;
 
-      // 互斥组检查：同一组内只触发第一个匹配的规则
-      if (rule.group.isNotEmpty && activeGroups.contains(rule.group)) continue;
+      // 互斥组检查：同一组内只触发第一个匹配的规则（仅锁定，不求值）
+      if (rule.group.isNotEmpty && activeGroups.contains(rule.group)) {
+        continue;
+      }
 
       final rs = RollStore();
       final matched = evalCondition(
