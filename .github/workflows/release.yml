@@ -71,16 +71,22 @@ jobs:
       - name: Configure Android signing
         if: matrix.artifact == 'mephisto-android'
         shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: |
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$GITHUB_WORKSPACE/android/app/mephisto.jks"
+          # 通过 env 传递 Secrets 而非内联展开，避免值含换行/特殊字符时破坏 shell 脚本结构。
+          # 使用 printf 而非 heredoc 生成 key.properties：YAML run: 块的公共缩进
+          # 剥离后 heredoc 终止符仍带缩进，bash 要求 EOF 必须顶格，会导致
+          # "here-document delimited by end-of-file" 语法错误。
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/android/app/mephisto.jks"
             # storeFile 相对路径基于 android/app/ 模块目录解析（build.gradle.kts 中 file() 的基路径）
-            cat > "$GITHUB_WORKSPACE/android/key.properties" << EOF
-            storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-            keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
-            keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-            storeFile=./mephisto.jks
-            EOF
+            printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=%s\nstoreFile=./mephisto.jks\n' \
+              "$KEYSTORE_PASSWORD" "$KEY_PASSWORD" "$KEY_ALIAS" \
+              > "$GITHUB_WORKSPACE/android/key.properties"
             echo "✅ 正式签名已配置"
           else
             echo "⚠️ 未配置 ANDROID_KEYSTORE_BASE64，使用 debug 签名（仅开发/测试分发）"
