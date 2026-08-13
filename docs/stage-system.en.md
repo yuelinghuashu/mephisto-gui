@@ -49,7 +49,7 @@ Each round of stage generation:
 3. **Output is a "panoramic narrative stream"**: one flowing third-person novel that naturally mentions the characters who have screen time
    - Characters with screen time interact within the same passage (dialogue / action / clash)
    - Unmentioned characters = no screen time this round, not forced to appear
-4. **The backend maps the text to mentioned characters** via "mention attribution"
+4. **Parsing & attribution**: the backend first tries to attribute each passage to a character via `【角色名】` section format (compatible with older model outputs); if the LLM does not use sections (panoramic narrative stream), it falls back to "mention attribution"—mapping the whole text to the characters mentioned
 5. **Fallback**: if the output can be neither sectioned nor attributed by mentions, it generates per-character independently to guarantee everyone gets a response
 
 > Dice rolls (`roll(1d100)` etc.) are supported too: when triggered, they appear as a "Fate Verdict" system-message card.

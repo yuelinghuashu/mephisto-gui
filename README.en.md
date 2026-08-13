@@ -46,6 +46,9 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
 - **Memory System**: Automatically extracts key event summaries (1-5 star importance), auto-compresses when over the limit, shaping long-term narrative consistency
 - **Context Window**: Choose a history message tier (20 / 40 / 60 / All) on the settings page to control LLM token consumption
 - **Child Save System**: Master contracts are read-only; runtime dialogues generate child snapshots, supporting branches and restoration
+- **Auxiliary Task Model** (multi-model routing): optionally configure a separate model for memory extraction / compression; off by default (shares the main config), and API Key / Base URL fall back to the main config when left blank
+- **Message Actions**: long-press / right-click a message to **Copy · Regenerate**
+- **Lightweight Markdown Rendering**: narrative text supports **bold**, _italic_, headings, quotes, lists, and `inline code` (zero external dependencies)
 - **Rule Hot-Reload**: Save `.meph` → **only rules take effect instantly**, with dialogue/state/memory/history all preserved
 - **Multi-Character Stage**: A subdirectory under the contracts folder = a stage, where multiple characters interact and save independently
 - **Cross-Platform**: Windows / macOS / Linux / Android / iOS, with built-in contracts including Faust, Edmond Dantès, Joan of Arc, Young Arthur, and Gilgamesh; plus two multi-character stages: Kurukshetra and Camlann
@@ -144,7 +147,7 @@ For writing `.meph` contracts, we recommend the **Mephisto VSCode plugin** (synt
 - **Riverpod** (State management)
 - **SharedPreferences** (Preference persistence)
 - **flutter_secure_storage** (System-keychain API Key storage)
-- **HTTP** (OpenAI-compatible SSE streaming calls)
+- **HTTP** (OpenAI-compatible + local Ollama SSE streaming calls)
 - **archive** (ZIP pack / restore)
 - **MephParser** (Self-developed contract parser)
 - **freezed** (Data model code generation)

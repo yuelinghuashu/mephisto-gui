@@ -656,6 +656,30 @@ abstract class AppLocalizations {
   /// **'写下命运的指引，叙事将在契约中生长...'**
   String get narrativeEmptyHint;
 
+  /// No description provided for @narrativeExport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出叙事'**
+  String get narrativeExport;
+
+  /// No description provided for @narrativeExportEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ 暂无叙事内容可导出'**
+  String get narrativeExportEmpty;
+
+  /// No description provided for @narrativeExportSaved.
+  ///
+  /// In zh, this message translates to:
+  /// **'✦ 叙事已导出: {path}'**
+  String narrativeExportSaved(Object path);
+
+  /// No description provided for @narrativeExportFail.
+  ///
+  /// In zh, this message translates to:
+  /// **'╳ 导出失败: {error}'**
+  String narrativeExportFail(Object error);
+
   /// No description provided for @messageBubbleThinking.
   ///
   /// In zh, this message translates to:
@@ -703,6 +727,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'发送'**
   String get inputBarSendTooltip;
+
+  /// No description provided for @inputBarRevealFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'立即显示全文（跳过打字机动画）'**
+  String get inputBarRevealFull;
 
   /// No description provided for @inputBarInvalidAttachment.
   ///

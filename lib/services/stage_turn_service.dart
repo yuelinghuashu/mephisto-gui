@@ -23,6 +23,7 @@ import 'engine/local_reply.dart';
 import 'engine/rule_engine.dart';
 import 'llm/client.dart';
 import 'llm/llm_invoker.dart';
+import 'llm/llm_message_builder.dart';
 import 'parser/stage_section_parser.dart';
 import 'prompt/stage_system_prompt.dart';
 import 'storage/stage_repo.dart';
@@ -323,29 +324,18 @@ class StageTurnService {
     required String narrativeRules,
     int? maxMemories,
   }) {
-    final history = historyMessages
-        .where((m) => m.role != MessageRole.system)
-        .map(
-          (m) => LlmMessage(
-            role: m.role == MessageRole.fate ? 'user' : 'assistant',
-            content: m.content,
-          ),
-        );
-    return [
-      LlmMessage(
-        role: 'system',
-        content: buildStageSystemPrompt(
-          stage: stage,
-          roleStates: roleStates,
-          roleMemories: roleMemories,
-          narrativeRules: narrativeRules,
-          attachedContexts: attachedContexts,
-          maxMemories: maxMemories,
-        ),
+    return buildLlmMessageList(
+      systemPrompt: buildStageSystemPrompt(
+        stage: stage,
+        roleStates: roleStates,
+        roleMemories: roleMemories,
+        narrativeRules: narrativeRules,
+        attachedContexts: attachedContexts,
+        maxMemories: maxMemories,
       ),
-      ...history,
-      LlmMessage(role: 'user', content: userInput),
-    ];
+      historyMessages: historyMessages,
+      userInput: userInput,
+    );
   }
 
   /// 构建本地多角色兜底回复：每个角色各自生成一段本地叙事。

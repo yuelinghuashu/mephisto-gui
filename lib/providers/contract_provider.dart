@@ -150,10 +150,14 @@ Future<Contract?> _builtinFallback(String name) async {
   }
 }
 
+// ============================================================
+// 契约信息 mtime 缓存（Riverpod Provider 管理生命周期）
+//
+// 从文件级全局 `Map` 迁移为 Provider 持有的实例，避免跨测试库
+// 并行加载时共享全局可变状态导致的污染/非确定性。
+// ============================================================
+
 /// 基于 mtime 的契约解析缓存条目。
-///
-/// 首页每次进入/刷新契约树时，避免对所有 .meph 文件重新读取 + 解析
-/// （IO + 字符串处理）。仅当文件 mtime 变化时才重新读取内容提取角色名。
 class _ContractInfoCacheEntry {
   final DateTime lastModified;
   final ContractInfo info;
@@ -164,17 +168,62 @@ class _ContractInfoCacheEntry {
   });
 }
 
-/// 契约信息解析缓存（模块级，key = 文件名）。
+/// 契约信息解析缓存（key = 文件名）。
 ///
 /// 设计要点：
 ///   - 仅在 mtime 变化时重新读取文件内容（轻量 stat 命中缓存）
 ///   - Riverpod 的 `ref.invalidate` 仍会触发重建（增删文件/切换目录），
 ///     但已解析的内容在文件未变化时被复用，避免重复 IO
 ///   - 契约切换（[switchContract]）时清空，确保新契约全量刷新
-final Map<String, _ContractInfoCacheEntry> _contractInfoCache = {};
+class ContractInfoCache {
+  /// 缓存最大条目数（内存安全兜底）。
+  static const int maxEntries = 200;
 
-/// 契约信息缓存最大条目数（内存安全兜底）。
-const int _maxContractInfoCacheEntries = 200;
+  /// 内部存储（按插入顺序迭代，淘汰时取最早条目）。
+  final Map<String, _ContractInfoCacheEntry> _entries = {};
+
+  /// 读取缓存条目；mtime 命中时返回 [ContractInfo]，否则返回 null。
+  ContractInfo? get(String name, DateTime? lastModified) {
+    if (lastModified == null) return null;
+    final cached = _entries[name];
+    if (cached == null || cached.lastModified != lastModified) return null;
+    return cached.info;
+  }
+
+  /// 写入缓存条目（超限时淘汰最早条目）。
+  void put(String name, DateTime lastModified, ContractInfo info) {
+    _entries[name] = _ContractInfoCacheEntry(
+      lastModified: lastModified,
+      info: info,
+    );
+    _evictIfNeeded();
+  }
+
+  /// 清空缓存（契约切换时调用，确保全量重新解析）。
+  void clear() {
+    _entries.clear();
+  }
+
+  /// 缓存超限时淘汰最旧（按插入顺序移除最早条目）。
+  void _evictIfNeeded() {
+    if (_entries.length <= maxEntries) return;
+    // 找到最早的条目（遍历取第一个），移除之
+    final justAddedKey = _entries.keys.last;
+    final firstKey = _entries.keys.firstWhere(
+      (k) => k != justAddedKey,
+      orElse: () => justAddedKey,
+    );
+    _entries.remove(firstKey);
+  }
+}
+
+/// 契约信息缓存 Provider。
+///
+/// 供 [contractGroupListProvider] 复用解析结果，抑制重复 IO。
+/// 生命周期由 Provider 容器管理，而非文件级全局变量。
+final contractInfoCacheProvider = Provider<ContractInfoCache>((ref) {
+  return ContractInfoCache();
+});
 
 /// 契约分组列表 Provider：按「层级路径」构建多级递归树
 ///
@@ -196,6 +245,8 @@ final contractGroupListProvider = FutureProvider<List<ContractGroup>>((
   await ensureContracts();
 
   final files = await listContracts();
+  // 获取共享缓存实例（生命周期由 Provider 管理）
+  final cache = ref.watch(contractInfoCacheProvider);
 
   // 先解析所有文件信息（并行读取，文件多时避免串行 IO 拖慢首页加载）
   final dir = await getContractsDirectory();
@@ -213,12 +264,8 @@ final contractGroupListProvider = FutureProvider<List<ContractGroup>>((
       }
 
       // mtime 缓存命中：文件未变化 → 直接复用已解析的 ContractInfo
-      final cached = _contractInfoCache[name];
-      if (cached != null &&
-          lastModified != null &&
-          cached.lastModified == lastModified) {
-        return cached.info;
-      }
+      final cached = cache.get(name, lastModified);
+      if (cached != null) return cached;
 
       // 缓存未命中 / mtime 变化：读取内容重新解析
       final content = await readContract(name);
@@ -233,11 +280,7 @@ final contractGroupListProvider = FutureProvider<List<ContractGroup>>((
         lastModified: lastModified,
       );
       if (lastModified != null) {
-        _contractInfoCache[name] = _ContractInfoCacheEntry(
-          lastModified: lastModified,
-          info: info,
-        );
-        _evictContractInfoCacheIfNeeded(name);
+        cache.put(name, lastModified, info);
       }
       return info;
     }),
@@ -245,25 +288,6 @@ final contractGroupListProvider = FutureProvider<List<ContractGroup>>((
 
   return buildContractTree(infos);
 });
-
-/// 契约信息缓存超限时淘汰最旧（按插入顺序移除最早条目）。
-void _evictContractInfoCacheIfNeeded(String justAddedKey) {
-  if (_contractInfoCache.length <= _maxContractInfoCacheEntries) return;
-  // 找到最早的条目（遍历取第一个），移除之
-  final firstKey = _contractInfoCache.keys.firstWhere(
-    (k) => k != justAddedKey,
-    orElse: () => justAddedKey,
-  );
-  _contractInfoCache.remove(firstKey);
-}
-
-/// 清除契约信息缓存（契约切换时调用）。
-///
-/// 参见 [switchContract]：切换契约后旧文件名可能被复用为新内容
-/// （如 `faust.meph` 被用户编辑后重新解析），必须清空避免脏缓存。
-void clearContractInfoCache() {
-  _contractInfoCache.clear();
-}
 
 /// 切换当前使用的契约。
 ///
@@ -276,7 +300,7 @@ Future<void> switchContract(WidgetRef ref, String contractName) async {
   clearConditionCache();
   // 清空契约信息 mtime 缓存：切换契约后旧文件名可能被复用为新内容，
   // 必须强制全量重新解析避免脏数据
-  clearContractInfoCache();
+  ref.read(contractInfoCacheProvider).clear();
   ref.invalidate(contractProvider);
   ref.invalidate(currentContractNameProvider);
 }

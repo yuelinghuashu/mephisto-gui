@@ -135,9 +135,14 @@ The rule engine executes in **two phases** within a single round:
 
 ```meph
 【记忆】
-- 浮士德与梅菲斯特签订了契约
+- [5] 我是浮士德，与梅菲斯特立下赌约
 - 浮士德正在书斋中
 ```
+
+- Each memory can carry an optional **`[weight]` prefix** manually marking its importance (1-5 stars, default 3):
+  `[5]` character-core memories are never compressed, `[4]` major events are likewise protected, low-weight memories may be compressed
+- Old-format memories without a prefix are treated as 3 stars by default, fully backward-compatible
+- See the [Memory System](memory-system.en.md) "Memory Importance" section for the full weight system
 
 ## 6. Common Errors
 

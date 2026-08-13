@@ -237,8 +237,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       context,
       child,
       action,
-      includeEdit: false,
-      onEdit: () async {}, // 子版不可编辑
+      includeEdit: false, // 子版不可编辑
       onOpenNarrative: _openNarrative,
       onRename: _renameDialog,
       onDelete: () => _confirmDeleteChild(child),
@@ -497,25 +496,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ..showSnackBar(SnackBar(content: Text(l10n.homeContractSaved)));
         }
         return;
-      case 'delete_role':
+      case 'delete_role' || 'delete_child':
+        final isChild = action == 'delete_child';
         final confirmed = await ConfirmDeleteDialog.show(
           context,
           title: l10n.stageDeleteTitle,
-          message: l10n.stageCardDeleteRoleConfirm(roleName),
+          message: isChild
+              ? l10n.stageCardDeleteChildConfirm(roleName)
+              : l10n.stageCardDeleteRoleConfirm(roleName),
         );
         if (!confirmed) return;
-        await deleteStageRoleCard(stagePath, fileName);
-        if (!mounted) return;
-        _refreshLists();
-        return;
-      case 'delete_child':
-        final confirmed = await ConfirmDeleteDialog.show(
-          context,
-          title: l10n.stageDeleteTitle,
-          message: l10n.stageCardDeleteChildConfirm(roleName),
-        );
-        if (!confirmed) return;
-        await deleteStageRoleChild(stagePath, fileName);
+        final ok = isChild
+            ? await deleteStageRoleChild(stagePath, fileName)
+            : await deleteStageRoleCard(stagePath, fileName);
+        if (!ok) return;
         if (!mounted) return;
         _refreshLists();
         return;

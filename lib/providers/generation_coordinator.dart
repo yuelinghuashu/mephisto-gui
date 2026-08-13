@@ -55,6 +55,15 @@ mixin GenerationCoordinator<T> {
   /// 使调用处 `cancelSignal: generationCancelSignal` 清晰无歧义。
   Future<void>? get generationCancelSignal => _generationCancel?.future;
 
+  /// 触发当前生成任务的取消信号（协作式取消）。
+  ///
+  /// 与 [stopGenerating] 的区别：只触发取消信号，不 flush 流式缓冲。
+  /// 用于「⏩ 立即显示全文」场景——调用方已自行 flush 缓冲，
+  /// 这里仅让 LlmClient 在下一条 SSE 数据行处停止读取并返回已累积内容。
+  void cancelGeneration() {
+    _generationCancel?.complete();
+  }
+
   /// 停止当前生成：立即 flush 已到达的流式内容并触发取消信号。
   ///
   /// 协作式取消：不会中断底层 http 连接，而是让 LlmClient 在下一个
@@ -62,7 +71,7 @@ mixin GenerationCoordinator<T> {
   void stopGenerating() {
     // 立即 flush 已到达的流式内容，避免遗留在缓冲中
     onGenerationStop();
-    _generationCancel?.complete();
+    cancelGeneration();
   }
 
   /// 停止生成时的流式缓冲 flush 钩子（由混入方实现）。

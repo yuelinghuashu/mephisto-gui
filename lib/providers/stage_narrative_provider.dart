@@ -44,6 +44,12 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   /// 消除两处约 30 行的重复流式缓冲样板。
   final ThrottledStreamBuffer _streaming = ThrottledStreamBuffer();
 
+  /// 是否已进入「立即显示全文」模式。
+  ///
+  /// 用户点击「⏩ 显示全文」后置位：后续流式 chunk 不再走 50ms 节流，
+  /// 直接累积进 StringBuffer 并整串提交状态，跳过打字机动画。
+  bool _revealInstant = false;
+
   /// 舞台加载请求版本号（用于竞态保护）
   ///
   /// `loadStage` 是异步的：用户快速切换舞台时，旧请求的 Future 完成较慢，
@@ -53,12 +59,36 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
 
   /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交。
   void _appendStreamChunk(String chunk) {
-    _streaming.append(chunk, _applyStreamChunk);
+    if (_revealInstant) {
+      // 已进入「跳过打字机」模式：静默忽略后续 chunk，
+      // 不触发 UI 重建（打字机动画消失）；
+      // 完整内容由 LLM 生成完毕后的 StageReplySucceeded 一次性写入消息列表。
+      // 注意：不能在此处调用 cancelGeneration()——那会中止 LLM 生成，
+      // 导致回复被截断。
+    } else {
+      _streaming.append(chunk, _applyStreamChunk);
+    }
   }
 
   /// 提交缓冲中的流式内容到状态。
   void _flushStreamBuffer() {
     _streaming.flush(_applyStreamChunk);
+  }
+
+  /// 立即显示全部流式内容（跳过剩余打字机动画）。
+  ///
+  /// 触发时机：用户点击「⏩ 显示全文」。
+  ///
+  /// 打字机效果的真实来源是 LLM 经 SSE 逐 chunk 返回内容（而非 UI 节流），
+  /// 「跳过打字机」的正确语义是**停止 UI 逐字更新**，而非**中止 LLM 生成**。
+  /// 因此：
+  ///   1. 立即 flush 当前已到达的流式内容到 UI（用户立刻看到已有全文）
+  ///   2. 置位 `_revealInstant`——后续 chunk 静默忽略，UI 不再逐字跳动
+  ///   3. LLM 继续在后台完整生成，结束后由 StageReplySucceeded 携带完整
+  ///      `replies` 一次性写入消息列表，保证内容不截断
+  void revealStreaming() {
+    _revealInstant = true;
+    _flushStreamBuffer();
   }
 
   /// 将累积的流式内容写入状态（StringBuffer 累积 → 一次性 toString）。
@@ -196,7 +226,9 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
 
     beginGeneration();
 
-    // 新一轮生成：清空流式累积器，避免旧内容残留
+    // 新一轮生成：清空流式累积器 + 复位「显示全文」标志，
+    // 避免旧一轮的跳过打字机状态泄漏到新一轮
+    _revealInstant = false;
     _streaming.reset();
 
     _dispatch(StageMessageSent(content.trim()));

@@ -126,7 +126,6 @@ During an active narrative, **rules and memories can be hot-updated**, which com
 
 ## 8. Related Code
 
-- `lib/services/session/child_save_store.dart`: core child save implementation
-- `lib/services/session/session_saver.dart`: session save helper
+- `lib/services/session/child_save_store.dart`: core child save implementation (master/child detection, branch-tree generation, overwrite/increment strategies)
 - `lib/services/parser/meph_serializer.dart`: contract serialization (injects runtime data)
 - `lib/services/parser/meph_parser.dart`: contract parsing (restoration)

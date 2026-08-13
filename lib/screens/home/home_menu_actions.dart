@@ -25,7 +25,7 @@ Future<void> handleNodeMenu(
   ContractInfo node,
   String action, {
   required bool includeEdit,
-  required Future<void> Function() onEdit,
+  Future<void> Function()? onEdit,
   required Future<void> Function(ContractInfo) onOpenNarrative,
   required Future<void> Function(ContractInfo) onRename,
   required Future<void> Function() onDelete,
@@ -38,7 +38,8 @@ Future<void> handleNodeMenu(
       await ContractPreviewSheet.show(context, node);
       return;
     case menuActionEdit:
-      if (includeEdit) await onEdit();
+      // 仅母版支持编辑；子版（includeEdit=false）时跳过
+      if (includeEdit) await onEdit?.call();
       return;
     case menuActionRename:
       await onRename(node);

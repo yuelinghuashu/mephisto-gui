@@ -5,7 +5,25 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.4.0] - 多模型路由 · 首页信息密度优化 · 消息操作 · Markdown 渲染 · 流式性能提升
+## [1.4.1] - 叙事体验增强 · 代码质量优化 · 契约树缓存治理
+
+### ✨ 新特性
+
+- **流式「立即显示全文」**：生成中点击输入区「⏩」按钮，跳过剩余打字机动画直接显示完整回复（单角色 / 多角色舞台均支持）
+- **输入历史 + 多行输入**：桌面端 ↑ / ↓ 回溯最近 5 条命运指引，Shift+Enter 换行 / Enter 发送；移动端保持单行回车发送
+- **导出叙事**：叙事页存档菜单新增「导出叙事」，经系统保存对话框将完整对话导出为排版优雅的 Markdown 阅读版（`角色-命运纪事.md`）
+
+### 🧹 重构
+
+- 叙事页共享骨架抽取：新增 `NarrativeScaffold` 组件，统一单角色 / 多角色叙事页的桌面快捷键绑定与 LLM 错误 SnackBar 提示，消除约 40 行重复样板
+- 契约信息缓存治理：模块级全局 `Map` 迁移为 Riverpod Provider（`contractInfoCacheProvider`），生命周期交由 Provider 容器管理，避免跨测试库并行加载的全局状态污染
+- LLM 消息列表构建抽为共享工具 `buildLlmMessageList`，单角色 / 多角色 TurnService 统一复用，消除约 15 行重复样板
+- 叙事 Reducer 优化：`ReplySucceeded` 三次链式 `copyWith` 合并为单次调用，减少中间不可变对象分配
+- 首页操作精简：舞台角色「删除角色卡 / 删除存档」合并为单分支；`handleNodeMenu.onEdit` 改为可空参数，移除空闭包占位
+- 状态管理统一导出补全：`home_section_visibility_provider` / `home_selection_controller` 纳入 `providers.dart` barrel
+
+<details>
+<summary>## [1.4.0] - 多模型路由 · 首页信息密度优化 · 消息操作 · Markdown 渲染 · 流式性能提升</summary>
 
 ### ✨ 新特性
 
@@ -46,6 +64,8 @@
 - 测试新增：辅助配置持久化 round-trip（未设置 null / 保存读取 / 清除回退）、`LlmAuxConfig.resolve` 字段继承与覆盖规则
 - `StateValue` 四子类添加 `toString()`，调试打印显示实际值
 - `home_screen_test.dart` 重写匹配新 UI（10 用例）；`rename_contract_dialog_test.dart` 适配真实异步 IO（8 用例）；`contract_provider_test.dart` 新增孤儿节点 + 深度守卫边界用例
+
+</details>
 
 <details>
 <summary>## [1.3.0] - 新内置契约 · Android 正式签名 · 多角色舞台 · 界面与代码精简</summary>

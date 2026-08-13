@@ -339,6 +339,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Write the guidance of fate, and the narrative will grow within the contract...';
 
   @override
+  String get narrativeExport => 'Export Narrative';
+
+  @override
+  String get narrativeExportEmpty => '╳ No narrative content to export yet';
+
+  @override
+  String narrativeExportSaved(Object path) {
+    return '✦ Narrative exported: $path';
+  }
+
+  @override
+  String narrativeExportFail(Object error) {
+    return '╳ Export failed: $error';
+  }
+
+  @override
   String get messageBubbleThinking => 'Mephisto is writing...';
 
   @override
@@ -362,6 +378,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get inputBarSendTooltip => 'Send';
+
+  @override
+  String get inputBarRevealFull => 'Show full text now (skip typing animation)';
 
   @override
   String inputBarInvalidAttachment(Object fileName) {

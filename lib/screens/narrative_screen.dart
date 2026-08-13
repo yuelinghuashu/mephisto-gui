@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
@@ -12,6 +13,7 @@ import '../providers/providers.dart';
 import '../screens/contract_editor_screen.dart';
 import '../services/contract_file_watcher.dart';
 import '../services/narrative_error_localizer.dart';
+import '../services/narrative_exporter.dart';
 import '../services/parser/meph_serializer.dart';
 import '../services/session/child_save_store.dart';
 import '../services/storage/contract_repo.dart';
@@ -22,6 +24,7 @@ import '../widgets/narrative/dashboard_drawer.dart';
 import '../widgets/narrative/empty_state.dart';
 import '../widgets/narrative/input_bar.dart';
 import '../widgets/narrative/message_list.dart';
+import '../widgets/narrative/narrative_scaffold.dart';
 import '../widgets/narrative/smart_jump_button.dart';
 import '../widgets/narrative/status_bar.dart';
 import '../widgets/narrative/width_constrained_center.dart';
@@ -179,23 +182,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
             ? localizeNarrativeError(l10n, rawFallbackNotice)
             : rawFallbackNotice;
 
-    // ---- 监听 LLM 错误：非空时提示用户，避免静默回退 ----
-    ref.listen(narrativeProvider.select((s) => s.lastError), (prev, next) {
-      if (next.isNotEmpty) {
-        final l10n = AppLocalizations.of(context);
-        // 错误码 → 本地化文本；自由格式错误文本（如 LLM 异常信息）直接展示
-        final displayError = isNarrativeErrorCode(next)
-            ? localizeNarrativeError(l10n, next)
-            : next;
-        ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(
-              content: Text(l10n.narrativeErrorPrefix(displayError)),
-            ),
-          );
-      }
-    });
+    // ---- 错误监听（LLM 错误 → SnackBar）已由 [NarrativeScaffold] 统一处理 ----
 
     // ---- 文件监听：sourceFileName 变化（重开子版/切换契约）时重绑 ----
     // 首次绑定已在 initState 的 microtask 中完成，此处仅监听后续变化
@@ -215,18 +202,11 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final isMobile =
         MediaQuery.sizeOf(context).width < AppTheme.mobileBreakpoint;
 
-    // ---- 构建界面 ----
-    return CallbackShortcuts(
-      // 桌面端快捷键（移动端无实体键盘，使用 AppBar 按钮替代）：
-      //   Ctrl+Home → 跳至第一条历史
-      //   Ctrl+End  → 跳至最后一条历史
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.home, control: true): () =>
-            _messageListKey.currentState?.scrollToTop(),
-        const SingleActivator(LogicalKeyboardKey.end, control: true): () =>
-            _messageListKey.currentState?.scrollToBottom(),
-      },
-      child: Scaffold(
+    // ---- 构建界面：共享骨架（快捷键 + 错误监听）----
+    return NarrativeScaffold(
+      messageListKey: _messageListKey,
+      lastError: state.lastError,
+      scaffoldBuilder: (context) => Scaffold(
         // 仪表盘：桌面端右侧抽屉；移动端改用底部弹出面板
         endDrawer: isMobile ? null : DashboardDrawer(state: state),
 
@@ -291,6 +271,12 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                   menuActionDelete,
                   Icons.delete_outline,
                   l10n.narrativeDeleteSave,
+                ),
+                const PopupMenuDivider(),
+                ContractMenuItem(
+                  menuActionExport,
+                  Icons.ios_share,
+                  l10n.narrativeExport,
                 ),
               ],
             ),
@@ -391,6 +377,9 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                 onStop: () {
                   ref.read(narrativeProvider.notifier).stopGenerating();
                 },
+                onReveal: () {
+                  ref.read(narrativeProvider.notifier).revealStreaming();
+                },
                 showAttachment: true,
                 attachedFileNames: state.attachedFileNames,
                 onAttach: (fileName, content) {
@@ -442,6 +431,52 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
           ),
         );
         break;
+      case menuActionExport:
+        await _exportNarrative();
+        break;
+    }
+  }
+
+  /// 导出当前叙事为 Markdown 阅读版（通过系统保存对话框写入 .md）。
+  Future<void> _exportNarrative() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
+
+    final state = ref.read(narrativeProvider);
+    if (state.history.isEmpty) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.narrativeExportEmpty)),
+      );
+      return;
+    }
+
+    final markdown = exportNarrativeMarkdown(
+      roleName: state.roleName,
+      branchName: state.branchName.isEmpty ? null : state.branchName,
+      history: state.history,
+    );
+
+    final baseName =
+        state.sourceFileName.replaceAll('.meph', '').replaceAll('.child', '');
+    final destination = await getSaveLocation(
+      suggestedName: '$baseName-chronicle.md',
+      acceptedTypeGroups: const [
+        XTypeGroup(label: 'Markdown', extensions: ['md']),
+      ],
+    );
+    if (destination == null) return; // 用户取消
+
+    try {
+      await File(destination.path).writeAsString(markdown);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.narrativeExportSaved(destination.path))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.narrativeExportFail(e.toString()))),
+      );
     }
   }
 

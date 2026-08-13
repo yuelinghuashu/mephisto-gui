@@ -80,28 +80,24 @@ NarrativeState _onReplySucceeded(
   required List<DiceResult> diceResults,
   required String lastError,
 }) {
-  // 聚合本轮所有变化（当前状态、注入记忆）
-  var next = state.copyWith(
+  // 一次性聚合本轮所有变化（当前状态、记忆注入、骰子系统消息、回复），
+  // 避免多次 copyWith 产生中间不可变对象。
+  final updatedMemories = injectedMemories.isEmpty
+      ? state.memories
+      : [...state.memories, ...injectedMemories];
+  final updatedMessages = [
+    ...state.messages,
+    // 骰子结果以系统消息展示（携带结构化数据供 UI 渲染）
+    if (rollInfo.isNotEmpty)
+      Message.system(rollInfo, diceResults: diceResults),
+    Message.assistant(reply),
+  ];
+
+  return state.copyWith(
     currentState: newState,
-    memories: injectedMemories.isEmpty
-        ? state.memories
-        : [...state.memories, ...injectedMemories],
-  );
-
-  // 骰子结果以系统消息展示（携带结构化数据供 UI 渲染）
-  if (rollInfo.isNotEmpty) {
-    next = next.copyWith(
-      messages: [
-        ...next.messages,
-        Message.system(rollInfo, diceResults: diceResults),
-      ],
-    );
-  }
-
-  // 写回回复 + 清空生成状态
-  return next.copyWith(
-    messages: [...next.messages, Message.assistant(reply)],
-    history: _appendHistoryEntry(next, MessageRole.assistant, reply),
+    memories: updatedMemories,
+    messages: updatedMessages,
+    history: _appendHistoryEntry(state, MessageRole.assistant, reply),
     isGenerating: false,
     streamingContent: '',
     // 错误信息提示（放在最后，避免被覆盖）

@@ -126,7 +126,6 @@ faust.dark.meph → 歌德.dark.meph
 
 ## 8. 相关代码
 
-- `lib/services/session/child_save_store.dart`：子版存档核心实现
-- `lib/services/session/session_saver.dart`：会话保存辅助
+- `lib/services/session/child_save_store.dart`：子版存档核心实现（含母版/子版判定、分支树生成、覆盖/递增策略）
 - `lib/services/parser/meph_serializer.dart`：契约序列化（注入运行时数据）
 - `lib/services/parser/meph_parser.dart`：契约解析（恢复）

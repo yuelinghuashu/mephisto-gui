@@ -18,6 +18,7 @@ import 'engine/local_reply.dart';
 import 'engine/rule_engine.dart';
 import 'llm/client.dart';
 import 'llm/llm_invoker.dart';
+import 'llm/llm_message_builder.dart';
 import 'prompt/system_prompt.dart';
 
 /// 单轮叙事生成的结构化结果
@@ -173,28 +174,17 @@ class NarrativeTurnService {
     required String narrativeRules,
     int? maxMemories,
   }) {
-    final history = priorMessages
-        .where((m) => m.role != MessageRole.system)
-        .map(
-          (m) => LlmMessage(
-            role: m.role == MessageRole.fate ? 'user' : 'assistant',
-            content: m.content,
-          ),
-        );
-    return [
-      LlmMessage(
-        role: 'system',
-        content: buildSystemPrompt(
-          contract: contract,
-          currentState: currentState,
-          memories: memories,
-          narrativeRules: narrativeRules,
-          attachedContexts: attachedContexts,
-          maxMemories: maxMemories,
-        ),
+    return buildLlmMessageList(
+      systemPrompt: buildSystemPrompt(
+        contract: contract,
+        currentState: currentState,
+        memories: memories,
+        narrativeRules: narrativeRules,
+        attachedContexts: attachedContexts,
+        maxMemories: maxMemories,
       ),
-      ...history,
-      LlmMessage(role: 'user', content: llmInput),
-    ];
+      historyMessages: priorMessages,
+      userInput: llmInput,
+    );
   }
 }

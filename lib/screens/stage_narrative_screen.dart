@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
-import '../domain/narrative_error.dart';
 import '../domain/stage_color_palette.dart';
 import '../providers/providers.dart';
-import '../services/narrative_error_localizer.dart';
 import '../widgets/narrative/input_bar.dart';
 import '../widgets/narrative/message_list.dart';
+import '../widgets/narrative/narrative_scaffold.dart';
 import '../widgets/narrative/role_status_bar.dart';
 import '../widgets/narrative/smart_jump_button.dart';
 import '../widgets/narrative/stage_empty_state.dart';
@@ -21,10 +19,9 @@ import '../widgets/narrative/width_constrained_center.dart';
 /// 消息流按 `【角色名】` 分节展示；输入发送后由 [StageTurnService]
 /// 单次 LLM 调用 → 分节解析 → 各角色独立回写。
 ///
-/// v1 基础版：
-///   - 复用 [MessageList]（纯展示）+ 复用 [InputBar]（与单角色叙事一致，
-///     含附件功能）
-///   - 不按角色分区块着色（M3.2 可增强 MessageBubble 按角色名着色）
+/// 角色消息气泡（[StageMessageBubble]）按角色着色：
+///   - 左侧竖排角色名标签 + 左边框使用该角色的主题色
+///   - roleTag 为空 / 色板不可查时退化为标准 [MessageBubble]
 class StageNarrativeScreen extends ConsumerStatefulWidget {
   /// 舞台目录绝对路径
   final String stagePath;
@@ -88,35 +85,13 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
             state.stage!.characters.map((c) => c.roleName).toList(),
           );
 
-    // ---- 监听错误：非空时提示（与单角色叙事页一致：错误码 → 本地化翻译）----
-    ref.listen(
-      stageNarrativeProvider.select((s) => s.lastError),
-      (prev, next) {
-        if (next.isNotEmpty && mounted) {
-          // 错误码 → 本地化文本；自由格式错误文本（如 LLM 异常信息）直接展示
-          final displayError = isNarrativeErrorCode(next)
-              ? localizeNarrativeError(l10n, next)
-              : next;
-          ScaffoldMessenger.of(context)
-            ..hideCurrentSnackBar()
-            ..showSnackBar(
-              SnackBar(content: Text(l10n.narrativeErrorPrefix(displayError))),
-            );
-        }
-      },
-    );
+    // ---- 错误监听（LLM 错误 → SnackBar）已由 [NarrativeScaffold] 统一处理 ----
 
-    return CallbackShortcuts(
-      // 桌面端快捷键（与单角色叙事页一致）：
-      //   Ctrl+Home → 跳至第一条历史
-      //   Ctrl+End  → 跳至最后一条历史
-      bindings: {
-        const SingleActivator(LogicalKeyboardKey.home, control: true): () =>
-            _messageListKey.currentState?.scrollToTop(),
-        const SingleActivator(LogicalKeyboardKey.end, control: true): () =>
-            _messageListKey.currentState?.scrollToBottom(),
-      },
-      child: Scaffold(
+    // ---- 构建界面：共享骨架（快捷键 + 错误监听）----
+    return NarrativeScaffold(
+      messageListKey: _messageListKey,
+      lastError: state.lastError,
+      scaffoldBuilder: (context) => Scaffold(
         appBar: AppBar(
           title: Text(
             state.stageName,
@@ -207,6 +182,9 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
               },
               onStop: () {
                 ref.read(stageNarrativeProvider.notifier).stopGenerating();
+              },
+              onReveal: () {
+                ref.read(stageNarrativeProvider.notifier).revealStreaming();
               },
               showAttachment: true,
               attachedFileNames: state.attachedFileNames,

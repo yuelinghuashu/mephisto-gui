@@ -99,6 +99,10 @@
   "narrativeStopGenerating": "停止生成",
   "narrativeConfirm": "保存",
   "narrativeEmptyHint": "写下命运的指引，叙事将在契约中生长...",
+  "narrativeExport": "导出叙事",
+  "narrativeExportEmpty": "╳ 暂无叙事内容可导出",
+  "narrativeExportSaved": "✦ 叙事已导出: {path}",
+  "narrativeExportFail": "╳ 导出失败: {error}",
 
   "messageBubbleThinking": "梅菲斯特正在执笔...",
   "messageMenuCopy": "复制",
@@ -109,6 +113,7 @@
   "inputBarHintGenerating": "梅菲斯特正在编织故事...",
   "inputBarHintIdle": "写下命运的指引，契约将推动叙事...",
   "inputBarSendTooltip": "发送",
+  "inputBarRevealFull": "立即显示全文（跳过打字机动画）",
   "inputBarInvalidAttachment": "╳ {fileName} 不是有效文本，已跳过",
 
   "statusBarRuleChip": "规则",

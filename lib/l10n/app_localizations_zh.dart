@@ -329,6 +329,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get narrativeEmptyHint => '写下命运的指引，叙事将在契约中生长...';
 
   @override
+  String get narrativeExport => '导出叙事';
+
+  @override
+  String get narrativeExportEmpty => '╳ 暂无叙事内容可导出';
+
+  @override
+  String narrativeExportSaved(Object path) {
+    return '✦ 叙事已导出: $path';
+  }
+
+  @override
+  String narrativeExportFail(Object error) {
+    return '╳ 导出失败: $error';
+  }
+
+  @override
   String get messageBubbleThinking => '梅菲斯特正在执笔...';
 
   @override
@@ -351,6 +367,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get inputBarSendTooltip => '发送';
+
+  @override
+  String get inputBarRevealFull => '立即显示全文（跳过打字机动画）';
 
   @override
   String inputBarInvalidAttachment(Object fileName) {
