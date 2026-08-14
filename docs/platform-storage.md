@@ -94,7 +94,7 @@
   - `arthur_sword.meph`（少年亚瑟）
   - `gilgamesh.meph`（吉尔伽美什）
   - `dantes.bonapart.meph`（基督山伯爵 × 波拿巴党卧底 if 线，预置示范子版）
-  - `faust.utopia.meph`（浮士德 × 理想国 / 乌托邦 if 线，预置示范子版）
+  - `faust.imperial.meph`（浮士德 × 帝国金殿 / 权柄幻象 if 线，预置示范子版）
 - **内置舞台**（多角色目录，`assets/contracts/<舞台名>/`）：
   - `Kurukshetra/`：`Arjuna.meph` + `Karna.meph`（俱卢之野）
   - `Camlann/`：`Arthur.meph` + `Mordred.meph`（卡美洛之陨）

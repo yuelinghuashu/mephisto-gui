@@ -51,7 +51,7 @@ In Goethe's _Faust_, Mephistopheles makes a pact with Faust: he grants Faust eve
 - **Lightweight Markdown Rendering**: narrative text supports **bold**, _italic_, headings, quotes, lists, and `inline code` (zero external dependencies)
 - **Rule Hot-Reload**: Save `.meph` → **only rules take effect instantly**, with dialogue/state/memory/history all preserved
 - **Multi-Character Stage**: A subdirectory under the contracts folder = a stage, where multiple characters interact and save independently
-- **Cross-Platform**: Windows / macOS / Linux / Android / iOS, with built-in contracts including Faust, Edmond Dantès, Joan of Arc, Young Arthur, and Gilgamesh; plus two multi-character stages: Kurukshetra and Camlann
+- **Cross-Platform**: Windows / macOS / Linux / Android / iOS, with built-in contracts including Faust, Edmond Dantès, Joan of Arc, Young Arthur, and Gilgamesh (plus two demo child lines: the Bonapartist Mole and the Imperial Court); plus two multi-character stages: Kurukshetra and Camlann
 
 ## ✨ Screenshots
 

@@ -232,25 +232,42 @@ void main() {
       expect(fate.condition, contains('roll(1d100)'));
     });
 
-    test('解析 faust.utopia.meph（官方示范子版：理想国 / 乌托邦线）', () async {
+    test('解析 faust.imperial.meph（浮士德子版：帝国金殿 / 权柄幻象线）', () async {
       final text = await rootBundle.loadString(
-        'assets/contracts/faust.utopia.meph',
+        'assets/contracts/faust.imperial.meph',
       );
       final contract = parseMeph(text);
 
       expect(contract.roleName, '浮士德');
-      // 状态：前所未有的平静（契约临界设定）
+      // 状态：权柄幻象线的核心状态集
       final state = {for (final s in contract.state) s.key: s.value};
-      expect(state['情绪'], const StringValue('前所未有的平静'));
+      expect(state['位置'], const StringValue('金殿'));
+      expect(state['皇眷'], const IntValue(50));
+      expect(state['权力欲'], const IntValue(60));
       // 记忆/历史为运行时产物，契约模板不应预置
       expect(contract.memories, isEmpty);
       expect(contract.history, isEmpty);
-      // 呼应原典「满足即终结」的规则
-      final critical = contract.rules.firstWhere((r) => r.name == '契约临界');
-      expect(critical.condition, contains('roll(1d100)'));
-      // 「说出停留」：浮士德亲口说出原典台词
-      final stay = contract.rules.firstWhere((r) => r.name == '说出停留');
-      expect(stay.action, contains('请停留一下'));
+      // @命运 区块（分支一句话）
+      expect(contract.branchTitle, contains('帝国金殿'));
+      // 场景链：金殿 → 召唤厅
+      final summon = contract.rules.firstWhere((r) => r.name == '海伦之召');
+      expect(summon.condition, contains('状态.位置 == "金殿"'));
+      expect(summon.action, contains('状态.位置 = "召唤厅"'));
+      // 互斥组「抉择」：弄权与清醒互斥
+      final powermove = contract.rules.firstWhere((r) => r.name == '弄权');
+      expect(powermove.group, '抉择');
+      final clarity = contract.rules.firstWhere((r) => r.name == '清醒');
+      expect(clarity.group, '抉择');
+      // 互斥组「终局」：沉沦与觉醒互斥
+      final fall = contract.rules.firstWhere((r) => r.name == '契约临界');
+      expect(fall.group, '终局');
+      final awakening = contract.rules.firstWhere((r) => r.name == '觉醒');
+      expect(awakening.group, '终局');
+      // 骰子判定（幻觉侵蚀 / 海伦降临）
+      final illusion = contract.rules.firstWhere((r) => r.name == '帝国幻象');
+      expect(illusion.condition, contains('roll(1d100)'));
+      final helen = contract.rules.firstWhere((r) => r.name == '美之降临');
+      expect(helen.condition, contains('roll(1d100)'));
     });
   });
 

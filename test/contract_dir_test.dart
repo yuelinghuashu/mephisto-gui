@@ -46,7 +46,7 @@ void main() {
     expect(File('${tempDir.path}/gilgamesh.meph').existsSync(), isTrue);
     // 官方示范子版（命运支流枝叶）
     expect(File('${tempDir.path}/dantes.bonapart.meph').existsSync(), isTrue);
-    expect(File('${tempDir.path}/faust.utopia.meph').existsSync(), isTrue);
+    expect(File('${tempDir.path}/faust.imperial.meph').existsSync(), isTrue);
     // 内容是完整的内置模板（非空）
     final faust = File('${tempDir.path}/faust.meph').readAsStringSync();
     expect(faust, contains('【角色名】'));

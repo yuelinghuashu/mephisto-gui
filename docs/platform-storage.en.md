@@ -97,7 +97,7 @@ On first launch (or first switch to a new contract directory), built-in template
   - `arthur_sword.meph` (Young Arthur)
   - `gilgamesh.meph` (Gilgamesh)
   - `dantes.bonapart.meph` (Dantès × Bonapartist mole if-line, pre-seeded demo child)
-  - `faust.utopia.meph` (Faust × Republic / Utopia if-line, pre-seeded demo child)
+  - `faust.imperial.meph` (Faust × Imperial Court / Illusion of Power if-line, pre-seeded demo child)
 - **Built-in stages** (multi-character directories, `assets/contracts/<stage name>/`):
   - `Kurukshetra/`: `Arjuna.meph` + `Karna.meph` (Kurukshetra)
   - `Camlann/`: `Arthur.meph` + `Mordred.meph` (The Fall of Camlann)

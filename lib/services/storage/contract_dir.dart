@@ -23,7 +23,7 @@ const String _assetPrefix = 'assets/contracts/';
 ///
 /// 除母版契约外，还预置「官方示范子版」（命运支流枝叶）：
 ///   - `dantes.bonapart.meph`：基督山伯爵 × 波拿巴党卧底 if 线
-///   - `faust.utopia.meph`：浮士德 × 理想国 / 乌托邦 if 线
+///   - `faust.imperial.meph`：浮士德 × 帝国金殿 / 权柄幻象 if 线
 /// 首页分组逻辑会自动将它们显示为对应母版下的子版，直观呈现「树根 + 枝叶」。
 const List<String> _builtinContracts = [
   'faust.meph',
@@ -32,7 +32,7 @@ const List<String> _builtinContracts = [
   'arthur_sword.meph',
   'gilgamesh.meph',
   'dantes.bonapart.meph',
-  'faust.utopia.meph',
+  'faust.imperial.meph',
 ];
 
 /// 内置舞台（多角色）定义：舞台目录名 → 目录内角色 .meph 文件列表

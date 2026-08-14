@@ -3,9 +3,9 @@
 > [Rule Engine Deep Dive](rule-engine.en.md) answers "what is syntactically **valid**"; this guide answers "**what is efficient, correct, and sustainable**".
 > The anti-patterns below come from real fixes to built-in contracts—they are not theory, but pits players actually stepped into.
 
-## 1. Before You Write: Seven-Question Design Checklist
+## 1. Before You Write: Eight-Question Design Checklist
 
-Run through these seven questions before writing a rule:
+Run through these eight questions before writing a rule:
 
 | # | Question | What happens if you skip it |
 |---|----------|----------------------------|
@@ -16,10 +16,11 @@ Run through these seven questions before writing a rule:
 | 5 | **Are ending-rule conditions too harsh?** Do stacked hard keywords make triggering nearly impossible? | Ending never reachable (Anti-pattern 5) |
 | 6 | **Does each mutual-exclusion group have an opposite rule?** Does a single-member group still make sense? | Mutual exclusion becomes meaningless (Anti-pattern 6) |
 | 7 | **Should the text this rule outputs be the same every time, or vary with the narrative flow?** If it should vary, should the LLM improvise it? | Repetitive narrative, character sounds like a broken record (Anti-pattern 7) |
+| 8 | **Is the LLM instruction's trigger condition too broad?** Does a character name / generic word alone trigger active output? | High-frequency false triggers crowding out other active narrative (Anti-pattern 8) |
 
 ---
 
-## 2. Seven Anti-Patterns and Their Fixes
+## 2. Eight Anti-Patterns and Their Fixes
 
 ### Anti-pattern 1: Rule not bound to scene state → cross-scene misfire
 
@@ -114,7 +115,7 @@ Run through these seven questions before writing a rule:
 
 ### Anti-pattern 5: Too many hard constraints on an ending rule → nearly unreachable
 
-**Wrong** (before the `faust.utopia.meph` fix): the ending requires the player to say **both** "停留"(stay) and "够了"(enough) at once, plus a soul-integrity threshold:
+**Wrong** (before the Faust contract fix): the ending requires the player to say **both** "停留"(stay) and "够了"(enough) at once, plus a soul-integrity threshold:
 
 ```meph
 [说出停留] if 包含 "停留" && 状态.灵魂完整度 >= 80 && 包含 "够了" -> ...
@@ -183,6 +184,29 @@ Note the action does **not** start with `注入 "..."` or `状态.xxx`—it is a
 |----------------|-----|
 | This text should be **identical every time** (contract terms, key lines, facts that must be anchored) | `注入` |
 | This text should **vary with context / prior events / character state** (dialogue, literary action descriptions) | LLM instruction (active rule) |
+
+---
+
+### Anti-pattern 8: Overly broad trigger conditions on LLM instructions → high-frequency false triggers
+
+**Wrong** (before the `faust.imperial.meph` / `Kurukshetra` fixes): using a **single character name** or a **high-frequency generic word** as the trigger condition for an LLM instruction:
+
+```meph
+[梅菲斯特耳语] if 包含 "梅菲斯特" || 包含 "弄臣" -> 梅菲斯特以弄臣的谄媚口吻靠近{角色名}，用权力、金钱与美人的言辞诱惑他沉溺于这场宫廷大戏
+```
+
+**Problem**: Mephistopheles is a core character constantly present in the imperial court drama—whether the player questions him, tests him, or merely mentions him, the same "approaches flatteringly and tempts" line forcibly interrupts. Worse, active rules (LLM instructions) use **mutual-exclusion matching**: only the first matched rule runs per round. A high-frequency rule crowds out other active narrative space, pushing the script back to the same action repeatedly. `Kurukshetra/Karna.meph`'s `[敬敌]` (`包含 "阿周那"`—the opposing commander's name; discussing tactics triggers it) and `[黄金甲]` (`包含 "铠甲"`—a battlefield generic word; talking about enemy armor also triggers it) are the same class of problem: context-detached fixed emotional output firing over and over.
+
+**Fix**: add **context-word gating** to LLM instruction conditions—trigger only when the player explicitly expresses the corresponding intent:
+
+```meph
+# Character name / item name + context words gate together
+[梅菲斯特耳语] if (包含 "梅菲斯特" || 包含 "弄臣") && (包含 "低语" || 包含 "耳语" || 包含 "引诱" || 包含 "蛊惑") -> 梅菲斯特以弄臣的谄媚姿态靠近{角色名}，用权力、金钱与美人的言辞诱惑他
+[敬敌] if 包含 "阿周那" && (包含 "敬" || 包含 "憾" || 包含 "兄弟" || 包含 "可惜") -> {角色名}流露出对阿周那的复杂敬意
+[黄金甲] if 包含 "黄金甲" -> {角色名}提及已献给因陀罗的黄金甲，但笃定太阳的庇护从未离开
+```
+
+> 💡 **LLM instruction trigger conditions should align with player intent**. Character names / high-frequency words only carry "character presence"; they should not trigger LLM active output alone. Active output should be gated by "character name / special item name + an explicit interactive context word. If you only need in-scene presence, use a passive `注入` description instead of an LLM instruction.
 
 ---
 
