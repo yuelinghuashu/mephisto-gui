@@ -13,9 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 固定 Flutter 版本（与本地/生成 golden 的版本一致）：golden 像素测试
+      # 对 Flutter 版本敏感（文本度量微移即越 0.1% 阈值），channel: stable 会
+      # 追最新稳定版导致 golden 偶发失败。升级 Flutter 后需重新生成 golden：
+      #   flutter test --update-goldens test/widgets/component_golden_test.dart
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: 3.44.8
           cache: true
 
       - name: Install dependencies
@@ -40,9 +44,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 固定 Flutter 版本（与 analyze-and-test 一致，golden 版本敏感）
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: 3.44.8
           cache: true
 
       - name: Install dependencies
