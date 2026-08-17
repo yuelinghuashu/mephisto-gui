@@ -114,9 +114,8 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
       child: Text(
         '≋ 诸神的注视落于棋盘之上 ≋',
         textAlign: TextAlign.center,
+        // labelSmall 已含 11px + textSecondary 默认值
         style: theme.textTheme.labelSmall?.copyWith(
-          color: AppTheme.textSecondary(theme.brightness),
-          fontSize: 11,
           letterSpacing: 1.2,
         ),
       ),
@@ -177,9 +176,9 @@ class _VerdictRow extends StatelessWidget {
             padding: const EdgeInsets.only(left: 24),
             child: Text(
               '阈值 ≥ ${result.threshold}',
+              // labelMedium 已含 12px 默认值
               style: theme.textTheme.labelMedium?.copyWith(
                 color: AppTheme.textSecondary(theme.brightness),
-                fontSize: 12,
               ),
             ),
           ),
@@ -189,9 +188,9 @@ class _VerdictRow extends StatelessWidget {
             padding: const EdgeInsets.only(left: 24),
             child: Text(
               '触发: ${result.action}',
+              // labelMedium 已含 12px 默认值
               style: theme.textTheme.labelMedium?.copyWith(
                 color: AppTheme.gold,
-                fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -201,9 +200,9 @@ class _VerdictRow extends StatelessWidget {
           padding: const EdgeInsets.only(left: 24),
           child: Text(
             result.verdict,
-            style: theme.textTheme.bodySmall?.copyWith(
+            // labelLarge 已含 13px 默认值，仅覆盖颜色/斜体
+            style: theme.textTheme.labelLarge?.copyWith(
               color: result.success ? AppTheme.gold : AppTheme.crimson,
-              fontSize: 13,
               fontStyle: FontStyle.italic,
             ),
           ),

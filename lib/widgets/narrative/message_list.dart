@@ -135,16 +135,24 @@ class MessageListState extends State<MessageList> {
     }
   }
 
-  /// 新消息/流式内容到来时：若正在跟随底部则平滑滚动到底部。
+  /// 新消息/流式内容到来时：若正在跟随底部则滚动到底部。
+  ///
+  /// 滚动策略区分两种场景：
+  ///   - 消息**条数**变化（新消息入列）→ 平滑滚动（250ms，视觉自然）
+  ///   - 流式**内容增长**（streamingContent 每 50ms 变化）→ 直接 `jumpTo`
+  ///     直落底部：逐 chunk 重启 250ms 动画会造成「追尾抖动」并每 50ms
+  ///     入队一次动画回调，故流式增长不走动画。
   @override
   void didUpdateWidget(MessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 消息数量变化或流式内容增长（排除纯滚动造成的 update）
+    if (!_autoFollowBottom) return;
+    final countChanged =
+        widget.messages.length != oldWidget.messages.length;
     final contentChanged =
-        widget.messages.length != oldWidget.messages.length ||
         widget.streamingContent != oldWidget.streamingContent ||
         widget.isGenerating != oldWidget.isGenerating;
-    if (contentChanged && _autoFollowBottom) {
+    if (countChanged) {
+      // 新消息入列：平滑滚动
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
         final position = _scrollController.position;
@@ -152,6 +160,14 @@ class MessageListState extends State<MessageList> {
           position.maxScrollExtent,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
+        );
+      });
+    } else if (contentChanged && widget.isGenerating) {
+      // 流式内容增长：jumpTo 直落底部（不触发动画，避免追尾抖动）
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) return;
+        _scrollController.jumpTo(
+          _scrollController.position.maxScrollExtent,
         );
       });
     }
@@ -231,16 +247,24 @@ class MessageListState extends State<MessageList> {
           }
 
           // ---- 普通消息 ----
-          final message = widget.messages[index];
-          final bubble =
-              widget.messageBuilder?.call(message, false) ??
-              MessageBubble(
-                message: message,
-                onRegenerate: widget.onRegenerate == null
-                    ? null
-                    : () => widget.onRegenerate!(index),
-              );
-          return _wrapBubble(bubble);
+          // 用 _CachedBubble 包裹：流式 chunk 高频重建列表时，历史消息的
+          // Message 对象内容未变（Equatable 按内容比较相等），缓存的气泡
+          // 子树直接复用，不再对每条可见历史消息重跑 Markdown 解析
+          // （ParagraphText.build），显著降低长叙事下的流式开销。
+          return _CachedBubble(
+            message: widget.messages[index],
+            builder: (message) {
+              final bubble =
+                  widget.messageBuilder?.call(message, false) ??
+                  MessageBubble(
+                    message: message,
+                    onRegenerate: widget.onRegenerate == null
+                        ? null
+                        : () => widget.onRegenerate!(index),
+                  );
+              return _wrapBubble(bubble);
+            },
+          );
         },
       ),
     );
@@ -265,6 +289,56 @@ class MessageListState extends State<MessageList> {
       ),
     );
   }
+}
+
+/// 消息气泡缓存（按内容短路）
+///
+/// 流式输出期间 [MessageList.build] 每 50ms 重建一次，itemBuilder 会对
+/// 全部可见项重新执行。历史消息的 [Message] 内容未变（Equatable 按内容
+/// 比较相等），但每次 rebuild 都会重新走一遍
+/// `MessageBubble → ParagraphText → Markdown 正则解析`——长叙事下成本
+/// 随可见消息数线性增长。
+///
+/// 本组件在 [didUpdateWidget] 中按「message 内容是否变化」短路：
+/// 内容未变时复用已构建的气泡子树（Flutter 对相同 child 实例跳过重建），
+/// 仅当消息内容真正变化（新回复入列/重新生成）时才重建气泡。
+class _CachedBubble extends StatefulWidget {
+  /// 当前消息（Equatable 按内容比较）
+  final Message message;
+
+  /// 气泡构建器（惰性调用：仅首次构建或内容变化时执行）
+  final Widget Function(Message message) builder;
+
+  const _CachedBubble({required this.message, required this.builder});
+
+  @override
+  State<_CachedBubble> createState() => _CachedBubbleState();
+}
+
+class _CachedBubbleState extends State<_CachedBubble> {
+  /// 上次构建时的消息（用于内容变化检测）
+  late Message _lastMessage = widget.message;
+
+  /// 已构建的气泡子树（内容未变时复用）
+  late Widget _cachedChild = _build();
+
+  /// 构建气泡子树（仅在首次/内容变化时执行）。
+  Widget _build() {
+    return widget.builder(widget.message);
+  }
+
+  @override
+  void didUpdateWidget(_CachedBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 内容未变 → 复用缓存子树，不重建（避免每 chunk 重跑 Markdown 解析）
+    if (widget.message != _lastMessage) {
+      _lastMessage = widget.message;
+      _cachedChild = _build();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _cachedChild;
 }
 
 /// 流式输出气泡（独立 StatefulWidget）

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
-import '../../domain/narrative_state.dart';
+import '../../domain/models.dart';
 import '../contract_panel.dart';
 
 /// 移动端仪表盘：从底部弹出面板展示契约数据。
@@ -12,14 +12,38 @@ import '../contract_panel.dart';
 ///   - 高度约占屏幕 75%
 ///   - 顶部显示拖动把手 + 标题 + 关闭按钮
 ///   - 内容复用 [ContractPanel] 契约数据面板
+///
+/// 接收「字段」而非整个 [NarrativeState]（与 [DashboardDrawer] 一致），
+/// 使调用方可对字段做窄监听。
 class DashboardBottomSheet extends StatelessWidget {
-  /// 叙事状态（包含契约、运行时状态、记忆、历史）
-  final NarrativeState state;
+  /// 契约（静态数据）
+  final Contract contract;
 
-  const DashboardBottomSheet({super.key, required this.state});
+  /// 运行时状态
+  final Map<String, StateValue> currentState;
+
+  /// 运行时记忆
+  final List<Memory> memories;
+
+  /// 运行时历史
+  final List<HistoryEntry> history;
+
+  const DashboardBottomSheet({
+    super.key,
+    required this.contract,
+    required this.currentState,
+    required this.memories,
+    required this.history,
+  });
 
   /// 弹出底部面板的便捷入口。
-  static Future<void> show(BuildContext context, NarrativeState state) {
+  static Future<void> show(
+    BuildContext context, {
+    required Contract contract,
+    required Map<String, StateValue> currentState,
+    required List<Memory> memories,
+    required List<HistoryEntry> history,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       // 圆角面板（顶角）
@@ -34,7 +58,12 @@ class DashboardBottomSheet extends StatelessWidget {
       builder: (context) => FractionallySizedBox(
         heightFactor: 0.75,
         child: SafeArea(
-          child: DashboardBottomSheet(state: state),
+          child: DashboardBottomSheet(
+            contract: contract,
+            currentState: currentState,
+            memories: memories,
+            history: history,
+          ),
         ),
       ),
     );
@@ -89,10 +118,10 @@ class DashboardBottomSheet extends StatelessWidget {
         // ---- 契约数据面板（复用共享组件） ----
         Expanded(
           child: ContractPanel(
-            contract: state.contract,
-            currentState: state.currentState,
-            memories: state.memories,
-            history: state.history,
+            contract: contract,
+            currentState: currentState,
+            memories: memories,
+            history: history,
           ),
         ),
       ],

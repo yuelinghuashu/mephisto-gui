@@ -286,11 +286,18 @@ int _findMatchingParen(String c, int start) {
   return -1;
 }
 
-/// 判断指定运算符是否出现在顶层（括号外）。
+/// 判断指定运算符是否出现在顶层（括号外，且不在双引号字符串内）。
 bool _hasTopLevelOperator(String c, String op) {
   var depth = 0;
   for (var i = 0; i < c.length; i++) {
     final ch = c[i];
+    if (ch == '"') {
+      // 跳过双引号字符串内容：`包含 "a||b"` 中的 || 是字符串数据，
+      // 不是逻辑运算符。引号内的 `(`/`)`/`&&`/`||` 均不参与结构扫描。
+      i = _skipQuoted(c, i);
+      if (i == -1) break;
+      continue;
+    }
     if (ch == '(') {
       depth++;
     } else if (ch == ')') {
@@ -302,13 +309,19 @@ bool _hasTopLevelOperator(String c, String op) {
   return false;
 }
 
-/// 在顶层（括号外）按运算符切分条件字符串，返回切分片段（已 trim）。
+/// 在顶层（括号外，且不在双引号字符串内）按运算符切分条件字符串。
 List<String> _splitTopLevel(String c, String op) {
   final parts = <String>[];
   var depth = 0;
   var start = 0;
   for (var i = 0; i < c.length; i++) {
     final ch = c[i];
+    if (ch == '"') {
+      // 跳过双引号字符串内容（与 [_hasTopLevelOperator] 一致）
+      i = _skipQuoted(c, i);
+      if (i == -1) break;
+      continue;
+    }
     if (ch == '(') {
       depth++;
     } else if (ch == ')') {
@@ -321,6 +334,17 @@ List<String> _splitTopLevel(String c, String op) {
   }
   parts.add(c.substring(start).trim());
   return parts;
+}
+
+/// 从 [i] 处的 `"` 起跳过整个双引号字符串，返回字符串结束位置（含闭合引号）。
+///
+/// 条件表达式中的字符串值使用 `"..."`（如 `包含 "a||b"`、`状态.x == "1"`）。
+/// 返回 -1 表示引号未闭合（按"剩余内容全部是字符串"处理，调用方安全退出）。
+int _skipQuoted(String c, int i) {
+  for (var j = i + 1; j < c.length; j++) {
+    if (c[j] == '"') return j;
+  }
+  return -1;
 }
 
 /// 评估条件表达式。
@@ -345,19 +369,25 @@ bool evalCondition(
 /// 评估状态条件：`状态.键 操作符 值`。
 ///
 /// 支持操作符：>=、<=、!=、==、>、<
+///
+/// 实现：先在「键名之后」查找运算符，避免状态键本身含运算符字符
+/// （如键 `a>b`）时被 `indexOf` 提前截断、静默返回 false。
 bool evalStateCondition(String cond, Map<String, StateValue> state) {
   final rest = cond.substring(3).trim(); // 去掉 "状态."
 
-  // 查找操作符（优先匹配多字符；复用公共常量避免重复定义）
+  // 逐个查找运算符（优先多字符），返回 (操作符, 在 rest 中的下标)。
+  // 只接受「运算符之前存在非空键名」的匹配：键名以空白或引号边界
+  // 收尾（如 `堕落指数 == 5`、`堕落指数>=5`），避免键内字符被误认。
   String? op;
   var idx = -1;
   for (final o in comparisonOperators) {
     final i = rest.indexOf(o);
-    if (i != -1) {
-      op = o;
-      idx = i;
-      break;
-    }
+    if (i == -1) continue;
+    final key = rest.substring(0, i).trim();
+    if (key.isEmpty) continue;
+    op = o;
+    idx = i;
+    break;
   }
   if (op == null) return false;
 

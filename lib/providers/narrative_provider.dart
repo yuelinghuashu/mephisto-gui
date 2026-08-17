@@ -15,11 +15,11 @@ import '../services/narrative_turn_service.dart';
 import '../services/parser/meph_parser.dart';
 import '../services/session/child_save_store.dart';
 import '../services/storage/meph_file_name.dart' as meph_file_name;
-import '../services/stream_throttle.dart';
 import 'contract_provider.dart';
 import 'generation_coordinator.dart';
 import 'generation_settings_provider.dart';
 import 'llm_settings_provider.dart';
+import 'streaming_coordinator.dart';
 
 // ============================================================
 // 叙事状态管理器（Notifier）
@@ -36,59 +36,12 @@ import 'llm_settings_provider.dart';
 /// 职责说明：
 ///   - 单轮生成管线已抽至 [NarrativeTurnService]（规则引擎 → 提示词 → LLM → 兜底），
 ///     本 Notifier 只负责「当前叙事会话」的状态编排（消息/历史/状态/记忆/存档）。
-///   - 未来多角色舞台，调度器可对每个角色各自调用 [NarrativeTurnService.generate]
-///     并与 `Future.wait` 并发执行，角色上下文天然隔离。
+///   - 流式输出状态机由 [StreamingCoordinator] mixin 管理。
 class NarrativeNotifier extends Notifier<NarrativeState>
-    with GenerationCoordinator<NarrativeState> {
-  /// 流式内容累积器（节流合并 + StringBuffer 一体化）
-  ///
-  /// 复用 [ThrottledStreamBuffer]（与多角色 [StageNarrativeNotifier] 共享），
-  /// 消除两处约 30 行的重复流式缓冲样板。
-  final ThrottledStreamBuffer _streaming = ThrottledStreamBuffer();
-
-  /// 是否已进入「立即显示全文」模式。
-  ///
-  /// 用户点击「⏩ 显示全文」后置位：后续流式 chunk 不再走 50ms 节流，
-  /// 直接累积进 StringBuffer 并整串提交状态，跳过打字机动画。
-  bool _revealInstant = false;
-
-  /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交（减少 Riverpod 通知）。
-  void _appendStreamChunk(String chunk) {
-    if (_revealInstant) {
-      // 已进入「跳过打字机」模式：静默忽略后续 chunk，
-      // 不触发 UI 重建（打字机动画消失）；
-      // 完整内容由 LLM 生成完毕后的 ReplySucceeded 一次性写入消息列表。
-      // 注意：不能在此处调用 cancelGeneration()——那会中止 LLM 生成，
-      // 导致回复被截断。
-    } else {
-      _streaming.append(chunk, _applyStreamChunk);
-    }
-  }
-
-  /// 提交缓冲中的流式内容到状态。
-  void _flushStreamBuffer() {
-    _streaming.flush(_applyStreamChunk);
-  }
-
-  /// 立即显示全部流式内容（跳过剩余打字机动画）。
-  ///
-  /// 触发时机：用户点击「⏩ 显示全文」。
-  ///
-  /// 打字机效果的真实来源是 LLM 经 SSE 逐 chunk 返回内容（而非 UI 节流），
-  /// 「跳过打字机」的正确语义是**停止 UI 逐字更新**，而非**中止 LLM 生成**。
-  /// 因此：
-  ///   1. 立即 flush 当前已到达的流式内容到 UI（用户立刻看到已有全文）
-  ///   2. 置位 `_revealInstant`——后续 chunk 静默忽略，UI 不再逐字跳动
-  ///   3. LLM 继续在后台完整生成，结束后由 ReplySucceeded 携带完整
-  ///      `reply` 一次性写入消息列表，保证内容不截断
-  void revealStreaming() {
-    _revealInstant = true;
-    _flushStreamBuffer();
-  }
-
-  /// 将累积的流式内容写入状态（StringBuffer 累积 → 一次性 toString）。
-  void _applyStreamChunk(String pending) {
-    final fullContent = _streaming.applyAndGet(pending);
+    with GenerationCoordinator<NarrativeState>, StreamingCoordinator {
+  /// 流式内容写回状态（StreamingCoordinator 钩子）。
+  @override
+  void applyStreamingContent(String fullContent) {
     state = state.copyWith(streamingContent: fullContent);
   }
 
@@ -101,7 +54,7 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   NarrativeState build() {
     // Notifier 重建（契约切换/Provider 失效）时清理流式定时器，避免泄漏
     ref.onDispose(() {
-      _streaming.dispose();
+      disposeStreaming();
       disposeGeneration();
     });
 
@@ -137,7 +90,12 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   }
 
   /// 发送消息（用户输入 → 叙事推进）。
-  void sendMessage(String content) {
+  /// 发送消息（用户输入 → 叙事推进）。
+  ///
+  /// 编排骨架与 [StageNarrativeNotifier.sendMessage] 完全一致
+  /// （守卫 → beginGeneration → 复位流式 → dispatch → 生成 → 收尾），
+  /// 通过 [GenerationCoordinator.runGeneration] 统一收尾（try/catch/finally）。
+  Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
     // 二次守卫：生成中禁止再次发送（UI 已禁用输入，极端连点/竞态时兜底）。
     // 复用 [GenerationCoordinator.canSend]（同步标志位 + 状态字段双保险）
@@ -147,20 +105,30 @@ class NarrativeNotifier extends Notifier<NarrativeState>
     beginGeneration();
 
     // 新一轮生成：清空流式累积器 + 复位「显示全文」标志，
-    // 避免旧一轮的跳过打字机状态泄漏到新一轮
-    _revealInstant = false;
-    _streaming.reset();
+    // 避免旧一轮的跳过打字机状态泄漏到新一轮（StreamingCoordinator）
+    resetStreamingForNewRound();
 
     final trimmed = content.trim();
     _dispatch(MessageSent(trimmed));
 
-    _generateReply(trimmed);
+    await runGeneration(
+      userInput: trimmed,
+      core: _generateCore,
+      // 生成失败：重置生成状态 + 抛出错误信息，避免 UI 永久停留在"生成中"
+      //（走 reducer）。错误以错误码形式暴露（provider.generation_failed），
+      // 由 UI 层本地化翻译。
+      onFailure: () {
+        flushStreamBuffer();
+        _dispatch(const GenerationFailed(narrativeErrorGenFailed));
+      },
+      onError: (e, st) => debugPrint('生成回复异常: $e\n$st'),
+    );
   }
 
   /// 停止生成时 flush 流式缓冲（GenerationCoordinator 钩子）。
   @override
   void onGenerationStop() {
-    _flushStreamBuffer();
+    flushStreamBuffer();
   }
 
   /// 生成 AI 回复（委托 [NarrativeTurnService]，结果写回状态）。
@@ -187,7 +155,7 @@ class NarrativeNotifier extends Notifier<NarrativeState>
       attachedContexts: state.attachedContexts,
       narrativeRules: settings.narrativeRules,
       config: settings.llmConfig,
-      onChunk: _appendStreamChunk,
+      onChunk: appendStreamChunk,
       // 当前生成任务的取消信号（停止生成时触发）
       cancelSignal: generationCancelSignal,
       // 上下文窗口上限（保留最近 N 条历史消息，控制 token 消耗）
@@ -199,7 +167,7 @@ class NarrativeNotifier extends Notifier<NarrativeState>
     );
 
     // 流式输出结束：先 flush 缓冲中的剩余 chunk，再聚合提交
-    _flushStreamBuffer();
+    flushStreamBuffer();
 
     // 聚合本轮所有变化（状态/记忆/骰子/回复/错误），一次性批量提交：
     // 状态迁移统一走 reducer（narrativeReducer），减少 Riverpod 通知与 UI 重建。
@@ -225,22 +193,6 @@ class NarrativeNotifier extends Notifier<NarrativeState>
         auxConfig: settings.auxLlmConfig,
       ),
     );
-  }
-
-  /// 生成回复的全局兜底包装：任何未预期异常都重置生成状态，避免卡死。
-  Future<void> _generateReply(String userInput) async {
-    try {
-      await _generateCore(userInput);
-    } catch (e, st) {
-      debugPrint('生成回复异常: $e\n$st');
-      // 重置生成状态 + 抛出错误信息，避免 UI 永久停留在"生成中"（走 reducer）
-      // 错误以错误码形式暴露（provider.generation_failed），由 UI 层本地化翻译
-      _flushStreamBuffer();
-      _dispatch(const GenerationFailed(narrativeErrorGenFailed));
-    } finally {
-      // 无论成功/失败/异常，都必须复位同步标志位，允许下一次发送
-      endGeneration();
-    }
   }
 
   /// 执行子版保存，统一处理「更新 [sourceFileName] + 错误提示」样板。
@@ -414,9 +366,8 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   /// 构造默认子版文件名（`faust.meph` → `faust.child.meph`；
   /// `faust.dark.meph` → `faust.dark.child.meph`）。
   ///
-  /// 委托共享工具 [meph_file_name.defaultChildFileName]，
-  /// 与 [StageNarrativeNotifier] 保持完全一致（此前两处实现不一致，
-  /// 且旧实现仅取母版根，多级分支下无法正确定位存档）。
+  /// 委托共享工具 [meph_file_name.defaultChildFileName]（与
+  /// [StageNarrativeNotifier] 完全一致，为唯一实现）。
   static String defaultChildFileName(String masterFileName) =>
       meph_file_name.defaultChildFileName(masterFileName);
 

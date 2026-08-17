@@ -2,17 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../../app/theme.dart';
-import '../../domain/narrative_state.dart';
+import '../../domain/models.dart';
 import '../contract_panel.dart';
 
 /// 仪表盘抽屉：展示当前契约的所有数据
 ///
 /// 复用共享 [ContractPanel] 组件，与首页预览使用同一套展示逻辑。
+///
+/// 接收「字段」而非整个 [NarrativeState]：使调用方（叙事页）可以对
+/// 各字段做窄监听（select），流式输出时 streamingContent 变化不会
+/// 触发抽屉重建。
 class DashboardDrawer extends StatelessWidget {
-  /// 叙事状态（包含契约、运行时状态、记忆、历史）
-  final NarrativeState state;
+  /// 契约（静态数据）
+  final Contract contract;
 
-  const DashboardDrawer({super.key, required this.state});
+  /// 运行时状态
+  final Map<String, StateValue> currentState;
+
+  /// 运行时记忆
+  final List<Memory> memories;
+
+  /// 运行时历史
+  final List<HistoryEntry> history;
+
+  const DashboardDrawer({
+    super.key,
+    required this.contract,
+    required this.currentState,
+    required this.memories,
+    required this.history,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -53,10 +72,10 @@ class DashboardDrawer extends StatelessWidget {
             // ---- 契约数据面板（复用共享组件，传运行时状态/记忆/历史） ----
             Expanded(
               child: ContractPanel(
-                contract: state.contract,
-                currentState: state.currentState,
-                memories: state.memories,
-                history: state.history,
+                contract: contract,
+                currentState: currentState,
+                memories: memories,
+                history: history,
               ),
             ),
           ],

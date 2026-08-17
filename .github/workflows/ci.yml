@@ -24,5 +24,32 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
+      # 本地化键一致性：zh/en .arb 键集合必须一致，防止漏翻导致运行期崩溃
+      - name: Validate l10n keys
+        run: python3 tool/validate_l10n.py
+
       - name: Run tests
         run: flutter test
+
+  # 覆盖率仪表盘：不设硬性门槛（避免 flaky），仅在日志输出摘要
+  # 便于观察核心文件覆盖趋势；后续可按需加 --fail-below 硬门槛
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run tests with coverage
+        run: flutter test --coverage
+
+      - name: Print coverage summary
+        run: python3 tool/coverage_summary.py

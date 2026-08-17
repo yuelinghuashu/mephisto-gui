@@ -194,4 +194,77 @@ void main() {
     expect(prompt, contains('- 誓言三'));
     expect(prompt, isNot(contains('- 普通记忆')));
   });
+
+  group('静态前缀缓存', () {
+    setUp(clearStaticPromptCache);
+
+    test('相同契约 + 相同状态 → 输出完全一致（缓存命中）', () {
+      final a = buildSystemPrompt(
+        contract: baseContract,
+        currentState: const {'灵魂完整度': IntValue(50)},
+        memories: [Memory(content: '记忆A')],
+      );
+      final b = buildSystemPrompt(
+        contract: baseContract,
+        currentState: const {'灵魂完整度': IntValue(50)},
+        memories: [Memory(content: '记忆A')],
+      );
+      expect(a, b);
+    });
+
+    test('静态相同但状态变化 → 动态层正确更新（缓存不污染动态段）', () {
+      final s50 = buildSystemPrompt(
+        contract: baseContract,
+        currentState: const {'灵魂完整度': IntValue(50)},
+      );
+      final s30 = buildSystemPrompt(
+        contract: baseContract,
+        currentState: const {'灵魂完整度': IntValue(30)},
+      );
+      // 静态前缀（角色/世界观/背景）复用，动态状态各自渲染
+      expect(s50, contains('灵魂完整度：50'));
+      expect(s30, contains('灵魂完整度：30'));
+      expect(s50, isNot(contains('灵魂完整度：30')));
+      expect(s30, isNot(contains('灵魂完整度：50')));
+      // 静态层内容仍完整
+      expect(s50, contains('你是浮士德'));
+      expect(s30, contains('你是浮士德'));
+    });
+
+    test('不同契约 → 静态前缀各自正确（缓存 key 不串）', () {
+      const other = Contract(
+        roleName: '唐泰斯',
+        worldview: '19 世纪的地中海监狱与复仇',
+        background: '蒙冤入狱的水手',
+      );
+      final faust = buildSystemPrompt(
+        contract: baseContract,
+        currentState: const {},
+      );
+      final dantes = buildSystemPrompt(
+        contract: other,
+        currentState: const {},
+      );
+      // 角色定义行是缓存专属内容；默认叙事约束示例含「浮士德」字样，
+      // 故用「你是XX」定位而非全局 contains
+      expect(faust, contains('你是浮士德'));
+      expect(dantes, contains('你是唐泰斯'));
+      expect(faust, isNot(contains('你是唐泰斯')));
+      expect(dantes, isNot(contains('你是浮士德')));
+    });
+
+    test('叙事约束变化 → 静态前缀失效重建', () {
+      final defaultPrompt = buildSystemPrompt(
+        contract: baseContract,
+        currentState: const {},
+      );
+      final customPrompt = buildSystemPrompt(
+        contract: baseContract,
+        currentState: const {},
+        narrativeRules: '自定义约束A',
+      );
+      expect(defaultPrompt, isNot(customPrompt));
+      expect(customPrompt, contains('自定义约束A'));
+    });
+  });
 }

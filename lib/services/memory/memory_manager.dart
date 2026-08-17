@@ -16,6 +16,7 @@ import 'package:http/http.dart' as http;
 
 import '../../domain/models.dart';
 import '../llm/client.dart';
+import '../parser/meph_dsl.dart' show memoryWeightPrefixPattern;
 
 /// 记忆管理：自动提取、去重、压缩、注入排序。
 class MemoryManager {
@@ -53,7 +54,8 @@ class MemoryManager {
   /// LLM 提取记忆时的权重前缀正则（同 meph_parser 中 `_memoryPrefixPattern`）。
   ///
   /// 复用同款格式：`[4] 内容`，使自动提取的记忆与契约手写记忆共享权重解析逻辑。
-  static final RegExp _weightPrefixPattern = RegExp(r'^\[(\d)\]\s+(.+)$');
+  /// 统一定义于 meph_dsl.dart（memoryWeightPrefixPattern），避免与 parser 双份漂移。
+  static final RegExp _weightPrefixPattern = memoryWeightPrefixPattern;
 
   /// 按重要性权重降序排序记忆（高权重在前，同权重保持原顺序稳定）。
   ///
@@ -71,6 +73,12 @@ class MemoryManager {
   ///   - 高权重记忆（≥ [Memory.highImportanceThreshold]）全部保留（人设核心）
   ///   - 其余按权重降序补足剩余名额
   ///   - 返回结果已按权重排序（高权重在前、低权重降序在后），调用方无需再排序
+  ///
+  /// **语义说明（有意设计）**：当高权重记忆数量超过 [maxMemories] 时，
+  /// 返回列表会**超过上限**——「高权重优先超限」是有意取舍：高权重记忆是
+  /// 人设核心，宁可本轮回合多带几条也不丢弃核心设定（见 system_prompt_test
+  /// 「高权重数量超过上限时全部保留」）。真正的容量保护由压缩
+  /// （[compress] / [highImportanceCap]）承担，此处只负责注入裁剪。
   ///
   /// 记忆数量未超上限时直接返回原列表**不排序**（保持调用方语义，
   /// 由调用方决定是否需要 [sortByImportance]）。
@@ -249,8 +257,11 @@ $buffer
         }
       }
       return cleaned;
-    } catch (e) {
-      debugPrint('多角色记忆提取失败（静默跳过）: $e');
+    } catch (e, st) {
+      // 静默跳过（符合后台任务设计），但记录堆栈与上下文便于排障：
+      // debugPrint 在 release 下会被节流，仅凭 `$e` 无法定位是哪个角色、
+      // 哪份配置、哪个阶段出错。
+      debugPrint('多角色记忆提取失败（静默跳过）: $e\n$st');
       return const {};
     }
   }
@@ -358,7 +369,8 @@ $historyText
       final merged = memories.map((m) {
         for (final f in fresh) {
           if (f.content == m.content && f.importance > m.importance) {
-            return f;
+            // 权重升级：用 copyWith 保留旧条目身份（id/createdAt）。
+            return m.copyWith(importance: f.importance);
           }
         }
         return m;
@@ -378,8 +390,10 @@ $historyText
         );
       }
       return updated;
-    } catch (e) {
-      debugPrint('记忆提取失败（静默跳过）: $e');
+    } catch (e, st) {
+      // 静默跳过（符合后台任务设计），但记录堆栈便于排障：
+      // 仅凭 `$e` 无法定位是哪个角色/哪份配置/哪个阶段出错。
+      debugPrint('记忆提取失败（静默跳过）: $e\n$st');
       return memories;
     }
   }
@@ -459,8 +473,9 @@ $compressText
       );
       if (lines.isEmpty) return allMemories;
       return [...lines.map((c) => Memory(content: c)), ...protectedHigh, ...recentCompressible];
-    } catch (e) {
-      debugPrint('记忆压缩失败（保留原列表）: $e');
+    } catch (e, st) {
+      // 压缩失败时保留原列表（数据安全优先），记录堆栈便于排障
+      debugPrint('记忆压缩失败（保留原列表）: $e\n$st');
       return allMemories;
     }
   }

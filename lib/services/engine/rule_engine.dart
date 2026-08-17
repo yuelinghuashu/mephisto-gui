@@ -26,11 +26,19 @@ class RuleRunResult {
   /// 骰子结构化结果（可分别取数值/阈值/状态）
   final List<DiceResult> diceResults;
 
+  /// 各动作执行的直接输出文本（状态确认/错误提示，如 `📊 除数不能为0`）。
+  ///
+  /// 由 [executeAction] 返回（executor.dart 文档承诺「状态.键 = 值 → 返回
+  /// 📊 确认消息」），透出供调用方决定展示策略（Notifier 可追加为系统消息
+  /// 或记录日志），避免用户改动反馈被静默丢弃。
+  final List<String> actionOutputs;
+
   const RuleRunResult({
     required this.newState,
     required this.injectedMemories,
     required this.activeRule,
     required this.diceResults,
+    this.actionOutputs = const [],
   });
 
   /// 骰子结果描述（所有相关 roll() 结果，每行一个）
@@ -68,6 +76,7 @@ class RuleEngine {
     final currentState = Map<String, StateValue>.from(state);
     final memories = <String>[];
     final rollParts = <DiceResult>[];
+    final actionOutputs = <String>[];
 
     // 阶段一：被动规则批量执行
     final passiveGroups = <String>{};
@@ -97,13 +106,15 @@ class RuleEngine {
       }
       if (matched) {
         if (rule.group.isNotEmpty) passiveGroups.add(rule.group);
-        executeAction(
+        final output = executeAction(
           rule.action,
           input: input,
           state: currentState,
           memories: memories,
           roleName: roleName,
         );
+        // 收集动作直接输出（状态确认 / 错误提示），不再静默丢弃
+        if (output.isNotEmpty) actionOutputs.add(output);
       }
     }
 
@@ -160,6 +171,7 @@ class RuleEngine {
       injectedMemories: memories,
       activeRule: activeRule,
       diceResults: allDiceResults,
+      actionOutputs: actionOutputs,
     );
   }
 }

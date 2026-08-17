@@ -59,3 +59,11 @@ final RegExp spacedComparisonPattern = RegExp(r'[<>=!]\s+[<>=!]');
 /// 排除 `==`（复合赋值符号后不允许直接跟 `=`，天然排除）。
 /// 被 parser 的 `_validateOperatorSpacing` 与 executor 的运行时兜底共用。
 final RegExp spacedCompoundOperatorPattern = RegExp(r'[+\-*/]\s+=(?!=)');
+
+/// 记忆权重前缀正则：`[权重] 内容`（如 `[4] 浮士德与梅菲斯特立下赌约`）。
+///
+/// 被 parser（meph_parser.dart 解析【记忆】区块）与 MemoryManager
+/// （memory_manager.dart 解析 LLM 提取结果）共用——两边曾各自定义一份
+/// 相同字面量，权重格式演化时极易失步（parser 负责解析、memory 负责生成，
+/// 失步即静默失效），统一收敛至此。
+final RegExp memoryWeightPrefixPattern = RegExp(r'^\[(\d)\]\s+(.+)$');

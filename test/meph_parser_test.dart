@@ -868,4 +868,126 @@ void main() {
       );
     });
   });
+
+  group('MephParser - 回归修复', () {
+    test('角色名区块首行为 # 注释时跳过注释取真实角色名', () {
+      // 回归：旧版 _parseRoleName 不跳过注释行，角色名被解析成 "# 这是注释"
+      final contract = parseMeph('''
+【角色名】
+# 这是注释
+浮士德
+''');
+      expect(contract.roleName, '浮士德');
+    });
+
+    test('条件中的括号出现在引号字符串内时不误报括号不匹配', () {
+      // 回归：旧版 _validateParenBalance 不屏蔽引号，`包含 "("` 被误报
+      final contract = parseMeph('''
+【角色名】
+测试
+
+【规则】
+[查括号] if 包含 "(" -> 注入 "内容"
+[查右括号] if 不包含 ")" -> 注入 "内容"
+''');
+      expect(contract.rules, hasLength(2));
+      expect(contract.rules[0].condition, '包含 "("');
+      expect(contract.rules[1].condition, '不包含 ")"');
+    });
+
+    test('散文区块内的 【未知】 行并入文本区块，内容不丢失', () {
+      // 回归：旧版将散文中的 `【传说】` 行切为未知区块并静默忽略，
+      // 其后的全部文本从世界观中丢失
+      final contract = parseMeph('''
+【角色名】
+测试
+
+【世界观】
+16 世纪的德意志，神秘学与契约的世界。
+
+【传说】
+有一位以灵魂换取知识的学者。
+
+【开局场景】
+烛火摇曳的书斋。
+''');
+      expect(contract.worldview, contains('16 世纪的德意志'));
+      expect(
+        contract.worldview,
+        contains('有一位以灵魂换取知识的学者'),
+        reason: '未知区块内容应并入前一个文本型区块，而非静默丢失',
+      );
+      expect(
+        contract.worldview,
+        contains('【传说】'),
+        reason: '未知区块标题行作为散文的一部分保留',
+      );
+    });
+
+    test('结构化区块（规则/记忆）后的未知区块仍静默忽略（草稿宽容）', () {
+      final contract = parseMeph('''
+【角色名】
+测试
+
+【规则】
+[测试] if 包含 "x" -> 注入 "内容"
+
+【草稿】
+这段草稿不应混入规则解析。
+''');
+      expect(contract.rules, hasLength(1));
+      expect(contract.rules[0].name, '测试');
+    });
+
+    test('锚点字符串值带引号序列化，往返保留类型与内容', () {
+      // 回归：旧版锚点用 item.value.value 直接输出，`"10"` 往返变数字、
+      // 值内含 `：`/`:` 时在第一个冒号处截断
+      final contract = parseMeph('''
+【角色名】
+测试
+
+【锚点】
+- 核心信念: "10"
+- 口头禅: "他说道：你好"
+- 座右铭: 真理
+
+【状态】
+- 灵魂完整度: 85
+''');
+      final anchorByKey = {
+        for (final a in contract.anchor) a.key: a.value,
+      };
+      expect(anchorByKey['核心信念'], isA<StringValue>());
+      expect(anchorByKey['核心信念']!.value, '10');
+      expect(anchorByKey['口头禅']!.value, '他说道：你好');
+
+      // 序列化 → 解析往返：类型与内容完整保留
+      final roundtrip = parseMeph(serializeMeph(contract));
+      final roundtripByKey = {
+        for (final a in roundtrip.anchor) a.key: a.value,
+      };
+      expect(roundtripByKey['核心信念'], isA<StringValue>());
+      expect(roundtripByKey['核心信念']!.value, '10');
+      expect(roundtripByKey['口头禅']!.value, '他说道：你好');
+      expect(roundtripByKey['座右铭']!.value, '真理');
+    });
+
+    test('字符串值含双引号时序列化往返不残留反斜杠', () {
+      // 回归：旧版 _formatStateValue 转义 `"` 为 `\"` 但 unquote 不反转义，
+      // 往返后内容带反斜杠损坏
+      final contract = parseMeph('''
+【角色名】
+测试
+
+【状态】
+- 台词: "他说\\"你好\\"然后离开"
+''');
+      final state = contract.stateMap;
+      expect(state['台词'], isA<StringValue>());
+      expect(state['台词']!.value, '他说"你好"然后离开');
+
+      final roundtrip = parseMeph(serializeMeph(contract));
+      expect(roundtrip.stateMap['台词']!.value, '他说"你好"然后离开');
+    });
+  });
 }

@@ -2,7 +2,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../domain/stage_models.dart';
 import '../../domain/stage_narrative_state.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 舞台角色状态条：展示各角色的状态/记忆数量。
 ///
@@ -12,18 +14,30 @@ import '../../domain/stage_narrative_state.dart';
 /// 区域时垂直滚轮事件被「平行兄弟节点」的滚动隔离（导致无法滚动下方消息流），
 /// 通过 [onVerticalScroll] 将垂直滚轮增量委托给外部（舞台叙事页转发给消息流）。
 /// 水平方向的自我滚动能力不受影响。
+///
+/// 接收 [stage] / [roles] 字段（而非整个 state），使调用方（舞台叙事页）
+/// 可以窄监听：流式输出期间本组件只随 roles 变化重建。
 class RoleStatusBar extends StatelessWidget {
-  final StageNarrativeState state;
+  /// 舞台数据（null = 未加载，不渲染）
+  final StageLoaded? stage;
+
+  /// 各角色运行时状态（角色名 → 状态/记忆/历史）
+  final Map<String, RoleRunState> roles;
 
   /// 垂直滚轮委托（鼠标在状态条区域滚动时转发给外部滚动目标）。
   final void Function(double deltaY)? onVerticalScroll;
 
-  const RoleStatusBar({super.key, required this.state, this.onVerticalScroll});
+  const RoleStatusBar({
+    super.key,
+    required this.stage,
+    required this.roles,
+    this.onVerticalScroll,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final stage = state.stage;
+    final stage = this.stage;
     if (stage == null) return const SizedBox.shrink();
 
     final statusBar = Container(
@@ -42,10 +56,8 @@ class RoleStatusBar extends StatelessWidget {
             for (final character in stage.characters) ...[
               RoleStatusChip(
                 roleName: character.roleName,
-                stateCount:
-                    state.roles[character.roleName]?.currentState.length ?? 0,
-                memoryCount:
-                    state.roles[character.roleName]?.memories.length ?? 0,
+                stateCount: roles[character.roleName]?.currentState.length ?? 0,
+                memoryCount: roles[character.roleName]?.memories.length ?? 0,
               ),
               const SizedBox(width: 12),
             ],
@@ -94,50 +106,55 @@ class RoleStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: const BoxDecoration(
-            color: AppTheme.gold,
-            shape: BoxShape.circle,
+    return Semantics(
+      // 合并读屏语义：朗读「角色名 状态 N 项，记忆 M 条」，避免逐段朗读
+      //（注意 gen-l10n 按占位符字母序生成参数：memoryCount/roleName/stateCount）
+      label: l10n.roleStatusChipSemantics(memoryCount, roleName, stateCount),
+      excludeSemantics: true,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: AppTheme.gold,
+              shape: BoxShape.circle,
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          roleName,
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+          const SizedBox(width: 6),
+          Text(
+            roleName,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        // 状态计数：⚡ + 金色加粗数字（与单角色 StatusBar 风格一致）
-        const Text('⚡', style: TextStyle(fontSize: 12)),
-        const SizedBox(width: 2),
-        Text(
-          '$stateCount ',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.gold,
+          const SizedBox(width: 8),
+          // 状态计数：⚡ + 金色加粗数字（与单角色 StatusBar 风格一致）
+          Text('⚡', style: theme.textTheme.bodySmall),
+          const SizedBox(width: 2),
+          Text(
+            '$stateCount ',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.gold,
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
-        // 记忆计数：🧠 + 金色加粗数字
-        const Text('🧠', style: TextStyle(fontSize: 12)),
-        const SizedBox(width: 2),
-        Text(
-          '$memoryCount',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.gold,
+          const SizedBox(width: 6),
+          // 记忆计数：🧠 + 金色加粗数字
+          Text('🧠', style: theme.textTheme.bodySmall),
+          const SizedBox(width: 2),
+          Text(
+            '$memoryCount',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.gold,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:mephisto/l10n/app_localizations.dart';
 
 import '../domain/stage_color_palette.dart';
 import '../providers/providers.dart';
+import '../services/storage/stage_repo.dart';
 import '../widgets/narrative/input_bar.dart';
 import '../widgets/narrative/message_list.dart';
 import '../widgets/narrative/narrative_scaffold.dart';
@@ -73,16 +74,35 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(stageNarrativeProvider);
+    // ---- 窄监听：仅依赖所需字段，避免流式 chunk 触发整页重建 ----
+    // 与单角色叙事页同一策略：streamingContent 每 50ms 变化只重建
+    // 消息流区域（_StageNarrativeMessageFlow），AppBar/输入栏/状态条不随
+    // 打字机效果刷新。
     final l10n = AppLocalizations.of(context);
-    final isGenerating = state.isGenerating;
+    final isGenerating = ref.watch(
+      stageNarrativeProvider.select((s) => s.isGenerating),
+    );
+    final stageName = ref.watch(
+      stageNarrativeProvider.select((s) => s.stageName),
+    );
+    final lastError = ref.watch(
+      stageNarrativeProvider.select((s) => s.lastError),
+    );
+    final attachedFileNames = ref.watch(
+      stageNarrativeProvider.select((s) => s.attachedFileNames),
+    );
+    // 舞台角色（加载完成后不变；null = 加载中）——消息流空态与色板所需
+    final stage = ref.watch(stageNarrativeProvider.select((s) => s.stage));
+    // 各角色运行时状态/记忆（RoleStatusBar 所需）
+    final roles = ref.watch(stageNarrativeProvider.select((s) => s.roles));
+
     // 叙事内容宽度偏好（与单角色叙事页共用，保证输入框宽度一致）
     final contentMaxWidth = ref.watch(narrativeWidthProvider).maxWidth;
-    // 角色色板：舞台所有角色 → 主题色（在页面 build 时计算一次，随 state 变化重建）
-    final roleColors = state.stage == null
+    // 角色色板：舞台所有角色 → 主题色（仅依赖 stage，加载后不变）
+    final roleColors = stage == null
         ? const <String, Color>{}
         : assignRoleColors(
-            state.stage!.characters.map((c) => c.roleName).toList(),
+            stage.characters.map((c) => c.roleName).toList(),
           );
 
     // ---- 错误监听（LLM 错误 → SnackBar）已由 [NarrativeScaffold] 统一处理 ----
@@ -90,11 +110,11 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
     // ---- 构建界面：共享骨架（快捷键 + 错误监听）----
     return NarrativeScaffold(
       messageListKey: _messageListKey,
-      lastError: state.lastError,
+      lastError: lastError,
       scaffoldBuilder: (context) => Scaffold(
         appBar: AppBar(
           title: Text(
-            state.stageName,
+            stageName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -130,44 +150,20 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
           // 垂直滚轮委托：鼠标在状态条区域滚动时转发给消息流，
           // 对齐单角色「屏幕任意位置滚动都生效」的桌面端体验。
           RoleStatusBar(
-            state: state,
+            stage: stage,
+            roles: roles,
             onVerticalScroll: (deltaY) =>
                 _messageListKey.currentState?.scrollBy(deltaY),
           ),
-          // ---- 消息流 ----
+          // ---- 消息流（独立 ConsumerWidget：窄监听，流式只重建本区域）----
           Expanded(
-            child: state.stage == null
-                ? const Center(child: CircularProgressIndicator())
-                // 舞台已加载、无消息且未在生成 → 展示各角色开局场景卡片
-                // （对齐单角色叙事页的 EmptyState 空态体验）
-                : (state.messages.isEmpty && !isGenerating)
-                    ? StageEmptyState(
-                        openings: [
-                          for (final c in state.stage!.characters)
-                            (
-                              c.roleName,
-                              c.contract.opening.replaceAll(
-                                '{角色名}',
-                                c.roleName,
-                              ),
-                            ),
-                        ],
-                        roleColors: roleColors,
-                      )
-                    : MessageList(
-                        key: _messageListKey,
-                        messages: state.messages,
-                        streamingContent: state.streamingContent,
-                        isGenerating: isGenerating,
-                        // 遵循用户选择的叙事内容宽度档位（与单角色叙事页一致）
-                        contentMaxWidth: contentMaxWidth,
-                        messageBuilder: (message, isStreaming) =>
-                            StageMessageBubble(
-                              message: message,
-                              roleColors: roleColors,
-                              isStreaming: isStreaming,
-                            ),
-                      ),
+            child: _StageNarrativeMessageFlow(
+              messageListKey: _messageListKey,
+              contentMaxWidth: contentMaxWidth,
+              stage: stage,
+              roleColors: roleColors,
+              isGenerating: isGenerating,
+            ),
           ),
           // ---- 输入栏（复用 [InputBar]，与单角色叙事页一致）----
           // 宽度约束与单角色叙事页共用 `WidthConstrainedCenter`，
@@ -187,7 +183,7 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
                 ref.read(stageNarrativeProvider.notifier).revealStreaming();
               },
               showAttachment: true,
-              attachedFileNames: state.attachedFileNames,
+              attachedFileNames: attachedFileNames,
               onAttach: (fileName, content) {
                 ref
                     .read(stageNarrativeProvider.notifier)
@@ -202,6 +198,77 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
           ),
         ],
       ),
+      ),
+    );
+  }
+}
+
+/// 舞台叙事消息流（窄监听消费者）
+///
+/// 独立 [ConsumerWidget]：只 watch `messages` / `streamingContent` /
+/// `isGenerating`，使 LLM 流式输出期间只有本区域重建，AppBar / 输入栏 /
+/// 角色状态条不随打字机效果刷新（与单角色 `_NarrativeMessageFlow` 同一策略）。
+class _StageNarrativeMessageFlow extends ConsumerWidget {
+  /// 消息列表控制 Key（滚动跳转）
+  final GlobalKey<MessageListState> messageListKey;
+
+  /// 消息内容最大宽度（null 表示满屏）
+  final double? contentMaxWidth;
+
+  /// 舞台数据（null = 加载中，显示进度圈）
+  final StageLoaded? stage;
+
+  /// 角色色板（按角色着色气泡）
+  final Map<String, Color> roleColors;
+
+  /// 是否正在生成
+  final bool isGenerating;
+
+  const _StageNarrativeMessageFlow({
+    required this.messageListKey,
+    required this.contentMaxWidth,
+    required this.stage,
+    required this.roleColors,
+    required this.isGenerating,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final messages = ref.watch(
+      stageNarrativeProvider.select((s) => s.messages),
+    );
+    final streamingContent = ref.watch(
+      stageNarrativeProvider.select((s) => s.streamingContent),
+    );
+
+    if (stage == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    // 舞台已加载、无消息且未在生成 → 展示各角色开局场景卡片
+    // （对齐单角色叙事页的 EmptyState 空态体验）
+    if (messages.isEmpty && !isGenerating) {
+      return StageEmptyState(
+        openings: [
+          for (final c in stage!.characters)
+            (
+              c.roleName,
+              c.contract.opening.replaceAll('{角色名}', c.roleName),
+            ),
+        ],
+        roleColors: roleColors,
+      );
+    }
+    return MessageList(
+      key: messageListKey,
+      messages: messages,
+      streamingContent: streamingContent,
+      isGenerating: isGenerating,
+      // 遵循用户选择的叙事内容宽度档位（与单角色叙事页一致）
+      contentMaxWidth: contentMaxWidth,
+      messageBuilder: (message, isStreaming) => StageMessageBubble(
+        message: message,
+        roleColors: roleColors,
+        isStreaming: isStreaming,
       ),
     );
   }

@@ -66,7 +66,7 @@ String formatMephText(String text) {
     if (blockTitle != null) {
       final normalized = blockTitle == '规则'
           ? _normalizeRuleLine(trimmed)
-          : _normalizeContentLine(trimmed);
+          : _normalizeContentLine(trimmed, blockTitle: blockTitle);
       result.add('  $normalized');
       continue;
     }
@@ -96,14 +96,23 @@ String? _blockTitleForLine(List<Block> blocks, int lineNo) {
 ///
 /// - 列表项 `- 内容`：`-` 后固定单个空格
 /// - 键值对 `key：value` / `key: value`：冒号后固定单个空格（英文冒号排除 `==` 相邻）
-String _normalizeContentLine(String line) {
-  // 列表项：`-` 后多余空格压缩为 1 个
+///
+/// **冒号规整仅作用于键值对结构区块（锚点/状态）**：这些区块的行是
+/// `- 键: 值` 结构，冒号后补空格是安全的格式修复。记忆/历史/世界观等
+/// 散文区块**不做冒号规整**——正文中的冒号（时间 `12:30`、URL
+/// `http://x.com`、对话引语）是用户数据，补空格会静默篡改内容。
+String _normalizeContentLine(String line, {required String blockTitle}) {
+  // 列表项：`-` 后多余空格压缩为 1 个（对所有区块安全）
   if (line.startsWith('- ')) {
     line = '- ${line.substring(2).replaceFirst(RegExp(r'^ +'), '')}';
   } else if (line.startsWith('-')) {
     // 形如 "-内容" 或 "-  内容" → 固定为 "- 内容"
     line = '- ${line.substring(1).trimLeft()}';
   }
+
+  // 键值对冒号规整：仅锚点/状态区块（结构化键值行）
+  final isKeyValueBlock = blockTitle == '锚点' || blockTitle == '状态';
+  if (!isKeyValueBlock) return line;
 
   // 键值对：冒号后多余空格压缩为 1 个
   final cnColonIdx = line.indexOf('：');
@@ -144,15 +153,19 @@ String _normalizeRuleLine(String line) {
   // 修复 `]if` → `] if`
   placeholder = placeholder.replaceFirst(RegExp(r'\]\s*if\b'), '] if');
   // 修复 `if包含` → `if 包含`
+  // 必须带词边界 `\b`：仅修复「规则名闭合 `]` 之后紧跟的 if 关键字」，
+  // 避免误伤规则名/动作文本中内含 `if` 的英文单词（如 `gift`、`unified`）。
+  // 注意：此时 `]if` 已被上一步修复为 `] if`，`]` 与 `if` 间有空格，
+  // 但 `if包含`（if 与关键词间无空格）仍会命中本正则。
   placeholder = placeholder.replaceAllMapped(
-    RegExp(r'if(?=[^\s])'),
+    RegExp(r'\bif(?=[^\s])'),
     (_) => 'if ',
   );
 
   // 合并被空格拆开的运算符：`< =` → `<=`，`- =` → `-=`（删除 = 前空白，保留等号）
   placeholder = placeholder.replaceAllMapped(
     RegExp(r'([<>=!+\-*/%&|^])\s*=\s*'),
-    (m) => '${m[1]}=' ,
+    (m) => '${m[1]}=',
   );
 
   // 合并被空格拆开的 DSL 关键词：

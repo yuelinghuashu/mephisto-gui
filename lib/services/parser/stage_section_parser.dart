@@ -64,7 +64,12 @@ StageSectionResult parseStageSections({
       if (text.isNotEmpty) {
         // 已声明角色 → 分段；未知角色名 → 归入 overflow（连同标题一起）
         if (roleNames.contains(currentRole)) {
-          sections[currentRole!] = text;
+          // 同一角色出现重复分节（LLM 分段输出并不罕见）时**追加合并**
+          // 而非后者覆盖前者——避免前段内容静默丢失。
+          final existing = sections[currentRole!];
+          sections[currentRole!] = existing == null
+              ? text
+              : '$existing\n\n$text';
         } else {
           overflow.writeln('【$currentRole】');
           overflow.writeln(text);

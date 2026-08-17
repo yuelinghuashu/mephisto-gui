@@ -42,6 +42,8 @@ class RoleChip extends StatelessWidget {
       onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(20),
       child: Container(
+        // minHeight 32：满足触屏最小点击目标（带长按手势的小芯片）
+        constraints: const BoxConstraints(minHeight: 32),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),

@@ -140,6 +140,31 @@ void main() {
       const state = <String, StateValue>{};
       expect(evalCondition('状态.不存在 > 10', input: '', state: state), isFalse);
     });
+
+    test('引号字符串内的 || 与 && 不被当作逻辑运算符切分', () {
+      // 回归：旧版 _hasTopLevelOperator/_splitTopLevel 只认括号不认引号，
+      // `包含 "a||b"` 被编译成 OrNode([ContainsNode('"a'), ...]) 静默永不触发
+      const state = <String, StateValue>{};
+      expect(
+        evalCondition('包含 "a||b"', input: 'a||b', state: state),
+        isTrue,
+        reason: '|| 在引号内是字符串数据，整体应作为包含匹配',
+      );
+      expect(
+        evalCondition('包含 "a||b"', input: '只有a', state: state),
+        isFalse,
+      );
+      expect(
+        evalCondition('包含 "x&&y"', input: 'x&&y', state: state),
+        isTrue,
+        reason: '&& 在引号内同样不应切分',
+      );
+      // 引号外的 || 仍正常作为逻辑运算符
+      expect(
+        evalCondition('包含 "攻击" || 包含 "战斗"', input: '战斗', state: state),
+        isTrue,
+      );
+    });
   });
 
   group('骰子', () {
@@ -355,6 +380,49 @@ void main() {
       );
       final result = engine.run(input: '船已靠上码头', state: const <String, StateValue>{});
       expect(result.activeRule?.action, '大笑');
+    });
+
+    test('动作直接输出透出到 actionOutputs（状态确认/错误提示不丢失）', () {
+      // 回归：旧版丢弃 executeAction 返回值，`📊 状态「x」不存在` 等
+      // 用户反馈全部静默丢失
+      final engine = RuleEngine(
+        rules: [
+          // 正常状态赋值 → 输出确认消息
+          rule('正常', '包含 "升级"', '状态.等级 = 2'),
+          // 除零错误 → 输出错误提示
+          rule('除零', '包含 "除零"', '状态.等级 /= 0'),
+        ],
+        roleName: '浮士德',
+      );
+      final result = engine.run(
+        input: '升级 除零',
+        state: <String, StateValue>{'等级': const IntValue(1)},
+      );
+      expect(result.newState['等级'], const IntValue(2));
+      expect(result.actionOutputs, isNotEmpty);
+      expect(
+        result.actionOutputs.join('\n'),
+        contains('等级 = 2'),
+        reason: '状态确认消息应透出',
+      );
+      expect(
+        result.actionOutputs.join('\n'),
+        contains('除数不能为0'),
+        reason: '除零错误提示应透出而非静默丢失',
+      );
+    });
+
+    test('动作无直接输出时（注入动作）actionOutputs 为空', () {
+      final engine = RuleEngine(
+        rules: [rule('注入', '包含 "契约"', '注入 "浮士德签订契约"')],
+        roleName: '浮士德',
+      );
+      final result = engine.run(
+        input: '签订契约',
+        state: const <String, StateValue>{},
+      );
+      expect(result.injectedMemories, contains('浮士德签订契约'));
+      expect(result.actionOutputs, isEmpty);
     });
 
   });

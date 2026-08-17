@@ -108,6 +108,7 @@
   "messageMenuCopy": "复制",
   "messageMenuRegenerate": "重新生成",
   "messageMenuCopied": "✦ 已复制到剪贴板",
+  "messageMenuOpenSemantics": "打开消息操作菜单",
 
   "inputBarAttachTooltip": "附加上下文（文本，可多选）",
   "inputBarHintGenerating": "梅菲斯特正在编织故事...",
@@ -119,6 +120,8 @@
   "statusBarRuleChip": "规则",
   "statusBarMemoryChip": "记忆",
   "statusBarHistoryChip": "历史",
+  "statusBarChipSemantics": "{label} {count} 条",
+  "roleStatusChipSemantics": "{roleName} 状态 {stateCount} 项，记忆 {memoryCount} 条",
 
   "diceVerdictTitle": "命运结算 · {count} 回判定",
   "diceVerdictThreshold": "阈值 ≥ {threshold}",

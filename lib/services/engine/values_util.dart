@@ -42,12 +42,18 @@ StateValue parseStateValue(String raw) {
   return StringValue(v);
 }
 
-/// 去除字符串两端的引号（如果存在）。
+/// 去除字符串两端的引号（如果存在），并反转义内部的 `\"`。
+///
+/// 与序列化器 `_formatStateValue` 的转义规则配套：
+/// 序列化时字符串值用 `"..."` 包裹且内部 `"` 转义为 `\"`（见 meph_serializer.dart），
+/// 解析时必须反转义 `\"` → `"`，否则含引号的字符串值在「序列化 → 解析」往返后
+/// 会残留反斜杠，内容损坏。
 String unquote(String s) {
   if (s.length >= 2 &&
       ((s.startsWith('"') && s.endsWith('"')) ||
           (s.startsWith("'") && s.endsWith("'")))) {
-    return s.substring(1, s.length - 1);
+    final inner = s.substring(1, s.length - 1);
+    return inner.replaceAll(r'\"', '"');
   }
   return s;
 }

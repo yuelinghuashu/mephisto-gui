@@ -367,6 +367,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get messageMenuCopied => '✦ Copied to clipboard';
 
   @override
+  String get messageMenuOpenSemantics => 'Open message actions menu';
+
+  @override
   String get inputBarAttachTooltip => 'Attach context (text, multi-select)';
 
   @override
@@ -395,6 +398,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusBarHistoryChip => 'History';
+
+  @override
+  String statusBarChipSemantics(Object count, Object label) {
+    return '$label $count';
+  }
+
+  @override
+  String roleStatusChipSemantics(
+    Object memoryCount,
+    Object roleName,
+    Object stateCount,
+  ) {
+    return '$roleName state $stateCount, memory $memoryCount';
+  }
 
   @override
   String diceVerdictTitle(Object count) {

@@ -91,6 +91,16 @@ class AppTheme {
   /// 用途：警告、高风险叙事节点
   static const Color crimson = Color(0xFFB22222);
 
+  /// 金色上的可读前景色（按钮/强调元素上的文字与图标）
+  ///
+  /// 金色（#C9A84C）为浅金，深色前景对比度更高；亮/暗主题通用。
+  static const Color onGold = Color(0xFF000000);
+
+  /// 深红色上的可读前景色（危险按钮上的文字与图标）
+  ///
+  /// 深红（#B22222）为深色底，白色前景对比度更高；亮/暗主题通用。
+  static const Color onCrimson = Color(0xFFFFFFFF);
+
   /// 通用圆角尺寸
   ///
   /// 遵循 8 点网格系统：
@@ -116,6 +126,46 @@ class AppTheme {
   ///
   /// 用途：骰子失败、错误提示
   static const Color error = Color(0xFFE53935);
+
+  /// 暗色主题辅助标签文字色（比次要文本更暗，用于标签/占位）
+  static const Color darkLabelSecondary = Color(0xFF666666);
+
+  /// 亮色主题辅助标签文字色（浅灰，用于标签/占位）
+  static const Color lightLabelSecondary = Color(0xFF888888);
+
+  /// 当前主题的辅助标签文字色（labelMedium 默认色 / 输入框 hint 色）
+  static Color labelSecondary(Brightness brightness) =>
+      brightness == Brightness.dark ? darkLabelSecondary : lightLabelSecondary;
+
+  /// 暗色主题警告条背景色（深棕，用于契约兜底提示条）
+  static const Color darkWarningContainer = Color(0xFF3A2A14);
+
+  /// 亮色主题警告条背景色（浅暖橙，用于契约兜底提示条）
+  static const Color lightWarningContainer = Color(0xFFFFF3E0);
+
+  /// 暗色主题警告条前景/图标色
+  static const Color darkWarningOnContainer = Color(0xFFE8C07A);
+
+  /// 亮色主题警告条前景/图标色
+  static const Color lightWarningOnContainer = Color(0xFFB26A00);
+
+  /// 当前主题的警告条背景色（用于契约兜底提示条等置顶警告）
+  static Color warningContainer(Brightness brightness) =>
+      brightness == Brightness.dark
+      ? darkWarningContainer
+      : lightWarningContainer;
+
+  /// 当前主题的警告条前景/图标色
+  static Color warningOnContainer(Brightness brightness) =>
+      brightness == Brightness.dark
+      ? darkWarningOnContainer
+      : lightWarningOnContainer;
+
+  /// 当前主题的警告条正文文字色（比图标色略深，保证正文可读）
+  static Color warningText(Brightness brightness) =>
+      brightness == Brightness.dark
+      ? const Color(0xFFD9B878)
+      : const Color(0xFF8C5A00);
 
   // ============================================================
   // 主题构建
@@ -209,6 +259,20 @@ class AppTheme {
         /// 用于：状态描述、辅助信息
         bodyMedium: TextStyle(color: textPrimary, fontSize: 16, height: 1.6),
 
+        /// 小标题（titleSmall）
+        ///
+        /// 用于：卡片标题、分区标题等强调性小标题
+        titleSmall: TextStyle(
+          color: textPrimary,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+
+        /// 辅助正文（bodySmall）
+        ///
+        /// 用于：次要说明、设置项副标题、骰子卡片说明
+        bodySmall: TextStyle(color: textSecondary, fontSize: 12),
+
         /// 标签文字（labelLarge）
         ///
         /// 用于：按钮文字、标签、次要标题
@@ -218,9 +282,14 @@ class AppTheme {
         ///
         /// 用于：提示信息、状态条
         labelMedium: TextStyle(
-          color: isDark ? const Color(0xFF666666) : const Color(0xFF888888),
+          color: labelSecondary(brightness),
           fontSize: 12,
         ),
+
+        /// 最小标签（labelSmall）
+        ///
+        /// 用于：文件名、时间、芯片等最小辅助文本
+        labelSmall: TextStyle(color: textSecondary, fontSize: 11),
       ),
 
       // ---- 分割线 ----
@@ -270,7 +339,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(radiusSmall),
           borderSide: const BorderSide(color: gold),
         ),
-        hintStyle: const TextStyle(color: Color(0xFF666666)),
+        hintStyle: TextStyle(color: labelSecondary(brightness)),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 12,

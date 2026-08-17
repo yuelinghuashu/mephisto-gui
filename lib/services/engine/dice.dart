@@ -26,6 +26,9 @@ class RollStore {
     final cached = _values[expr];
     if (cached != null) return cached;
     final sides = parseRollDice(expr);
+    // 防御：非法/不支持的面数（parseRollDice 返回 0）时跳过掷骰，
+    // 避免 `Random().nextInt(0)` 抛 RangeError 拖垮整轮规则评估。
+    if (sides <= 0) return 0;
     final total = Random().nextInt(sides) + 1;
     _values[expr] = total;
     return total;
@@ -46,9 +49,10 @@ int parseRollDice(String expr) {
   if (inner.endsWith(')')) inner = inner.substring(0, inner.length - 1);
   final parts = inner.split('d');
   if (parts.length != 2) return 0;
+  final count = int.tryParse(parts[0].trim());
   final sides = int.tryParse(parts[1].trim()) ?? 0;
-  // 硬限制：仅 2（1d2 二元判定）与 100（1d100 高精度判定）合法
-  return (sides == 2 || sides == 100) ? sides : 0;
+  // 硬限制：单骰 + 仅 2（1d2 二元判定）与 100（1d100 高精度判定）合法
+  return (count == 1 && (sides == 2 || sides == 100)) ? sides : 0;
 }
 
 /// 解析后的骰子表达式。
@@ -87,6 +91,11 @@ class RollExpr {
 ///
 /// 返回 null 表示不是合法的 roll 表达式。
 /// 由 [parseRollExpr] 和 [evalRoll] 共用，消除重复解析逻辑。
+///
+/// **合法性硬限制与 [parseRollDice] / parser 一致**：
+/// 仅接受 `roll(1d2)`（二元判定）与 `roll(1d100)`（高精度判定）——
+/// 骰子个数必须为 1、面数必须为 2 或 100。`roll(2d6)` 等其余写法返回 null
+/// （评估视为不匹配），避免「被当作 1d6 静默掷骰」的语义漂移。
 RollExpr? _parseRollCore(String c) {
   if (!c.startsWith('roll(')) return null;
 
@@ -97,8 +106,12 @@ RollExpr? _parseRollCore(String c) {
   final expr = c.substring(5, endExpr).trim();
   final parts = expr.split('d');
   if (parts.length != 2) return null;
+  final count = int.tryParse(parts[0].trim());
   final sides = int.tryParse(parts[1].trim());
-  if (sides == null || sides <= 0) return null;
+  // 硬限制：单骰 + 仅 2 / 100 面（与 parser 的 _validRollDicePattern 一致）
+  if (count != 1 || sides == null || (sides != 2 && sides != 100)) {
+    return null;
+  }
 
   // 解析自定义阈值（可选）
   final rest = c.substring(endExpr + 1).trim();
@@ -231,14 +244,11 @@ List<DiceResult> extractDiceResults(
       ),
     );
 
-    // 跳过已解析部分与阈值
-    remaining = remaining.substring(idx + re.rollCore.length);
-    if (re.op.isNotEmpty) {
-      final skipLen = re.op.length + '${re.userThreshold}'.length;
-      remaining = remaining.length > skipLen
-          ? remaining.substring(skipLen).trim()
-          : '';
-    }
+    // 跳过已解析部分（含自定义阈值）：`re.raw` 已包含完整的
+    // `roll(...) [op 阈值]`，整体跳过后从后续部分继续扫描。
+    remaining = remaining.substring(
+      idx + re.raw.length,
+    );
     remaining = remaining.trim();
     if (remaining.startsWith('&&')) {
       remaining = remaining.substring(2).trim();

@@ -29,26 +29,20 @@ import '../services/session/child_save_store.dart';
 import '../services/stage_turn_service.dart';
 import '../services/storage/meph_file_name.dart' as meph_file_name;
 import '../services/storage/stage_repo.dart' as stage_repo;
-import '../services/stream_throttle.dart';
 import 'generation_coordinator.dart';
 import 'generation_settings_provider.dart';
 import 'llm_settings_provider.dart';
 import 'narrative_provider.dart';
+import 'streaming_coordinator.dart';
 
 /// 舞台叙事状态管理器
 class StageNarrativeNotifier extends Notifier<StageNarrativeState>
-    with GenerationCoordinator<StageNarrativeState> {
-  /// 流式内容累积器（节流合并 + StringBuffer 一体化）
-  ///
-  /// 复用 [ThrottledStreamBuffer]（与单角色 [NarrativeNotifier] 共享），
-  /// 消除两处约 30 行的重复流式缓冲样板。
-  final ThrottledStreamBuffer _streaming = ThrottledStreamBuffer();
-
-  /// 是否已进入「立即显示全文」模式。
-  ///
-  /// 用户点击「⏩ 显示全文」后置位：后续流式 chunk 不再走 50ms 节流，
-  /// 直接累积进 StringBuffer 并整串提交状态，跳过打字机动画。
-  bool _revealInstant = false;
+    with GenerationCoordinator<StageNarrativeState>, StreamingCoordinator {
+  /// 流式内容写回状态（StreamingCoordinator 钩子）。
+  @override
+  void applyStreamingContent(String fullContent) {
+    state = state.copyWith(streamingContent: fullContent);
+  }
 
   /// 舞台加载请求版本号（用于竞态保护）
   ///
@@ -56,46 +50,6 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   /// 若其 dispatch 晚于新请求，会覆盖新舞台的状态。每发起一次加载
   /// 递增此版本号，dispatch 前校验仍是当前版本，否则丢弃过期结果。
   int _loadRequestId = 0;
-
-  /// 追加流式 chunk：累积到缓冲，按节流窗口统一提交。
-  void _appendStreamChunk(String chunk) {
-    if (_revealInstant) {
-      // 已进入「跳过打字机」模式：静默忽略后续 chunk，
-      // 不触发 UI 重建（打字机动画消失）；
-      // 完整内容由 LLM 生成完毕后的 StageReplySucceeded 一次性写入消息列表。
-      // 注意：不能在此处调用 cancelGeneration()——那会中止 LLM 生成，
-      // 导致回复被截断。
-    } else {
-      _streaming.append(chunk, _applyStreamChunk);
-    }
-  }
-
-  /// 提交缓冲中的流式内容到状态。
-  void _flushStreamBuffer() {
-    _streaming.flush(_applyStreamChunk);
-  }
-
-  /// 立即显示全部流式内容（跳过剩余打字机动画）。
-  ///
-  /// 触发时机：用户点击「⏩ 显示全文」。
-  ///
-  /// 打字机效果的真实来源是 LLM 经 SSE 逐 chunk 返回内容（而非 UI 节流），
-  /// 「跳过打字机」的正确语义是**停止 UI 逐字更新**，而非**中止 LLM 生成**。
-  /// 因此：
-  ///   1. 立即 flush 当前已到达的流式内容到 UI（用户立刻看到已有全文）
-  ///   2. 置位 `_revealInstant`——后续 chunk 静默忽略，UI 不再逐字跳动
-  ///   3. LLM 继续在后台完整生成，结束后由 StageReplySucceeded 携带完整
-  ///      `replies` 一次性写入消息列表，保证内容不截断
-  void revealStreaming() {
-    _revealInstant = true;
-    _flushStreamBuffer();
-  }
-
-  /// 将累积的流式内容写入状态（StringBuffer 累积 → 一次性 toString）。
-  void _applyStreamChunk(String pending) {
-    final fullContent = _streaming.applyAndGet(pending);
-    state = state.copyWith(streamingContent: fullContent);
-  }
 
   /// 状态迁移统一走 [stageNarrativeReducer]
   void _dispatch(StageNarrativeEvent event) {
@@ -105,7 +59,7 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   @override
   StageNarrativeState build() {
     ref.onDispose(() {
-      _streaming.dispose();
+      disposeStreaming();
       disposeGeneration();
     });
     return const StageNarrativeState();
@@ -157,26 +111,13 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     // skipRestoreRoles 非空时：集合内角色跳过恢复（从母版开局），其余角色恢复存档。
     // 并发执行：各角色存档恢复互不依赖，串行 IO 会随角色数线性增加等待
     //（5 角色舞台最多可减少约 4 次磁盘读取往返）。结果按角色名归位。
-    final restoredByRole = <String, Contract>{};
-    if (restoreSaves) {
-      final restoredList = await Future.wait(
-        stage.characters.map((character) async {
-          // 该角色被指定从母版开局 → 不恢复存档
-          if (skipRestoreRoles != null &&
-              skipRestoreRoles.contains(character.roleName)) {
-            return (roleName: character.roleName, restored: null);
-          }
-          final restored = await ChildSaveStore.restore(
-            defaultChildFileName(character.fileName),
+    final restoredByRole = restoreSaves
+        ? await _restoreRoleSaves(
+            stage,
             dirPath: stagePath,
-          );
-          return (roleName: character.roleName, restored: restored);
-        }),
-      );
-      for (final r in restoredList) {
-        if (r.restored != null) restoredByRole[r.roleName] = r.restored!;
-      }
-    }
+            skipRestoreRoles: skipRestoreRoles,
+          )
+        : const <String, Contract>{};
 
     // 竞态保护：加载期间已有新请求 → 丢弃本次过期结果
     if (requestId != _loadRequestId) return false;
@@ -219,7 +160,7 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   /// 发送消息（用户输入 → 舞台叙事推进）。
   ///
   /// 全局兜底：任何未预期异常都必须复位同步标志位，避免 UI 永久卡在「生成中」
-  /// （复用 [GenerationCoordinator] 的防重入与取消编排）。
+  /// （复用 [GenerationCoordinator] 的防重入与取消编排 + [runGeneration] 收尾）。
   Future<void> sendMessage(String content) async {
     if (content.trim().isEmpty) return;
     if (!canSend(isGenerating: state.isGenerating)) return;
@@ -227,28 +168,27 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     beginGeneration();
 
     // 新一轮生成：清空流式累积器 + 复位「显示全文」标志，
-    // 避免旧一轮的跳过打字机状态泄漏到新一轮
-    _revealInstant = false;
-    _streaming.reset();
+    // 避免旧一轮的跳过打字机状态泄漏到新一轮（StreamingCoordinator）
+    resetStreamingForNewRound();
 
     _dispatch(StageMessageSent(content.trim()));
 
-    try {
-      await _generateCore(content.trim());
-    } catch (e, st) {
-      debugPrint('舞台生成回复异常: $e\n$st');
-      _flushStreamBuffer();
-      _dispatch(const StageGenerationFailed(narrativeErrorGenFailed));
-    } finally {
-      // 无论成功/失败/异常，都复位同步标志位，允许用户发下一条
-      endGeneration();
-    }
+    await runGeneration(
+      userInput: content.trim(),
+      core: _generateCore,
+      // 生成失败：flush 流式缓冲 + 重置生成状态（走 reducer）
+      onFailure: () {
+        flushStreamBuffer();
+        _dispatch(const StageGenerationFailed(narrativeErrorGenFailed));
+      },
+      onError: (e, st) => debugPrint('舞台生成回复异常: $e\n$st'),
+    );
   }
 
   /// 停止生成时 flush 流式缓冲（GenerationCoordinator 钩子）。
   @override
   void onGenerationStop() {
-    _flushStreamBuffer();
+    flushStreamBuffer();
   }
 
   /// 生成舞台回复（委托 [StageTurnService]，结果按角色写回状态）。
@@ -287,13 +227,13 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
       attachedContexts: state.attachedContexts,
       narrativeRules: settings.narrativeRules,
       config: settings.llmConfig,
-      onChunk: _appendStreamChunk,
+      onChunk: appendStreamChunk,
       cancelSignal: generationCancelSignal,
       maxHistoryMessages: settings.maxHistoryMessages,
       maxMemories: settings.maxMemories,
     );
 
-    _flushStreamBuffer();
+    flushStreamBuffer();
 
     _dispatch(
       StageReplySucceeded(
@@ -456,21 +396,33 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     );
   }
 
-  /// 恢复各角色存档（显式调用；loadStage 已自动恢复，通常无需手动）。
+  /// 并发恢复各角色存档（`舞台/角色.child.meph`），返回「角色名 → 恢复的契约」。
+  ///
+  /// 被 [loadStage]（自动恢复）与 [restoreStage]（显式恢复）共用，
+  /// 收敛两处的并发恢复逻辑。
   ///
   /// **并发优化**：各角色存档恢复互不依赖（各自独立文件路径），
   /// 因此使用 [Future.wait] 并发执行——5 角色舞台最多可减少约 4 次
-  /// 磁盘读取的串行等待。恢复结果按角色名归位。
-  Future<bool> restoreStage() async {
-    final stage = state.stage;
-    if (stage == null) return false;
-
+  /// 磁盘读取的串行等待。结果按角色名归位。
+  ///
+  /// [skipRestoreRoles] 非空时：集合内角色跳过恢复（从母版开局），
+  /// 其余角色恢复各自存档。传 null 视为全部角色统一恢复。
+  Future<Map<String, Contract>> _restoreRoleSaves(
+    StageLoaded stage, {
+    String? dirPath,
+    Set<String>? skipRestoreRoles,
+  }) async {
     final restoredByRole = <String, Contract>{};
     final restoredList = await Future.wait(
       stage.characters.map((character) async {
+        // 该角色被指定从母版开局 → 不恢复存档
+        if (skipRestoreRoles != null &&
+            skipRestoreRoles.contains(character.roleName)) {
+          return (roleName: character.roleName, restored: null);
+        }
         final restored = await ChildSaveStore.restore(
           defaultChildFileName(character.fileName),
-          dirPath: stage.info.path,
+          dirPath: dirPath ?? stage.info.path,
         );
         return (roleName: character.roleName, restored: restored);
       }),
@@ -478,6 +430,17 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     for (final r in restoredList) {
       if (r.restored != null) restoredByRole[r.roleName] = r.restored!;
     }
+    return restoredByRole;
+  }
+
+  /// 恢复各角色存档（显式调用；loadStage 已自动恢复，通常无需手动）。
+  ///
+  /// 存档恢复逻辑复用 [_restoreRoleSaves]（并发 + skipRestoreRoles 语义一致）。
+  Future<bool> restoreStage() async {
+    final stage = state.stage;
+    if (stage == null) return false;
+
+    final restoredByRole = await _restoreRoleSaves(stage);
     if (restoredByRole.isEmpty) return false;
 
     // 重建共享消息流：取各角色中最长的历史重建（history 最长的角色通常
@@ -515,8 +478,8 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   /// 构造默认子版文件名（`浮士德.meph` → `浮士德.child.meph`；
   /// `faust.dark.meph` → `faust.dark.child.meph`）。
   ///
-  /// 委托共享工具 [meph_file_name.defaultChildFileName]，
-  /// 与 [NarrativeNotifier] 保持完全一致（此前两处实现不一致）。
+  /// 委托共享工具 [meph_file_name.defaultChildFileName]（与
+  /// [NarrativeNotifier] 完全一致，为唯一实现）。
   static String defaultChildFileName(String masterFileName) =>
       meph_file_name.defaultChildFileName(masterFileName);
 }

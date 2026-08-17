@@ -1,5 +1,74 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
+
 import '../../domain/models.dart';
 import '../memory/memory_manager.dart';
+
+/// 系统提示词「静态前缀」缓存。
+///
+/// [buildSystemPrompt] 的静态层（格式要求 / 世界设定 / 角色定义）只依赖
+/// 契约的静态字段 + 叙事约束，同一契约在多轮对话中重复构建会产生大量
+/// 相同的字符串拼接与 `{角色名}` 插值。缓存按「静态输入指纹」复用前缀，
+/// 动态层（状态 / 记忆 / 附加上下文 / 追加规则 / 此刻）照旧每轮拼接——
+/// 注意【追加规则】区块在输出顺序上位于附加上下文之后，属动态段，不缓存。
+///
+/// key 为参与静态层的字段组合（经 Equatable 值比较），契约切换/编辑时
+/// 字段变化自然失配。容量上限防止长期运行/多契约切换下无界增长。
+final Map<_StaticPromptKey, String> _staticPromptCache = {};
+
+/// 静态前缀缓存最大条目数（契约数量级远低于此，LRU 兜底防无界增长）。
+const int _maxStaticPromptCacheEntries = 64;
+
+/// 清空静态前缀缓存（测试隔离用；生产代码契约切换时 key 指纹自然失配，
+/// 无需手动失效）。
+@visibleForTesting
+void clearStaticPromptCache() {
+  _staticPromptCache.clear();
+}
+
+/// 静态前缀缓存 key：仅含影响静态层的字段（排除 rules/memories/history 等
+/// 非静态或位于动态段的字段）。
+class _StaticPromptKey {
+  final String roleName;
+  final List<StateItem> anchor;
+  final String worldview;
+  final String background;
+  final String narrativeRules;
+
+  const _StaticPromptKey({
+    required this.roleName,
+    required this.anchor,
+    required this.worldview,
+    required this.background,
+    required this.narrativeRules,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! _StaticPromptKey) return false;
+    return other.roleName == roleName &&
+        _listEquals(other.anchor, anchor) &&
+        other.worldview == worldview &&
+        other.background == background &&
+        other.narrativeRules == narrativeRules;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    roleName,
+    Object.hashAll(anchor),
+    worldview,
+    background,
+    narrativeRules,
+  );
+
+  static bool _listEquals(List<Object> a, List<Object> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+}
 
 /// 构建系统提示词（角色扮演叙事设定）。
 ///
@@ -54,53 +123,14 @@ String buildSystemPrompt({
     memoriesPreSorted = true;
   }
 
+  // ---- 静态前缀（缓存复用）+ 动态层拼接 ----
   final buffer = StringBuffer();
-
-  // ============================================================
-  // 第一层：格式硬性要求（放在最前，强化记忆）
-  // ============================================================
-  final constraints =
-      (narrativeRules != null && narrativeRules.trim().isNotEmpty)
-      ? narrativeRules.trim()
-      : defaultNarrativeRules;
-  buffer.writeln('【格式要求】');
-  buffer.writeln(constraints);
-  buffer.writeln();
-
-  // ============================================================
-  // 第二层：世界设定
-  // ============================================================
-  if (contract.worldview.isNotEmpty) {
-    buffer.writeln('【世界设定】');
-    buffer.writeln(_interpolate(contract.worldview, contract.roleName));
-    buffer.writeln();
-  }
-
-  // ============================================================
-  // 第三层：角色定义
-  // ============================================================
-  buffer.writeln('【角色】');
-  buffer.writeln('你是${contract.roleName}');
-  if (contract.anchor.isNotEmpty) {
-    // 人格标签/核心信念 → 「你是……的存在」；说话风格 → 独立句（说话方式）
-    final persona = _extractAnchorValue(contract.anchor, _personaKeys);
-    if (persona != null) {
-      buffer.writeln('，一个$persona的存在');
-    }
-    buffer.writeln('。');
-    final speechStyle = _extractAnchorValue(contract.anchor, _styleKeys);
-    if (speechStyle != null) {
-      buffer.writeln('你的说话风格：$speechStyle。');
-    }
-  } else {
-    buffer.writeln('。');
-  }
-  if (contract.background.isNotEmpty) {
-    buffer.writeln(
-      '你的背景：${_interpolate(contract.background, contract.roleName)}',
-    );
-  }
-  buffer.writeln();
+  buffer.write(
+    _buildStaticPrefixCached(
+      contract: contract,
+      narrativeRules: narrativeRules,
+    ),
+  );
 
   // ============================================================
   // 第四层：当前状态（运行时值，非契约初始值）
@@ -182,6 +212,84 @@ String buildSystemPrompt({
   buffer.writeln();
 
   return buffer.toString();
+}
+
+/// 构建系统提示词静态前缀（第一至三层），带缓存复用。
+///
+/// 静态层只依赖 [contract] 的静态字段与 [narrativeRules]（不含运行时
+/// 状态/记忆/历史，也不含【追加规则】——后者位于动态段末尾），同一契约
+/// 多轮生成时直接复用缓存串，避免重复拼接与 `{角色名}` 插值。缓存按
+/// [_StaticPromptKey] 指纹命中，容量上限兜底防无界增长。
+String _buildStaticPrefixCached({
+  required Contract contract,
+  String? narrativeRules,
+}) {
+  final constraints =
+      (narrativeRules != null && narrativeRules.trim().isNotEmpty)
+      ? narrativeRules.trim()
+      : defaultNarrativeRules;
+
+  final key = _StaticPromptKey(
+    roleName: contract.roleName,
+    anchor: contract.anchor,
+    worldview: contract.worldview,
+    background: contract.background,
+    narrativeRules: constraints,
+  );
+  final cached = _staticPromptCache[key];
+  if (cached != null) return cached;
+
+  final buffer = StringBuffer();
+
+  // ============================================================
+  // 第一层：格式硬性要求（放在最前，强化记忆）
+  // ============================================================
+  buffer.writeln('【格式要求】');
+  buffer.writeln(constraints);
+  buffer.writeln();
+
+  // ============================================================
+  // 第二层：世界设定
+  // ============================================================
+  if (contract.worldview.isNotEmpty) {
+    buffer.writeln('【世界设定】');
+    buffer.writeln(_interpolate(contract.worldview, contract.roleName));
+    buffer.writeln();
+  }
+
+  // ============================================================
+  // 第三层：角色定义
+  // ============================================================
+  buffer.writeln('【角色】');
+  buffer.writeln('你是${contract.roleName}');
+  if (contract.anchor.isNotEmpty) {
+    // 人格标签/核心信念 → 「你是……的存在」；说话风格 → 独立句（说话方式）
+    final persona = _extractAnchorValue(contract.anchor, _personaKeys);
+    if (persona != null) {
+      buffer.writeln('，一个$persona的存在');
+    }
+    buffer.writeln('。');
+    final speechStyle = _extractAnchorValue(contract.anchor, _styleKeys);
+    if (speechStyle != null) {
+      buffer.writeln('你的说话风格：$speechStyle。');
+    }
+  } else {
+    buffer.writeln('。');
+  }
+  if (contract.background.isNotEmpty) {
+    buffer.writeln(
+      '你的背景：${_interpolate(contract.background, contract.roleName)}',
+    );
+  }
+  buffer.writeln();
+
+  final prefix = buffer.toString();
+  // 容量上限：超限时清空重建（简单 FIFO 兜底，契约数远低于上限）
+  if (_staticPromptCache.length >= _maxStaticPromptCacheEntries) {
+    _staticPromptCache.clear();
+  }
+  _staticPromptCache[key] = prefix;
+  return prefix;
 }
 
 /// 默认叙事约束（用户未自定义时使用）。

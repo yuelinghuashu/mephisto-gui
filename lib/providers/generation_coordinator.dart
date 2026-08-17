@@ -77,6 +77,38 @@ mixin GenerationCoordinator<T> {
   /// 停止生成时的流式缓冲 flush 钩子（由混入方实现）。
   void onGenerationStop();
 
+  /// 执行一轮完整生成的「收尾编排」：try/catch/finally 统一处理。
+  ///
+  /// 单角色 [NarrativeNotifier.sendMessage] 与多角色
+  /// [StageNarrativeNotifier.sendMessage] 的生成段骨架完全一致，收敛为
+  /// 统一实现：
+  ///   - 成功/失败都必须在 finally 中复位同步标志位 [endGeneration]，
+  ///     允许用户发送下一条（防卡死）
+  ///   - 失败时调用 [onFailure]（flush 流式缓冲 + dispatch 失败事件），
+  ///     错误信息经 [onError] 记录（含堆栈）
+  ///
+  /// 参数：
+  ///   - [userInput]: 本轮命运指引（原样传给 [core]）
+  ///   - [core]: 实际生成管线（_generateCore，含 LLM 调用/存档/记忆提取）
+  ///   - [onFailure]: 生成失败的收尾（dispatch GenerationFailed 事件）
+  ///   - [onError]: 异常记录回调（debugPrint 带堆栈）
+  Future<void> runGeneration({
+    required String userInput,
+    required Future<void> Function(String input) core,
+    required void Function() onFailure,
+    required void Function(Object error, StackTrace stackTrace) onError,
+  }) async {
+    try {
+      await core(userInput);
+    } catch (e, st) {
+      onError(e, st);
+      onFailure();
+    } finally {
+      // 无论成功/失败/异常，都必须复位同步标志位，允许下一次发送
+      endGeneration();
+    }
+  }
+
   /// Notifier dispose 清理（防止 Timer / 信号泄漏）。
   void disposeGeneration() {
     _generationCancel = null;

@@ -212,10 +212,8 @@ class _BranchTile extends StatelessWidget {
       ),
       subtitle: Text(
         subtitle,
-        style: theme.textTheme.labelSmall?.copyWith(
-          color: AppTheme.textSecondary(theme.brightness),
-          fontSize: 11,
-        ),
+        // labelSmall 已含 11px + textSecondary 默认值
+        style: theme.textTheme.labelSmall,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

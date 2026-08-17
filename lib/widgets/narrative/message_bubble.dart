@@ -117,12 +117,35 @@ class MessageBubble extends StatelessWidget {
 
   /// 包裹消息气泡并附加长按/右键操作菜单。
   ///
-  /// 菜单项根据消息角色动态生成：
-  ///   - 复制：所有非系统消息
-  ///   - 重新生成：仅角色消息（assistant）
+  /// 菜单项**按需构造**（在回调内构建而非每次 build）：
+  /// 流式期间气泡每 chunk 重建，若在 build 中构造 PopupMenuItem 列表
+  /// （含 ListTile、AppLocalizations 查找），即使菜单从未打开也白白消耗。
   Widget _withMessageMenu(BuildContext context, Widget child) {
+    return Semantics(
+      // 读屏可感知「此处是按钮，可打开消息操作菜单」；
+      // 不排除子语义（消息文本仍需朗读）
+      button: true,
+      label: AppLocalizations.of(context).messageMenuOpenSemantics,
+      child: GestureDetector(
+        // HitTestBehavior.opaque：确保整块区域可命中（含透明区域），
+        // 满足桌面右键/触屏长按的最小命中范围
+        behavior: HitTestBehavior.opaque,
+        // 桌面端右键亦触发菜单
+        onSecondaryTapDown: (details) =>
+            _showMenu(context, details.globalPosition),
+        onLongPress: () => _showMenu(context),
+        child: child,
+      ),
+    );
+  }
+
+  /// 构建菜单项列表（按需调用）。
+  ///
+  /// 在 [showMenu] 之前构建——菜单被触发时才会执行
+  /// `AppLocalizations.of(context)` 查找与 ListTile 构造。
+  List<PopupMenuEntry<String>> _buildMenuItems(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final items = <PopupMenuEntry<String>>[
+    return <PopupMenuEntry<String>>[
       PopupMenuItem(
         value: 'copy',
         child: ListTile(
@@ -146,22 +169,15 @@ class MessageBubble extends StatelessWidget {
         ),
       ],
     ];
-
-    return GestureDetector(
-      // 桌面端右键亦触发菜单
-      onSecondaryTapDown: (details) =>
-          _showMenu(context, items, details.globalPosition),
-      onLongPress: () => _showMenu(context, items),
-      child: child,
-    );
   }
 
   /// 弹出操作菜单（优先使用触发位置，否则居中显示）。
   void _showMenu(
-    BuildContext context,
-    List<PopupMenuEntry<String>> items,
-    [Offset? position,
+    BuildContext context, [
+    Offset? position,
   ]) async {
+    // 按需构建菜单项（避免每次 build 都构造）
+    final items = _buildMenuItems(context);
     if (items.isEmpty) return;
     final result = await showMenu<String>(
       context: context,
@@ -194,6 +210,19 @@ class MessageBubble extends StatelessWidget {
   }
 }
 
+/// 角色消息气泡的内容内边距（水平 16 / 垂直 10）。
+///
+/// 与 [assistantBubbleRadius] 一起构成角色气泡的标准视觉，被标准气泡
+/// `_MessageContainer` 与舞台角色气泡 `StageMessageBubble` 共用，
+/// 避免两处视觉常量漂移（改圆角/内边距需同步两处）。
+const EdgeInsets assistantBubblePadding = EdgeInsets.symmetric(
+  horizontal: 16,
+  vertical: 10,
+);
+
+/// 角色消息气泡的圆角。
+const double assistantBubbleRadius = 12;
+
 /// 消息气泡容器（命运/角色共用）。
 ///
 /// 统一「Padding + Align + Container」三段结构：
@@ -220,10 +249,10 @@ class _MessageContainer extends StatelessWidget {
         alignment: alignment,
         child: Container(
           // 宽度继承外层用户选择的叙事内容宽度档位，自动换行
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: assistantBubblePadding,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(assistantBubbleRadius),
           ),
           child: child,
         ),

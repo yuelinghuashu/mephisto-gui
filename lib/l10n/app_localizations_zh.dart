@@ -357,6 +357,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageMenuCopied => '✦ 已复制到剪贴板';
 
   @override
+  String get messageMenuOpenSemantics => '打开消息操作菜单';
+
+  @override
   String get inputBarAttachTooltip => '附加上下文（文本，可多选）';
 
   @override
@@ -384,6 +387,20 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get statusBarHistoryChip => '历史';
+
+  @override
+  String statusBarChipSemantics(Object count, Object label) {
+    return '$label $count 条';
+  }
+
+  @override
+  String roleStatusChipSemantics(
+    Object memoryCount,
+    Object roleName,
+    Object stateCount,
+  ) {
+    return '$roleName 状态 $stateCount 项，记忆 $memoryCount 条';
+  }
 
   @override
   String diceVerdictTitle(Object count) {

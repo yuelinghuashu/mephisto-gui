@@ -130,7 +130,13 @@ List<Block> lexMeph(String text) {
 
     // 残缺标题：以【开头但无闭合】，或以】结尾但无开头 → 格式错误
     if (trimmed.startsWith('【') || trimmed.endsWith('】')) {
-      throw MephParseError(line: lineNumber, message: '区块标题格式错误');
+      // 区分两种错误，帮助用户定位真实原因：
+      //   - 以【开头（如 `【xxx`、`【】`、`【xxx】正文`）→ 标题本身/格式问题
+      //   - 仅以】结尾（如 `xxx】`）→ 缺失开头
+      final message = trimmed.startsWith('【')
+          ? _describeBrokenBlockHeader(trimmed)
+          : '区块标题缺少开头的 "【"（应以 "【标题】" 独立成行）';
+      throw MephParseError(line: lineNumber, message: message);
     }
 
     // 区块外的普通内容
@@ -179,4 +185,24 @@ String? blockTitle(String trimmed) {
   final title = trimmed.substring(1, trimmed.length - 1).trim();
   if (title.isEmpty) return null;
   return title;
+}
+
+/// 描述以 `【` 开头的残缺区块标题行（供错误信息精确定位）。
+///
+/// 覆盖三种情况：
+///   - `【】`（空标题）
+///   - `【xxx`（未闭合，无 `】`）
+///   - `【xxx】正文`（标题行带正文，且未以 `】` 结尾——被外层 `endsWith('】')`
+///     判为残缺；若恰好以 `】` 结尾则属于「标题行不允许带正文」）
+String _describeBrokenBlockHeader(String trimmed) {
+  final closeIdx = trimmed.indexOf('】');
+  if (closeIdx == -1) {
+    return '区块标题格式错误：缺少闭合的 "】"';
+  }
+  final title = trimmed.substring(1, closeIdx).trim();
+  if (title.isEmpty) {
+    return '区块标题格式错误：标题不能为空（应写为 "【标题】"）';
+  }
+  // 有闭合】但整行未以】结尾 → 标题行后面带了正文
+  return '区块标题格式错误：标题行不允许携带正文（"【$title】" 应独立成行）';
 }

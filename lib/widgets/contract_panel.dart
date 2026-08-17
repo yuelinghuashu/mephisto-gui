@@ -117,10 +117,8 @@ class ContractPanel extends StatelessWidget {
                             '${i + 1}. [${contract.rules[i].name}] '
                             '${contract.rules[i].condition} '
                             '-> ${contract.rules[i].action}',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontSize: 13,
-                              color: AppTheme.textSecondary(theme.brightness),
-                            ),
+                            // labelLarge 已含 13px + textSecondary 默认值
+                            style: theme.textTheme.labelLarge,
                           ),
                         ),
                     ],
@@ -217,10 +215,8 @@ class ContractPanel extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 2),
             child: Text(
               '- $item',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontSize: 13,
-                color: AppTheme.textSecondary(theme.brightness),
-              ),
+              // labelLarge 已含 13px + textSecondary 默认值
+              style: theme.textTheme.labelLarge,
             ),
           ),
       ],

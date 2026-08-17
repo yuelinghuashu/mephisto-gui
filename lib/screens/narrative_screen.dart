@@ -168,11 +168,15 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ---- 读取状态 ----
-    final state = ref.watch(narrativeProvider);
+    // ---- 窄监听：仅依赖所需字段，避免流式 chunk 触发整页重建 ----
+    // 流式输出时 streamingContent 每 50ms 变化一次，若此处 watch 整个
+    // NarrativeState，AppBar/输入栏/状态条/抽屉会随每个 chunk 全量 rebuild
+    //（约 20fps 全页重建）。改用 select 后，只有真正依赖某字段的组件
+    // 才随该字段变化重建（见 _NarrativeMessageFlow 的独立 watch）。
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final l10n = AppLocalizations.of(context);
+
     // 契约兜底提示（用户文件缺失/损坏 → 已加载内置模板时非空）
     // 注意：契约兜底提示来自 Provider 层，可能为错误码，需要本地化翻译
     final rawFallbackNotice = ref.watch(contractFallbackNoticeProvider);
@@ -191,10 +195,42 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
       (prev, next) => _startFileWatch(next),
     );
 
-    // ---- 获取数据 ----
-    final roleName = state.roleName;
-    final isGenerating = state.isGenerating;
-    final opening = state.contract.opening.replaceAll('{角色名}', roleName);
+    // ---- 窄监听各字段 ----
+    final roleName = ref.watch(narrativeProvider.select((s) => s.roleName));
+    final branchName = ref.watch(
+      narrativeProvider.select((s) => s.branchName),
+    );
+    final isGenerating = ref.watch(
+      narrativeProvider.select((s) => s.isGenerating),
+    );
+    final lastError = ref.watch(narrativeProvider.select((s) => s.lastError));
+    final opening = ref.watch(
+      narrativeProvider.select((s) => s.contract.opening),
+    ).replaceAll('{角色名}', roleName);
+    final attachedFileNames = ref.watch(
+      narrativeProvider.select((s) => s.attachedFileNames),
+    );
+    final ruleCount = ref.watch(narrativeProvider.select((s) => s.ruleCount));
+    final memoryCount = ref.watch(
+      narrativeProvider.select((s) => s.memoryCount),
+    );
+    final historyCount = ref.watch(
+      narrativeProvider.select((s) => s.historyCount),
+    );
+    // 仪表盘抽屉所需字段（contract/currentState/memories/history）
+    final dashboardContract = ref.watch(
+      narrativeProvider.select((s) => s.contract),
+    );
+    final dashboardState = ref.watch(
+      narrativeProvider.select((s) => s.currentState),
+    );
+    final dashboardMemories = ref.watch(
+      narrativeProvider.select((s) => s.memories),
+    );
+    final dashboardHistory = ref.watch(
+      narrativeProvider.select((s) => s.history),
+    );
+
     // 叙事内容宽度偏好（桌面端可选，移动端自动占满）
     final narrativeWidth = ref.watch(narrativeWidthProvider);
     final contentMaxWidth = narrativeWidth.maxWidth;
@@ -205,10 +241,17 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     // ---- 构建界面：共享骨架（快捷键 + 错误监听）----
     return NarrativeScaffold(
       messageListKey: _messageListKey,
-      lastError: state.lastError,
+      lastError: lastError,
       scaffoldBuilder: (context) => Scaffold(
         // 仪表盘：桌面端右侧抽屉；移动端改用底部弹出面板
-        endDrawer: isMobile ? null : DashboardDrawer(state: state),
+        endDrawer: isMobile
+            ? null
+            : DashboardDrawer(
+                contract: dashboardContract,
+                currentState: dashboardState,
+                memories: dashboardMemories,
+                history: dashboardHistory,
+              ),
 
         // 天幕栏
         appBar: AppBar(
@@ -218,7 +261,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
               // 避免出现文本已消失但箭头孤立的窄屏问题。
               // 阈值为「 ▸ 」+ 两侧间距 + 最小分支名宽度的估算值。
               final showBranch =
-                  state.branchName.isNotEmpty &&
+                  branchName.isNotEmpty &&
                   constraints.maxWidth > AppTheme.minWidthForBranchDisplay;
 
               return Row(
@@ -238,7 +281,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        state.branchName,
+                        branchName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.labelLarge?.copyWith(
@@ -296,7 +339,13 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                 icon: const Icon(Icons.dashboard),
                 onPressed: () {
                   if (isMobile) {
-                    DashboardBottomSheet.show(context, state);
+                    DashboardBottomSheet.show(
+                      context,
+                      contract: dashboardContract,
+                      currentState: dashboardState,
+                      memories: dashboardMemories,
+                      history: dashboardHistory,
+                    );
                   } else {
                     Scaffold.of(context).openEndDrawer();
                   }
@@ -318,9 +367,11 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
         body: Column(
           children: [
             // ---- 契约兜底提示条（用户文件缺失/损坏时置顶提醒） ----
+            // 颜色走 AppTheme.warning* 令牌：暗色主题自动切换为深棕底，
+            // 避免旧版硬编码亮色系颜色在暗色下刺眼
             if (fallbackNotice != null)
               Material(
-                color: const Color(0xFFFFF3E0),
+                color: AppTheme.warningContainer(theme.brightness),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -328,17 +379,17 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.warning_amber_rounded,
                         size: 18,
-                        color: Color(0xFFB26A00),
+                        color: AppTheme.warningOnContainer(theme.brightness),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           fallbackNotice,
                           style: textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF8C5A00),
+                            color: AppTheme.warningText(theme.brightness),
                           ),
                         ),
                       ),
@@ -348,22 +399,15 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
               ),
 
             // 叙事流（消息列表或空状态）—— 滚动视口全宽，条目内部受限居中
+            // 独立 ConsumerWidget：只 watch messages/streamingContent/isGenerating，
+            // 流式 chunk 变化时仅本区域重建，AppBar/输入栏/状态条不随打字机刷新
             Expanded(
-              child: state.messages.isEmpty && !isGenerating
-                  ? EmptyState(opening: opening)
-                  : MessageList(
-                      key: _messageListKey,
-                      messages: state.messages,
-                      streamingContent: state.streamingContent,
-                      isGenerating: isGenerating,
-                      contentMaxWidth: contentMaxWidth,
-                      // 长按/右键操作：重新生成消息
-                      onRegenerate: (index) {
-                        ref
-                            .read(narrativeProvider.notifier)
-                            .regenerateMessage(index);
-                      },
-                    ),
+              child: _NarrativeMessageFlow(
+                messageListKey: _messageListKey,
+                contentMaxWidth: contentMaxWidth,
+                opening: opening,
+                isGenerating: isGenerating,
+              ),
             ),
 
             // 输入区（StatefulWidget 管理 Controller 生命周期）—— 居中受限
@@ -381,7 +425,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                   ref.read(narrativeProvider.notifier).revealStreaming();
                 },
                 showAttachment: true,
-                attachedFileNames: state.attachedFileNames,
+                attachedFileNames: attachedFileNames,
                 onAttach: (fileName, content) {
                   ref
                       .read(narrativeProvider.notifier)
@@ -399,9 +443,9 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
             WidthConstrainedCenter(
               contentMaxWidth: contentMaxWidth,
               child: StatusBar(
-                ruleCount: state.ruleCount,
-                memoryCount: state.memoryCount,
-                historyCount: state.historyCount,
+                ruleCount: ruleCount,
+                memoryCount: memoryCount,
+                historyCount: historyCount,
               ),
             ),
           ],
@@ -537,5 +581,58 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
         SnackBar(content: Text(l10n.narrativeBranchFail)),
       );
     }
+  }
+}
+
+/// 叙事消息流（窄监听消费者）
+///
+/// 独立 [ConsumerWidget]：只 watch `messages` / `streamingContent` /
+/// `isGenerating` 三个字段（经 `select`），使 LLM 流式输出期间
+/// （streamingContent 每 50ms 变化）只有本区域重建，而 AppBar、
+/// 输入栏、状态条、仪表盘抽屉不随打字机效果刷新——消除整页重建。
+///
+/// 由 [NarrativeScreen] 传入 [opening]（空态文案）与 [isGenerating]
+/// （渲染空态/流式占位所需），避免本组件 watch 无关字段。
+class _NarrativeMessageFlow extends ConsumerWidget {
+  /// 消息列表控制 Key（滚动跳转）
+  final GlobalKey<MessageListState> messageListKey;
+
+  /// 消息内容最大宽度（null 表示满屏）
+  final double? contentMaxWidth;
+
+  /// 开局场景文案（空态展示用）
+  final String opening;
+
+  /// 是否正在生成
+  final bool isGenerating;
+
+  const _NarrativeMessageFlow({
+    required this.messageListKey,
+    required this.contentMaxWidth,
+    required this.opening,
+    required this.isGenerating,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final messages = ref.watch(narrativeProvider.select((s) => s.messages));
+    final streamingContent = ref.watch(
+      narrativeProvider.select((s) => s.streamingContent),
+    );
+
+    if (messages.isEmpty && !isGenerating) {
+      return EmptyState(opening: opening);
+    }
+    return MessageList(
+      key: messageListKey,
+      messages: messages,
+      streamingContent: streamingContent,
+      isGenerating: isGenerating,
+      contentMaxWidth: contentMaxWidth,
+      // 长按/右键操作：重新生成消息
+      onRegenerate: (index) {
+        ref.read(narrativeProvider.notifier).regenerateMessage(index);
+      },
+    );
   }
 }

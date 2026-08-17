@@ -302,5 +302,72 @@ void main() {
       expect(reparsed.rules.last.condition, contains('状态.位置 != "书斋"'));
       expect(reparsed.rules.last.action, contains('状态.灵魂完整度 += 10'));
     });
+
+    test('修复 `if` 关键字修复不误伤含 if 的英文单词（规则名/动作文本）', () {
+      // 回归：旧版 `if(?=[^\s])` 无词边界，会把 `gift` → `gif t`、
+      // `unified` → `unif ied`，编辑器保存即触发静默改写
+      final input = [
+        '【规则】',
+        '[gift] if 包含 "unified" -> 注入 "if only"',
+        '[unified] if 包含 "x" -> 状态.point = 1',
+      ].join('\n');
+
+      final formatted = formatMephText(input);
+      final lines = formatted.split('\n');
+
+      expect(lines[1], contains('[gift] if'));
+      expect(lines[1], isNot(contains('gif t')));
+      expect(lines[1], contains('"unified"'), reason: '字符串内的 unified 不应被改写');
+      expect(lines[1], contains('"if only"'), reason: '字符串内的 if 不应被改写');
+      expect(lines[2], contains('[unified] if'));
+      expect(lines[2], isNot(contains('unif ied')));
+
+      // 格式化后应能正常解析（规则名/动作原样保留）
+      final reparsed = parseMeph(formatted);
+      expect(reparsed.rules, hasLength(2));
+      expect(reparsed.rules[0].name, 'gift');
+      expect(reparsed.rules[1].name, 'unified');
+      expect(reparsed.rules[0].action, '注入 "if only"');
+    });
+  });
+
+  group('格式化 - 散文内容不被篡改（回归）', () {
+    test('记忆/历史/世界观等散文区块的冒号不被补空格', () {
+      // 回归：旧版对全部非规则区块做冒号规整，`12:30` → `12: 30`、
+      // `http://x.com` → `http: //x.com`，静默篡改用户数据
+      final input = [
+        '【角色名】',
+        '测试',
+        '【世界观】',
+        '深夜 12:30 的钟声响起。',
+        '网址 http://x.com/y 是传说之地。',
+        '【记忆】',
+        '- [3] 午夜12:30的钟声',
+        '- [3] 他说道：你好',
+        '【历史】',
+        '- fate: 出发 12:30',
+        '【锚点】',
+        '- 核心信念: 真理',
+        '【状态】',
+        '- 灵魂完整度: 100',
+      ].join('\n');
+
+      final formatted = formatMephText(input);
+
+      // 散文区块：冒号原样保留（不补空格）
+      expect(formatted, contains('12:30 的钟声'));
+      expect(formatted, isNot(contains('12: 30')));
+      expect(formatted, contains('http://x.com/y'));
+      expect(formatted, isNot(contains('http: //x.com')));
+      // 中文冒号在散文（记忆）中同样不被补空格
+      expect(formatted, contains('他说道：你好'));
+      expect(formatted, isNot(contains('他说道： 你好')));
+      // 历史区块：冒号原样保留
+      expect(formatted, contains('fate: 出发 12:30'));
+
+      // 锚点/状态（结构化键值对）仍做冒号规整
+      expect(formatted, contains('核心信念: 真理'));
+      expect(formatted, contains('灵魂完整度: 100'));
+    });
   });
 }

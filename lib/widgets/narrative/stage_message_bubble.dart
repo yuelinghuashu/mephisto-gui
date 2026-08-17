@@ -49,58 +49,63 @@ class StageMessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 左侧角色名标签（竖排小圆点 + 角色名）
-          Padding(
-            padding: const EdgeInsets.only(top: 12, right: 8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: roleColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                RotatedBox(
-                  quarterTurns: 3,
-                  child: Text(
-                    roleTag,
-                    style: theme.textTheme.labelSmall?.copyWith(
+      // MergeSemantics：竖排角色名标签与正文合并为单一读屏单元，
+      // 避免读屏按「竖排标签 → 正文」割裂顺序朗读（见 B3）
+      child: MergeSemantics(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 左侧角色名标签（竖排小圆点 + 角色名）
+            Padding(
+              padding: const EdgeInsets.only(top: 12, right: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
                       color: roleColor,
-                      fontWeight: FontWeight.bold,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          // 角色消息气泡（左边框用角色色）
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: theme.cardColor.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(12),
-                border: Border(
-                  left: BorderSide(color: roleColor, width: 3),
-                ),
-              ),
-              child: ParagraphText(
-                // 剥离 content 开头的 `【角色名】` 前缀：
-                // reducer 写入 history 时保留该头（存档可读），
-                // 但 UI 已有左侧竖排角色名标签，正文不再重复显示角色名。
-                stripRoleHeader(message.content),
-                style: theme.textTheme.bodyMedium,
+                  const SizedBox(height: 4),
+                  RotatedBox(
+                    quarterTurns: 3,
+                    child: Text(
+                      roleTag,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: roleColor,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            // 角色消息气泡（左边框用角色色）
+            Expanded(
+              child: Container(
+                // 复用标准气泡的视觉常量（padding/圆角），避免两处漂移
+                padding: assistantBubblePadding,
+                decoration: BoxDecoration(
+                  color: theme.cardColor.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(assistantBubbleRadius),
+                  border: Border(
+                    left: BorderSide(color: roleColor, width: 3),
+                  ),
+                ),
+                child: ParagraphText(
+                  // 剥离 content 开头的 `【角色名】` 前缀：
+                  // reducer 写入 history 时保留该头（存档可读），
+                  // 但 UI 已有左侧竖排角色名标签，正文不再重复显示角色名。
+                  stripRoleHeader(message.content),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

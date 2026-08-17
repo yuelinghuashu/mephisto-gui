@@ -137,4 +137,45 @@ void main() {
       expect(result.overflow, contains('沉默'));
     });
   });
+
+  group('重复分节（回归：追加合并而非覆盖）', () {
+    test('同一角色出现两个分节 → 文本追加合并，不丢失前段', () {
+      // LLM 分段输出中重复标题并不罕见；旧实现后者覆盖前者，前段静默丢失
+      const reply = '''
+【浮士德】
+浮士德站在书斋窗前。
+
+【浮士德】
+浮士德转身面对梅菲斯特。
+''';
+      final result = parseStageSections(reply: reply, roleNames: roleNames);
+      expect(result.sections['浮士德'], contains('浮士德站在书斋窗前。'));
+      expect(result.sections['浮士德'], contains('浮士德转身面对梅菲斯特。'));
+      expect(
+        result.sections['浮士德']!.indexOf('站在书斋窗前') <
+            result.sections['浮士德']!.indexOf('转身面对'),
+        isTrue,
+        reason: '前段内容应保留在合并结果的前部，而非被覆盖丢失',
+      );
+    });
+
+    test('重复分节之间有其他角色 → 各自段落互不混淆', () {
+      const reply = '''
+【浮士德】
+第一段浮士德。
+
+【梅菲斯特】
+梅菲斯特段落。
+
+【浮士德】
+第二段浮士德。
+''';
+      final result = parseStageSections(reply: reply, roleNames: roleNames);
+      final faust = result.sections['浮士德']!;
+      expect(faust, contains('第一段浮士德'));
+      expect(faust, contains('第二段浮士德'));
+      expect(faust, isNot(contains('梅菲斯特')), reason: '浮士德段不含梅菲斯特内容');
+      expect(result.sections['梅菲斯特'], '梅菲斯特段落。');
+    });
+  });
 }

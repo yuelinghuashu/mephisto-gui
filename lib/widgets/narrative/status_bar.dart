@@ -60,27 +60,33 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
-    return Row(
-      children: [
-        Text(icon, style: const TextStyle(fontSize: 12)),
-        const SizedBox(width: 4),
-        Text(
-          '$count ',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppTheme.gold,
+    return Semantics(
+      // 合并读屏语义：读屏朗读「规则 12 条」而非逐个朗读 emoji/数字/标签
+      //（注意 gen-l10n 按占位符字母序生成参数：count 在前、label 在后）
+      label: l10n.statusBarChipSemantics(count, label),
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          // bodySmall 为 12px 基准，emoji 图标字号沿用同一档位
+          Text(icon, style: theme.textTheme.bodySmall),
+          const SizedBox(width: 4),
+          Text(
+            '$count ',
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.gold,
+            ),
           ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppTheme.textSecondary(theme.brightness),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppTheme.textSecondary(theme.brightness),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

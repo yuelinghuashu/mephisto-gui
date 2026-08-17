@@ -57,3 +57,4 @@ android/key.properties
 .env
 .env.*
 !.env.example
+node_modules

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mephisto/app/theme.dart';
 import 'package:mephisto/l10n/app_localizations.dart';
 
 /// 首页空状态：没有找到任何契约
@@ -57,7 +58,7 @@ class HomeEmptyState extends StatelessWidget {
                   isRestoring ? l10n.emptyStateRestoring : l10n.emptyStateRestoreBuiltin,
                 ),
                 style: FilledButton.styleFrom(
-                  foregroundColor: Colors.black,
+                  foregroundColor: AppTheme.onGold,
                   backgroundColor: theme.colorScheme.primary,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,

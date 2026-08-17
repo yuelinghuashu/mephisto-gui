@@ -45,6 +45,12 @@ Contract _parseBlocks(List<Block> blocks) {
   final history = <HistoryEntry>[];
   final seen = <String>{};
 
+  // 最近处理的「文本型区块」类型（'世界观' / '角色背景' / '开局场景' / null）。
+  // 用于未知区块的内容归并：散文区块中的一行 `【传说】` 会被 lexer 切为
+  // 未知区块，若静默忽略，其后的全部文本会从世界观/背景/开局场景中丢失。
+  // 归并后保留标题行 + 内容行，用户散文原样不丢。
+  String? lastTextBlock;
+
   for (final block in blocks) {
     // 检测重复区块
     if (!seen.add(block.title)) {
@@ -60,36 +66,61 @@ Contract _parseBlocks(List<Block> blocks) {
     switch (block.title) {
       case '角色名':
         roleName = _parseRoleName(block);
+        lastTextBlock = null;
         break;
       case '锚点':
         anchor.addAll(_parseKeyValue(block));
+        lastTextBlock = null;
         break;
       case '世界观':
         worldview = _parseTextBlock(block);
+        lastTextBlock = '世界观';
         break;
       case '角色背景':
         background = _parseTextBlock(block);
+        lastTextBlock = '角色背景';
         break;
       case '开局场景':
         opening = _parseTextBlock(block);
+        lastTextBlock = '开局场景';
         break;
       case '状态':
         state.addAll(_parseKeyValue(block));
+        lastTextBlock = null;
         break;
       case '规则':
         rules.addAll(_parseRules(block));
+        lastTextBlock = null;
         break;
       case '记忆':
         memories.addAll(_parsePlainList(block));
+        lastTextBlock = null;
         break;
       case '历史':
         history.addAll(_parseHistory(block));
+        lastTextBlock = null;
         break;
       case '@命运':
         branchTitle = _parsePlainText(block);
+        lastTextBlock = null;
         break;
       default:
-        // 自定义区块：静默忽略
+        // 未知区块（用户草稿/备忘）：静默忽略（草稿宽容）。
+        // 例外：紧跟在文本型区块之后时，把标题行 + 内容行**并入**该区块
+        // 文本——散文正文中出现的一行 `【xxx】` 不应导致其后内容丢失。
+        // 结构化区块（规则/记忆/历史等）后的未知区块仍忽略（避免脏行
+        // 混入结构化解析导致误报）。
+        if (lastTextBlock != null) {
+          final merged = _mergeUnknownIntoText(block);
+          if (lastTextBlock == '世界观') {
+            worldview = '$worldview\n$merged';
+          } else if (lastTextBlock == '角色背景') {
+            background = '$background\n$merged';
+          } else {
+            opening = '$opening\n$merged';
+          }
+          // 保持 lastTextBlock 不变：后续未知区块继续并入同一文本区块
+        }
         break;
     }
   }
@@ -108,6 +139,17 @@ Contract _parseBlocks(List<Block> blocks) {
   );
 }
 
+/// 将未知区块合并为文本行（标题行 + 原内容行），供并入前一个文本型区块。
+///
+/// 标题行以 `【标题】` 形式保留在文本中——它本来就是用户散文的一部分。
+String _mergeUnknownIntoText(Block block) {
+  final buffer = StringBuffer('【${block.title}】');
+  for (final line in block.content) {
+    buffer.write('\n${line.text}');
+  }
+  return buffer.toString();
+}
+
 /// 解析纯文本系统区块（如 `@命运`）：取首行非空内容作为值；无内容返回空字符串。
 String _parsePlainText(Block block) {
   for (final line in block.content) {
@@ -118,11 +160,16 @@ String _parsePlainText(Block block) {
   return '';
 }
 
-/// 解析【角色名】：取第一个非空行。
+/// 解析【角色名】：取第一个非空、非注释行。
+///
+/// 与 [_parsePlainText] / [_scanEntries] 的注释处理保持一致：
+/// 以 `#` 开头的行是注释（lexer 在区块内保留注释行），应被跳过，
+/// 否则角色名会被错误解析为注释文本。
 String _parseRoleName(Block block) {
   for (final line in block.content) {
     final trimmed = line.text.trim();
-    if (trimmed.isNotEmpty) return trimmed;
+    if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+    return trimmed;
   }
   throw MephParseError(
     line: block.line,
@@ -141,7 +188,10 @@ String _parseTextBlock(Block block) {
 /// 可选的前缀（极简设计）：
 ///   - `[权重]`：1-5 星重要性，用于注入时排序裁剪（人设核心优先被模型看到）
 /// 无前缀的旧格式条目自动兜底默认权重，100% 向后兼容。
-final RegExp _memoryPrefixPattern = RegExp(r'^\[(\d)\]\s+(.+)$');
+///
+/// 与 MemoryManager 共享（memory_manager.dart 解析 LLM 提取结果使用同一
+/// 格式），统一定义于 meph_dsl.dart，避免两处正则漂移。
+final RegExp _memoryPrefixPattern = memoryWeightPrefixPattern;
 
 /// 解析【记忆】：`- 条目` 文本列表，支持可选结构化前缀 `[权重] `。
 ///
@@ -284,7 +334,9 @@ Rule _parseRuleLine(String trimmed, int lineNumber, String blockName) {
   if (action.startsWith('[group:')) {
     final end = action.indexOf(']');
     if (end != -1) {
-      group = action.substring(7, end);
+      // 使用前缀长度常量而非魔法数字 7（`[group:` 长度）
+      const groupPrefixLength = '[group:'.length;
+      group = action.substring(groupPrefixLength, end);
       action = action.substring(end + 1).trim();
     }
   }
@@ -431,14 +483,19 @@ void _validateKeywordSpacing(
 }
 
 /// 检测条件中的括号匹配（缺右括号或多余右括号都会导致条件静默失效）。
+///
+/// 与 [_validateKeywordSpacing] 一致，先屏蔽双引号字符串内容：
+/// 条件 `包含 "("`（查找含左括号的文本）中的括号是字符串数据，
+/// 不参与结构括号计数，否则会被误报「括号不匹配」。
 void _validateParenBalance(
   String condition,
   int lineNumber,
   String blockName,
 ) {
+  final masked = _maskQuotedStrings(condition);
   var depth = 0;
-  for (var i = 0; i < condition.length; i++) {
-    final ch = condition[i];
+  for (var i = 0; i < masked.length; i++) {
+    final ch = masked[i];
     if (ch == '(') {
       depth++;
     } else if (ch == ')') {
@@ -548,12 +605,34 @@ List<StateItem> _parseKeyValue(Block block) {
 }
 
 /// 解析键值对：优先按中文冒号「：」分割，其次按英文冒号「:」。
+///
+/// **跳过双引号字符串内的冒号**：序列化器为字符串值加引号输出
+/// （`- 键: "值含：冒号"`），若冒号出现在引号内，它是值的组成部分而非
+/// 键值分隔符，在此分割会把值截断、破坏「序列化 → 解析」的可逆性。
 (String, String)? _splitKeyValue(String s) {
-  final cn = s.indexOf('：');
-  if (cn != -1) return (s.substring(0, cn).trim(), s.substring(cn + 1).trim());
-  final en = s.indexOf(':');
-  if (en != -1) return (s.substring(0, en).trim(), s.substring(en + 1).trim());
+  for (var i = 0; i < s.length; i++) {
+    final ch = s[i];
+    if (ch == '"') {
+      // 跳过引号字符串内容（引号内的冒号不参与键值分割）
+      final end = _skipQuotedString(s, i);
+      if (end == -1) break; // 引号未闭合：剩余视为字符串数据，不再分割
+      i = end;
+      continue;
+    }
+    if (ch == '：' || ch == ':') {
+      return (s.substring(0, i).trim(), s.substring(i + 1).trim());
+    }
+  }
   return null;
+}
+
+/// 从 [i] 处的 `"` 起跳过整个双引号字符串，返回字符串结束位置（含闭合引号）。
+/// 返回 -1 表示引号未闭合。
+int _skipQuotedString(String s, int i) {
+  for (var j = i + 1; j < s.length; j++) {
+    if (s[j] == '"') return j;
+  }
+  return -1;
 }
 
 // ============================================================

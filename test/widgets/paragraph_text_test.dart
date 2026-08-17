@@ -230,4 +230,84 @@ void main() {
     final spans = collectAllSpans(tester);
     expect(spans, isEmpty);
   });
+
+  // ============================================================
+  // 边界用例：嵌套标记 / 列表续行 / 连续引用 / 首尾空白
+  // ============================================================
+
+  testWidgets('嵌套标记：**粗*斜*体** → 粗体 span 内含斜体 span', (tester) async {
+    await tester.pumpWidget(buildParagraph('**粗*斜*体**'));
+
+    final spans = collectAllSpans(tester);
+    // 外层粗体：粗体样式片段
+    final boldSpan = spans.where((s) => s['fontWeight'] == FontWeight.bold);
+    expect(boldSpan, isNotEmpty, reason: '外层应有粗体 span');
+    // 内层斜体：斜体样式片段（嵌套递归解析）
+    final italicSpan = spans
+        .where((s) => s['fontStyle'] == FontStyle.italic)
+        .toList();
+    expect(italicSpan, isNotEmpty, reason: '粗体内部嵌套的 *斜* 应被解析为斜体 span');
+    // 斜体内容「斜」存在于斜体 span 中
+    expect(
+      italicSpan.any((s) => s['text'] == '斜'),
+      isTrue,
+      reason: '斜体 span 文本应为「斜」',
+    );
+  });
+
+  testWidgets('列表续行：- 第一行\n续行文本 → 合并为同一列表项', (tester) async {
+    // 列表中的非列表行（缩进续行）追加到前一项：
+    // 合并后作为单个列表项渲染（续行文本与列表项同在一个 span 中）
+    await tester.pumpWidget(buildParagraph('- 第一行\n续行内容'));
+
+    final spans = collectAllSpans(tester);
+    // 续行内容应被渲染（作为合并项的一部分，不单独成项）
+    expect(
+      spans.any((s) => s['text'] == '第一行\n续行内容'),
+      isTrue,
+      reason: '续行应并入前一项文本',
+    );
+    // 列表项「第一行」不应作为独立 span 单独出现（已合并）
+    expect(
+      spans.any((s) => s['text'] == '第一行'),
+      isFalse,
+      reason: '合并后不再存在孤立的「第一行」span',
+    );
+  });
+
+  testWidgets('连续引用行合并为同一引用块', (tester) async {
+    await tester.pumpWidget(buildParagraph('> 第一行引用\n> 第二行引用'));
+
+    // 引用行被合并为单个引用块：文本以 \n 连接成一个 span
+    final spans = collectAllSpans(tester);
+    expect(
+      spans.any((s) => s['text'] == '第一行引用\n第二行引用'),
+      isTrue,
+      reason: '连续引用行应合并为同一引用块文本',
+    );
+  });
+
+  testWidgets('单段落保留原始首尾空白（原样渲染）', (tester) async {
+    // 单段落路径（paragraphs.length <= 1）直接渲染原始 content
+    await tester.pumpWidget(buildParagraph('  两端有空格  '));
+
+    final spans = collectAllSpans(tester);
+    expect(spans, isNotEmpty);
+  });
+
+  testWidgets('多段落各自 trim：首尾空白被裁剪', (tester) async {
+    await tester.pumpWidget(buildParagraph('  第一段  \n\n  第二段  '));
+
+    final spans = collectAllSpans(tester);
+    // 多段落路径对每段做 trim，段落内容仍可找到
+    expect(findSpan(spans, '第一段'), isNotNull);
+    expect(findSpan(spans, '第二段'), isNotNull);
+  });
+
+  testWidgets('行内标记跨行（**未闭合）→ 不崩溃并按原样渲染', (tester) async {
+    await tester.pumpWidget(buildParagraph('**未闭合的粗体'));
+
+    final spans = collectAllSpans(tester);
+    expect(spans, isNotEmpty, reason: '未闭合标记不抛异常，文本仍渲染');
+  });
 }

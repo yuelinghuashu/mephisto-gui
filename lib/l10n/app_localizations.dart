@@ -704,6 +704,12 @@ abstract class AppLocalizations {
   /// **'✦ 已复制到剪贴板'**
   String get messageMenuCopied;
 
+  /// No description provided for @messageMenuOpenSemantics.
+  ///
+  /// In zh, this message translates to:
+  /// **'打开消息操作菜单'**
+  String get messageMenuOpenSemantics;
+
   /// No description provided for @inputBarAttachTooltip.
   ///
   /// In zh, this message translates to:
@@ -757,6 +763,22 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'历史'**
   String get statusBarHistoryChip;
+
+  /// No description provided for @statusBarChipSemantics.
+  ///
+  /// In zh, this message translates to:
+  /// **'{label} {count} 条'**
+  String statusBarChipSemantics(Object count, Object label);
+
+  /// No description provided for @roleStatusChipSemantics.
+  ///
+  /// In zh, this message translates to:
+  /// **'{roleName} 状态 {stateCount} 项，记忆 {memoryCount} 条'**
+  String roleStatusChipSemantics(
+    Object memoryCount,
+    Object roleName,
+    Object stateCount,
+  );
 
   /// No description provided for @diceVerdictTitle.
   ///

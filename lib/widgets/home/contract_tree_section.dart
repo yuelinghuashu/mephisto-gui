@@ -135,88 +135,139 @@ class ContractTreeSection extends ConsumerWidget {
       for (final infos in groupInfosCache.values) ...infos,
     ]);
 
-    return ListView(
+    // ---- 惰性列表：固定头部（品牌/舞台/契约标题）按索引映射，契约卡片懒构建 ----
+    // 旧实现用 `ListView(children: [...])` 一次性构建全部契约卡；契约库上百时
+    // 首帧 build 与内存 O(N)、滚动无懒加载。改用 `ListView.builder`：
+    //   - 头部固定项（品牌/舞台/标题）少而稳定，作为前 N 个索引
+    //   - 契约卡按 `groups[index - headerCount]` 懒构建，视口外不实例化
+    // StageSection 内部舞台数通常个位数，保持整块构建（不拆散其独立滚动语义）。
+    final headerCount = isSelectMode ? 1 : 4; // 多选时隐藏品牌/标题区
+    final cardCount = contractCollapsed ? 0 : groups.length;
+
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-      children: [
-        // ---- 品牌展示区（多选模式下隐藏，聚焦操作） ----
-        if (!isSelectMode) HomeBrandHeader(recentEntry: recentEntry),
-
-        // ---- 多角色舞台聚合入口（独立于单角色契约树） ----
-        StageSection(
-          onStageTap: onStageTap,
-          onStageLongPress: isSelectMode ? null : onStageLongPress,
-          onStageToggleSelect: isSelectMode ? onStageToggleSelect : null,
-          onStageMenu: isSelectMode ? null : onStageMenu,
-          isSelectMode: isSelectMode,
-          isStageSelected: selection.isStageSelected,
-          onRoleTap: isSelectMode
-              ? null
-              : (stagePath, roleName, {restoreSave = false}) =>
-                    onRoleTap!(stagePath, roleName, restoreSave: restoreSave),
-          onRoleLongPress: isSelectMode ? null : onRoleLongPress,
-        ),
-
-        // ---- 单角色契约分区标题（仅普通模式显示，多选时聚焦操作） ----
-        if (!isSelectMode)
-          SectionHeader(
-            leadingIcon: Icons.menu_book_outlined,
-            title: l10n.homeContractSectionTitle,
-            count: groups.length,
-            trailing: IconButton(
-              icon: Icon(
-                contractCollapsed ? Icons.expand_more : Icons.expand_less,
-                size: 20,
-                color: AppTheme.gold,
-              ),
-              tooltip: contractCollapsed
-                  ? l10n.homeSectionExpand
-                  : l10n.homeSectionCollapse,
-              onPressed: () => ref
-                  .read(homeSectionVisibilityProvider.notifier)
-                  .toggleContractCollapsed(),
-            ),
+      itemCount: headerCount + cardCount,
+      itemBuilder: (context, index) {
+        if (index < headerCount) {
+          return _buildHeaderItem(
+            context,
+            ref,
+            index,
+            l10n,
+            recentEntry,
+            isSelectMode,
+            contractCollapsed,
+          );
+        }
+        // ---- 契约卡片（懒构建：仅视口内实例化） ----
+        final group = groups[index - headerCount];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: ContractCard(
+            group: group,
+            isSelectMode: isSelectMode,
+            isSelected: selection.isSelected(group.master.fileName),
+            onTap: () => onMasterTap(group.master),
+            onLongPress: () {
+              if (!isSelectMode) {
+                // 长按节点 → 级联选中其整棵子树
+                final subtreeNames =
+                    (groupInfosCache[group.master.fileName] ??
+                            const <ContractInfo>[])
+                        .map((i) => i.fileName)
+                        .toList();
+                selection.enterSelectMode(
+                  group.master.fileName,
+                  cascadeNames: subtreeNames,
+                  expandNodes: subtreeNames,
+                );
+              }
+            },
+            onMenu: (action) => onMasterMenu(context, group.master, action),
+            // 分支选择器：点击分支进入对应契约
+            onBranchTap: onChildTap,
+            // 分支选择器内 ⋮ 菜单：按 isChild 自动分发到母版/子版菜单处理。
+            // 母版走 onMasterMenu（含编辑/导出/级联删除），子版走 onChildMenu。
+            onBranchMenu: (info, action) {
+              if (info.isChild) {
+                onChildMenu(info, action);
+              } else {
+                onMasterMenu(context, info, action);
+              }
+            },
           ),
-        const SizedBox(height: 4),
+        );
+      },
+    );
+  }
 
-        // ---- 契约卡片列表（单行紧凑卡片，每个母版一张） ----
-        if (!contractCollapsed)
-          for (final group in groups) ...[
-            ContractCard(
-              group: group,
-              isSelectMode: isSelectMode,
-              isSelected: selection.isSelected(group.master.fileName),
-              onTap: () => onMasterTap(group.master),
-              onLongPress: () {
-                if (!isSelectMode) {
-                  // 长按节点 → 级联选中其整棵子树
-                  final subtreeNames =
-                      (groupInfosCache[group.master.fileName] ??
-                              const <ContractInfo>[])
-                          .map((i) => i.fileName)
-                          .toList();
-                  selection.enterSelectMode(
-                    group.master.fileName,
-                    cascadeNames: subtreeNames,
-                    expandNodes: subtreeNames,
-                  );
-                }
-              },
-              onMenu: (action) => onMasterMenu(context, group.master, action),
-              // 分支选择器：点击分支进入对应契约
-              onBranchTap: onChildTap,
-              // 分支选择器内 ⋮ 菜单：按 isChild 自动分发到母版/子版菜单处理。
-              // 母版走 onMasterMenu（含编辑/导出/级联删除），子版走 onChildMenu。
-              onBranchMenu: (info, action) {
-                if (info.isChild) {
-                  onChildMenu(info, action);
-                } else {
-                  onMasterMenu(context, info, action);
-                }
-              },
+  /// 构建列表头部的固定项（按索引映射）。
+  ///
+  /// [index] 为列表索引；头部项数由 [headerCount] 决定：
+  ///   - 普通模式（headerCount=4）：0=品牌区，1=舞台区，2=契约标题，3=间距
+  ///   - 多选模式（headerCount=1）：0=舞台区（品牌/标题隐藏，聚焦操作）
+  Widget _buildHeaderItem(
+    BuildContext context,
+    WidgetRef ref,
+    int index,
+    AppLocalizations l10n,
+    RecentEditEntry? recentEntry,
+    bool isSelectMode,
+    bool contractCollapsed,
+  ) {
+    if (isSelectMode) {
+      // 多选模式：仅舞台区（强制展开）
+      return _buildStageSection(ref, isSelectMode, contractCollapsed);
+    }
+    switch (index) {
+      case 0:
+        // ---- 品牌展示区（多选模式下隐藏，聚焦操作） ----
+        return HomeBrandHeader(recentEntry: recentEntry);
+      case 1:
+        return _buildStageSection(ref, isSelectMode, contractCollapsed);
+      case 2:
+        // ---- 单角色契约分区标题（仅普通模式显示，多选时聚焦操作） ----
+        return SectionHeader(
+          leadingIcon: Icons.menu_book_outlined,
+          title: l10n.homeContractSectionTitle,
+          count: groups.length,
+          trailing: IconButton(
+            icon: Icon(
+              contractCollapsed ? Icons.expand_more : Icons.expand_less,
+              size: 20,
+              color: AppTheme.gold,
             ),
-            const SizedBox(height: 8),
-          ],
-      ],
+            tooltip: contractCollapsed
+                ? l10n.homeSectionExpand
+                : l10n.homeSectionCollapse,
+            onPressed: () => ref
+                .read(homeSectionVisibilityProvider.notifier)
+                .toggleContractCollapsed(),
+          ),
+        );
+      default:
+        return const SizedBox(height: 4);
+    }
+  }
+
+  /// 构建舞台聚合入口（普通/多选模式共用；舞台数通常个位数，整块构建）。
+  Widget _buildStageSection(
+    WidgetRef ref,
+    bool isSelectMode,
+    bool contractCollapsed,
+  ) {
+    return StageSection(
+      onStageTap: onStageTap,
+      onStageLongPress: isSelectMode ? null : onStageLongPress,
+      onStageToggleSelect: isSelectMode ? onStageToggleSelect : null,
+      onStageMenu: isSelectMode ? null : onStageMenu,
+      isSelectMode: isSelectMode,
+      isStageSelected: selection.isStageSelected,
+      onRoleTap: isSelectMode
+          ? null
+          : (stagePath, roleName, {restoreSave = false}) =>
+                onRoleTap!(stagePath, roleName, restoreSave: restoreSave),
+      onRoleLongPress: isSelectMode ? null : onRoleLongPress,
     );
   }
 }

@@ -320,7 +320,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: AppTheme.crimson,
-              foregroundColor: Colors.white,
+              foregroundColor: AppTheme.onCrimson,
             ),
             onPressed: () => Navigator.pop(dialogContext, 'overwrite'),
             child: Text(l10n.contractEditorConflictOverwrite),
@@ -360,7 +360,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
             label: Text(l10n.contractEditorSave),
             style: FilledButton.styleFrom(
               backgroundColor: AppTheme.gold,
-              foregroundColor: Colors.black,
+              foregroundColor: AppTheme.onGold,
             ),
           ),
           const SizedBox(width: 8),
@@ -457,8 +457,8 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
                                   : '',
                               _liveError!.message,
                             ),
-                            style: TextStyle(
-                              fontSize: 12,
+                            // bodySmall 已含 12px 默认值，仅覆盖颜色/行高
+                            style: theme.textTheme.bodySmall?.copyWith(
                               height: 1.5,
                               color: AppTheme.crimson.withValues(alpha: 0.9),
                             ),

@@ -37,7 +37,10 @@ String serializeMeph(
   if (contract.anchor.isNotEmpty) {
     buffer.writeln('【锚点】');
     for (final item in contract.anchor) {
-      buffer.writeln('- ${item.key}: ${item.value.value}');
+      // 与【状态】区块统一使用 _formatStateValue：
+      // 字符串值带引号输出（避免 `"10"` 被往返解析成数字、值内含 `：`/`:` 时
+      // 在第一个冒号处被截断成错误键值），保证 parseMeph 可完整还原类型。
+      buffer.writeln('- ${item.key}: ${_formatStateValue(item.value)}');
     }
     buffer.writeln();
   }

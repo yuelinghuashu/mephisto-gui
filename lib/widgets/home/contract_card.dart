@@ -93,8 +93,6 @@ class ContractCard extends StatelessWidget {
   ///   - 第一行：角色名（母版根）/ 命运一句话（子版）
   ///   - 第二行：文件名
   Widget _buildTitleColumn(ThemeData theme, ContractInfo info) {
-    final textSecondary = AppTheme.textSecondary(theme.brightness);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -116,10 +114,8 @@ class ContractCard extends StatelessWidget {
         // ---- 第二行：文件名 ----
         Text(
           info.fileName,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: textSecondary,
-            fontSize: 11,
-          ),
+          // labelSmall 已含 11px + textSecondary 默认值，无需重复覆盖
+          style: theme.textTheme.labelSmall,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -168,10 +164,10 @@ class _BranchTextButton extends StatelessWidget {
         ),
         child: Text(
           AppLocalizations.of(context).contractBranchCount(count),
+          // labelMedium 已含 12px 默认值，仅覆盖颜色/字重
           style: theme.textTheme.labelMedium?.copyWith(
             color: AppTheme.gold,
             fontWeight: FontWeight.w600,
-            fontSize: 12,
           ),
         ),
       ),

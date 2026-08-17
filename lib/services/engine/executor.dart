@@ -10,6 +10,7 @@
 library;
 
 import '../../domain/models.dart';
+import '../parser/meph_dsl.dart' show spacedCompoundOperatorPattern;
 import 'values_util.dart';
 
 /// 规则动作前缀常量。
@@ -83,12 +84,13 @@ String executeAction(
 ///   - 当前值是 [IntValue] 时，结果保持 int（向零截断，与 Go int() 一致）
 ///   - 当前值是 [DoubleValue] 时，结果保持 double
 String setState(String action, Map<String, StateValue> state) {
-  final rest = action.substring(3).trim(); // 去掉 "状态."
+  final rest = action.substring(RuleAction.statePrefix.length).trim(); // 去掉 "状态."
 
   // 兜底校验：`+ =`、`- =` 等「复合运算符符号与等号间有空格」的写法
   // 会导致 `+=` 无法识别、简单赋值分支把 `+` 并进键名（静默创建错误状态键）。
   // 解析阶段已拦截（parseMeph），此处防手动编辑/绕过解析的规则。
-  if (RegExp(r'[+\-*/]\s+=(?!=)').hasMatch(rest)) {
+  // 复用 meph_dsl.dart 的共享常量（与 parser 校验同一模式，避免双正则漂移）。
+  if (spacedCompoundOperatorPattern.hasMatch(rest)) {
     return '📊 复合运算符（如 \'+=\'、\'-=\'）中间不能有空格';
   }
 

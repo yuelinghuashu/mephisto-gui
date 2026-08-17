@@ -368,18 +368,24 @@ class _AttachmentChip extends StatelessWidget {
         Expanded(
           child: Text(
             name,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: AppTheme.textSecondary(theme.brightness),
-              fontSize: 11,
-            ),
+            // labelSmall 已含 11px + textSecondary 默认值
+            style: theme.textTheme.labelSmall,
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        InkWell(
-          onTap: onRemove,
-          child: const Padding(
-            padding: EdgeInsets.all(4),
-            child: Icon(Icons.close, size: 14, color: AppTheme.crimson),
+        // 移除按钮：外层 ConstrainedBox 保证 ≥32px 热区（满足触屏最小
+        // 点击目标）；视觉仅 14px 图标 + 4px padding，热区扩大不改变外观
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: 32,
+            minHeight: 32,
+          ),
+          child: InkWell(
+            onTap: onRemove,
+            child: const Padding(
+              padding: EdgeInsets.all(4),
+              child: Icon(Icons.close, size: 14, color: AppTheme.crimson),
+            ),
           ),
         ),
       ],

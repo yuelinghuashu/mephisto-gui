@@ -14,6 +14,9 @@ import '../../app/theme.dart';
 ///   - `***粗斜体***`：行内粗斜体
 ///
 /// 按 `\n\n` 段落拆分，段落间加垂直间距；段落内部的换行保留。
+///
+/// 性能说明：所有正则均预编译为 `static final`（流式输出时本组件被高频
+/// 重建，若在 build/_parseInline 内构造 RegExp 会每帧重复编译）。
 class ParagraphText extends StatelessWidget {
   /// 文本内容
   final String content;
@@ -31,11 +34,34 @@ class ParagraphText extends StatelessWidget {
     this.textAlign = TextAlign.left,
   });
 
+  /// 段落分隔正则（空行分隔）
+  static final RegExp _paragraphSplitPattern = RegExp(r'\n\s*\n');
+
+  /// 标题正则：`# ` ~ `###### `（1~6 级）
+  static final RegExp _headingPattern = RegExp(r'^(#{1,6})\s+(.+)$');
+
+  /// 行内 Markdown 标记检测正则（粗斜体/粗体/代码/斜体）
+  static final RegExp _inlineMarkupPattern =
+      RegExp(r'\*\*\*.+?\*\*\*|\*\*.+?\*\*|`[^`]+`|(?<!\*)\*[^*\n]+\*(?!\*)');
+
+  /// 粗斜体标记正则（`***xxx***`）
+  static final RegExp _boldItalicPattern = RegExp(r'\*\*\*(.+?)\*\*\*');
+
+  /// 粗体标记正则（`**xxx**`）
+  static final RegExp _boldPattern = RegExp(r'\*\*(.+?)\*\*');
+
+  /// 行内代码标记正则（`` `xxx` ``）
+  static final RegExp _codePattern = RegExp(r'`([^`]+)`');
+
+  /// 斜体标记正则（`*xxx*`，单星号需前后都有文本避免误匹配）
+  static final RegExp _italicPattern =
+      RegExp(r'(?<!\*)\*([^*\n]+)\*(?!\*)');
+
   @override
   Widget build(BuildContext context) {
     // 按段落拆分（空行分隔）
     final paragraphs = content
-        .split(RegExp(r'\n\s*\n'))
+        .split(_paragraphSplitPattern)
         .map((p) => p.trim())
         .where((p) => p.isNotEmpty)
         .toList();
@@ -68,7 +94,7 @@ class ParagraphText extends StatelessWidget {
     // ---- 标题：`# ` ~ `###### `（1~6 级） ----
     // 标题行的字体大小按级别放大，不随正文换行。
     // 三级标题（×1.3）与旧版行为完全一致，保持向后兼容。
-    final headingMatch = RegExp(r'^(#{1,6})\s+(.+)$').firstMatch(firstLine);
+    final headingMatch = _headingPattern.firstMatch(firstLine);
     if (headingMatch != null) {
       final level = headingMatch.group(1)!.length;
       final titleText = headingMatch.group(2)!.trim();
@@ -127,13 +153,20 @@ class ParagraphText extends StatelessWidget {
     }
 
     // ---- 无序列表：`- 列表` / `* 列表` ----
+    // 列表项 + 续行统一参与解析；[consumedLines] 记录「被列表消费的非空行数」
+    //（列表项行 + 追加进前一项的续行），用于判断整块是否全是列表内容。
+    // 旧守卫 `listItems.length == nonEmptyLines.length` 只统计列表项行数，
+    // 当存在续行时（续行被并入前一项，listItems 不增）守卫必然失败，
+    // 导致带续行的列表整体退化为纯文本——续行合并逻辑形同虚设。
     final listItems = <String>[];
     var inList = false;
+    var consumedLines = 0;
     for (final line in lines) {
       final trimmed = line.trim();
       if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
         listItems.add(trimmed.substring(2).trim());
         inList = true;
+        consumedLines++;
       } else if (inList && trimmed.isEmpty) {
         break; // 列表结束
       } else if (inList) {
@@ -142,9 +175,10 @@ class ParagraphText extends StatelessWidget {
           listItems[listItems.length - 1] =
               '${listItems.last}\n$trimmed';
         }
+        consumedLines++;
       }
     }
-    if (listItems.isNotEmpty && listItems.length == nonEmptyLines.length) {
+    if (listItems.isNotEmpty && consumedLines == nonEmptyLines.length) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -197,8 +231,7 @@ class ParagraphText extends StatelessWidget {
 
   /// 检查文本是否包含任何行内 Markdown 标记。
   bool _hasInlineMarkup(String text) {
-    return RegExp(r'\*\*\*.+?\*\*\*|\*\*.+?\*\*|`[^`]+`|(?<!\*)\*[^*\n]+\*(?!\*)')
-        .hasMatch(text);
+    return _inlineMarkupPattern.hasMatch(text);
   }
 
   /// 构建行内富文本（支持 `**粗体**`、`*斜体*`、`` `代码` ``、`***粗斜体***`）。
@@ -223,11 +256,12 @@ class ParagraphText extends StatelessWidget {
     var buffer = StringBuffer();
 
     while (remaining.isNotEmpty) {
-      // 查找各种标记
-      final boldItalicMatch = RegExp(r'\*\*\*(.+?)\*\*\*').firstMatch(remaining);
-      final boldMatch = RegExp(r'\*\*(.+?)\*\*').firstMatch(remaining);
-      final codeMatch = RegExp(r'`([^`]+)`').firstMatch(remaining);
-      final italicMatch = RegExp(r'(?<!\*)\*([^*\n]+)\*(?!\*)').firstMatch(remaining);
+      // 查找各种标记（正则均为 static final 预编译，
+      // 流式高频重建下避免每轮重复构造 RegExp）
+      final boldItalicMatch = _boldItalicPattern.firstMatch(remaining);
+      final boldMatch = _boldPattern.firstMatch(remaining);
+      final codeMatch = _codePattern.firstMatch(remaining);
+      final italicMatch = _italicPattern.firstMatch(remaining);
 
       // 找到最早出现的匹配
       final matches = <(int, Match, TextSpan Function(Match, TextStyle))>[

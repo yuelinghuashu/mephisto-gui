@@ -5,34 +5,62 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.4.1] - 叙事体验增强 · 代码质量优化 · 契约树缓存治理
+## [1.4.1] - 浮士德帝国线 · 流式立即显示 · 输入历史 · 导出叙事 · 解析器健壮性 · 主题令牌收敛 · 无障碍增强
 
 ### ✨ 新特性
 
-- 浮士德官方示范子版新增 `faust.imperial.meph`（帝国金殿 / 权柄幻象 if 线）：梅菲斯特以弄臣身份混入破产帝国宫廷，浮士德以星相家身份献策发行纸币、受命召唤海伦——灵魂完整度 / 皇眷 / 幻惑 / 权力欲 / 警觉五维状态机，双终局（沉沦 / 觉醒）
+- 新增浮士德示范子版 `faust.imperial.meph`（帝国金殿 / 权柄幻象 if 线）：梅菲斯特以弄臣身份混入破产帝国宫廷，浮士德以星相家身份献策发行纸币、受命召唤海伦——灵魂完整度 / 皇眷 / 幻惑 / 权力欲 / 警觉五维状态机，双终局（沉沦 / 觉醒）
+- **流式「立即显示全文」**：生成中点输入区「⏩」跳过打字机动画直接显示完整回复（单角色 / 多角色舞台均支持）
+- **输入历史 + 多行输入**：桌面端 ↑ / ↓ 回溯最近 5 条命运指引，Shift+Enter 换行、Enter 发送；移动端保持单行回车发送
+- **导出叙事**：存档菜单新增「导出叙事」，将完整对话导出为 Markdown 阅读版（`角色-命运纪事.md`）
+
+### 🐛 修复
+
+- 格式化器修复：`if` 关键字补充词边界（不再误伤 `gift`/`unified` 等英文单词）；冒号规整仅作用于锚点/状态键值对区块，散文内容中的冒号（如 `12:30`、`http://x.com`）不再被补空格篡改
+- 解析器修复：`【角色名】` 首行 `# 注释` 不再被当作角色名；括号校验屏蔽引号内容（`包含 "("` 不再误报）；散文区块中的 `【xxx】` 行不再导致其后内容丢失（未知区块并入前一文本区块）
+- 条件编译跳过双引号字符串内的 `||` / `&&`（`包含 "a||b"` 不再被错误切分为逻辑或）
+- 序列化可逆性修复：`unquote` 反转义 `\"`；锚点与状态统一带引号输出（`"10"` 往返不再变数字）；键值对解析跳过引号内冒号
+- 规则引擎透出动作执行反馈（`RuleRunResult.actionOutputs`）——`📊 状态「x」不存在`、`📊 除数不能为0` 等提示不再被静默丢弃
+- 骰子面数校验统一：`roll(2d6)` 等非法表达式不再被当作 1d6 静默掷骰；`RollStore.roll` 防御非法面数
+- 舞台分节解析：同一角色出现重复分节时追加合并，不再后者覆盖前者
+- 记忆权重升级保留原 `id` / `createdAt`（不再新建对象丢弃身份信息）
+- Markdown 无序列表续行合并失效：带续行的列表此前退化为纯文本，现按注释语义正确合并（`- 首行\n续行` 的续行并入列表项）
+
+### 🚀 增强
+
+- 流式输出性能：单/多角色叙事页改为窄监听，`streamingContent` 变化只重建消息流区域，AppBar / 输入栏 / 状态条 / 仪表盘不再整页重建
+- 消息气泡按内容缓存（`_CachedBubble`），流式期间历史消息不再重复执行 Markdown 解析
+- Markdown 渲染正则全部预编译为 `static final`；流式滚动改为 `jumpTo` 直落底部（消除逐 chunk 动画追尾抖动）
+- 消息操作菜单按需构造（菜单触发时才构建，不再每次 build 生成）
+- 首页契约列表惰性化：`ContractTreeSection` 由一次性构建改为 `ListView.builder` 懒构建，契约库上百时首帧 build 与内存不再 O(N)、滚动懒加载
+- 系统提示词静态前缀缓存：角色/世界观/背景等静态层按指纹缓存复用（同一契约多轮生成免重复拼接），动态层（状态/记忆/规则/此刻）照旧每轮拼接
+- 无障碍增强：状态条/角色状态芯片合并读屏语义（一次朗读而非逐段朗读 emoji）；消息气泡菜单入口暴露按钮语义；舞台角色气泡合并语义；附件移除按钮 / 角色芯片热区扩大至 ≥32px
 
 ### 🧹 重构
 
-- 移除 `faust.utopia.meph`（理想国 / 乌托邦 if 线）及其种子、解析测试、文档引用
-- 收紧高频 LLM 指令触发条件：`faust.imperial.meph` 删除「梅菲斯特耳语 / 在场」规则；`Kurukshetra/Karna.meph` 的 `[敬敌]`（单角色名触发）、`[黄金甲]`（`铠甲` 高频泛词）与 `Kurukshetra/Arjuna.meph` 的 `[黑天低语]` 增加语境词门控，避免提及角色名 / 通用词即误触发
+- 流式样板提取为 `StreamingCoordinator` mixin、生成收尾编排提取为 `GenerationCoordinator.runGeneration`；叙事页共享骨架 `NarrativeScaffold`、LLM 消息列表构建 `buildLlmMessageList` 抽取复用
+- 舞台存档恢复提取为 `_restoreRoleSaves`；气泡视觉常量、记忆权重/运算符正则下沉共享定义
+- 契约信息缓存治理：模块级全局 `Map` 迁移为 Riverpod Provider（`contractInfoCacheProvider`）
+- 叙事 Reducer 的 `ReplySucceeded` 三次链式 `copyWith` 合并为单次调用
+- 移除 `faust.utopia.meph`；收紧 `faust.imperial.meph` / Kurukshetra 高频 LLM 指令触发条件
+- 记忆管理 LLM 失败日志携带完整堆栈（原仅 `$e` 无法定位角色/配置/阶段）
+- 主题令牌收敛：补齐 `textTheme` 档位（`titleSmall` / `bodySmall` / `labelSmall`），收敛散落的 11/12/13px 字号魔数与硬编码颜色；兜底提示条颜色随明暗主题联动（新增 `AppTheme.warning*` / `onGold` / `onCrimson` 令牌）
+
+### 🔧 工程化
+
+- 测试覆盖增强（+45 用例，总计 512）：
+  - 新增 ZIP 打包/导入边界测试（`contract_pack_test.dart`）
+  - 新增存档命名规则独立测试（`meph_file_name_test.dart`）
+  - 补 Markdown 渲染边界、舞台分节重复标题合并回归测试
+  - 新增无障碍语义测试（`accessibility_test.dart`：合并读屏语义 / 按钮语义 / 热区尺寸）
+  - 新增提示词静态前缀缓存行为测试（命中 / 动态段隔离 / key 不串 / 约束失效）
+  - 核心组件 UI 黄金基准（`component_golden_test.dart`）
+- 工程基建：`tool/validate_l10n.py`（zh/en .arb 键一致性断言，接入 CI）；`tool/coverage_summary.py` + CI coverage job（覆盖率仪表盘，不设硬门槛）
 
 ### 📚 文档
 
-- 规则书写指南新增**反模式 8：LLM 指令触发条件过宽 → 高频误触发**（含 `faust.imperial.meph` / `Kurukshetra` 真实修复案例），检查清单与章节标题同步更新为「八项 / 八大」
-- README / README.en 内置契约列表补充两个示范子版说明；docs/platform-storage 内置模板列表同步为 `faust.imperial.meph`
-
-- **流式「立即显示全文」**：生成中点击输入区「⏩」按钮，跳过剩余打字机动画直接显示完整回复（单角色 / 多角色舞台均支持）
-- **输入历史 + 多行输入**：桌面端 ↑ / ↓ 回溯最近 5 条命运指引，Shift+Enter 换行 / Enter 发送；移动端保持单行回车发送
-- **导出叙事**：叙事页存档菜单新增「导出叙事」，经系统保存对话框将完整对话导出为排版优雅的 Markdown 阅读版（`角色-命运纪事.md`）
-
-### 🧹 重构
-
-- 叙事页共享骨架抽取：新增 `NarrativeScaffold` 组件，统一单角色 / 多角色叙事页的桌面快捷键绑定与 LLM 错误 SnackBar 提示，消除约 40 行重复样板
-- 契约信息缓存治理：模块级全局 `Map` 迁移为 Riverpod Provider（`contractInfoCacheProvider`），生命周期交由 Provider 容器管理，避免跨测试库并行加载的全局状态污染
-- LLM 消息列表构建抽为共享工具 `buildLlmMessageList`，单角色 / 多角色 TurnService 统一复用，消除约 15 行重复样板
-- 叙事 Reducer 优化：`ReplySucceeded` 三次链式 `copyWith` 合并为单次调用，减少中间不可变对象分配
-- 首页操作精简：舞台角色「删除角色卡 / 删除存档」合并为单分支；`handleNodeMenu.onEdit` 改为可空参数，移除空闭包占位
-- 状态管理统一导出补全：`home_section_visibility_provider` / `home_selection_controller` 纳入 `providers.dart` barrel
+- 规则书写指南新增**反模式 8：LLM 指令触发条件过宽 → 高频误触发**（含 `faust.imperial.meph` / Kurukshetra 真实修复案例）
+- README / README.en 内置契约列表补充示范子版说明；docs 内置模板与文档中心同步更新
 
 <details>
 <summary>## [1.4.0] - 多模型路由 · 首页信息密度优化 · 消息操作 · Markdown 渲染 · 流式性能提升</summary>
