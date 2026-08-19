@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  analyze-and-test:
+  analyze-test-coverage:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -28,31 +28,25 @@ jobs:
       - name: Analyze code
         run: flutter analyze
 
+      # 代码格式一致性：dart format 检查（CI 用 --set-exit-if-changed，
+      # 未格式化的提交会使 CI 失败，保证全库格式统一）
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test tool
+
       # 本地化键一致性：zh/en .arb 键集合必须一致，防止漏翻导致运行期崩溃
       - name: Validate l10n keys
         run: python3 tool/validate_l10n.py
 
-      - name: Run tests
-        run: flutter test
+      # 构建配置静态断言：AndroidManifest INTERNET 权限 / iOS ATS /
+      # 打包脚本版本号剥离 / 舞台 assets 声明等。
+      # 此前该脚本 docstring 自称「在 CI 中执行」但未被任何 workflow 引用，
+      # 现正式接入 CI 防止构建/打包配置回归。
+      - name: Validate build config
+        run: python3 tool/validate_build_config.py
 
-  # 覆盖率仪表盘：不设硬性门槛（避免 flaky），仅在日志输出摘要
-  # 便于观察核心文件覆盖趋势；后续可按需加 --fail-below 硬门槛
-  coverage:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # 固定 Flutter 版本（与 analyze-and-test 一致，golden 版本敏感）
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: 3.44.8
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
+      # 全量测试 + 覆盖率一次完成（--coverage 在跑测试的同时生成 lcov，
+      # 替代此前 analyze-and-test 与 coverage 双 job 各跑一遍 flutter test
+      # 的重复执行；覆盖率不设硬门槛避免 flaky，仅输出摘要供观察趋势）
       - name: Run tests with coverage
         run: flutter test --coverage
 

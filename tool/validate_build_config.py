@@ -9,6 +9,8 @@
      发布构建/打包全部归 release.yml，防止职责漂移或配置被误删）
   5. assets/contracts 下的舞台子目录必须在 pubspec.yaml 中显式声明
      （Flutter assets 不递归，漏声明会导致 rootBundle 加载舞台角色静默失败）
+  6. 舞台子目录必须登记到 contract_dir.dart 的 _builtinStages
+     （恢复内置角色/首次种子复制依赖它，漏登记会静默缺失）
 
 用法：
   python3 tool/validate_build_config.py
@@ -164,6 +166,50 @@ def check_assets_stage_dirs() -> None:
     )
 
 
+def _extract_builtin_stage_keys() -> list[str]:
+    """从 contract_dir.dart 提取 `_builtinStages` 的舞台目录名。
+
+    `_builtinStages` 是「恢复内置角色 / 首次种子复制」的权威数据源；
+    舞台目录名以 `'Name': [` 形式出现在 map 中。
+    """
+    dart_file = os.path.join(ROOT, 'lib', 'services', 'storage', 'contract_dir.dart')
+    try:
+        with open(dart_file, encoding='utf-8') as f:
+            content = f.read()
+    except OSError as e:
+        return []
+    m = re.search(r'_builtinStages\s*=\s*\{(.*?)\};', content, re.DOTALL)
+    if m is None:
+        return []
+    return re.findall(r"'([A-Za-z0-9_]+)':\s*\[", m.group(1))
+
+
+def check_builtin_stage_sync() -> None:
+    """新增舞台必须同步登记到 `contract_dir.dart` 的 `_builtinStages`。
+
+    舞台资产有三处需同步：assets/contracts/ 实盘目录、pubspec.yaml
+    声明、`_builtinStages`（恢复内置/种子复制）。前两者已由
+    [check_assets_stage_dirs] 校验；本断言补上「实盘目录 ↔
+    `_builtinStages`」链路——漏登记会导致「恢复内置角色」时舞台
+    文件夹不出现（静默缺失，本次 Lundao 曾踩中）。
+    """
+    stage_dirs: list[str] = []
+    if os.path.isdir(CONTRACTS_DIR):
+        for entry in os.listdir(CONTRACTS_DIR):
+            full = os.path.join(CONTRACTS_DIR, entry)
+            if os.path.isdir(full):
+                stage_dirs.append(entry)
+
+    registered = set(_extract_builtin_stage_keys())
+    unregistered = [d for d in stage_dirs if d not in registered]
+    check(
+        '内置舞台已登记 _builtinStages（恢复内置可用）',
+        not unregistered,
+        ', '.join(unregistered) if unregistered
+        else ', '.join(stage_dirs) or '无舞台目录',
+    )
+
+
 def check_workflow_paths() -> None:
     """ci.yml 只承担代码检查；release.yml 承担全部发布构建与打包。"""
     with open(CI_WORKFLOW, encoding='utf-8') as f:
@@ -196,6 +242,7 @@ def main() -> None:
     check_version_normalization()
     check_release_workflow_version_pattern()
     check_assets_stage_dirs()
+    check_builtin_stage_sync()
     check_workflow_paths()
     print('=' * 46)
     if failures:

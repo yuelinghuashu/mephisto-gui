@@ -7,7 +7,7 @@
 
 TARGET := lib/main.dart
 
-.PHONY: run debug test analyze coverage validate-workflows validate-build-config validate-l10n clean
+.PHONY: run debug test analyze format format-check coverage validate-workflows validate-build-config validate-l10n clean
 
 run:            ## 开发运行（入口为 lib/main.dart，转发至 lib/app/main.dart）
 	flutter run -t $(TARGET)
@@ -20,6 +20,12 @@ test:           ## 运行全量测试
 
 analyze:        ## 静态分析
 	flutter analyze
+
+format:         ## 一键格式化全部 Dart 代码（lib + test + tool）
+	dart format lib test tool
+
+format-check:   ## 检查格式是否合规（CI 用；不合规返回非 0）
+	dart format --output=none --set-exit-if-changed lib test tool
 
 coverage:       ## 覆盖率仪表盘（测试 + lcov 摘要，产物在 coverage/ 不入库）
 	flutter test --coverage
