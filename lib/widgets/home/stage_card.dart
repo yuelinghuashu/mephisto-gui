@@ -153,9 +153,7 @@ class StageCard extends StatelessWidget {
         // 第二行：仅保留最近活动时间（角色数由下方角色芯片自然表达）
         if (lastModified != null)
           Text(
-            l10n.stageCardLastModified(
-              formatRelativeTime(lastModified!, l10n),
-            ),
+            l10n.stageCardLastModified(formatRelativeTime(lastModified!, l10n)),
             style: theme.textTheme.labelSmall?.copyWith(
               color: AppTheme.textSecondary(theme.brightness),
             ),

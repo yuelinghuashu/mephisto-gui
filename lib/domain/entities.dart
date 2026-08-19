@@ -111,12 +111,12 @@ class Message extends Equatable {
     DateTime? timestamp,
     String? roleTag,
   }) : this(
-        id: id,
-        role: MessageRole.assistant,
-        content: content,
-        timestamp: timestamp,
-        roleTag: roleTag,
-      );
+         id: id,
+         role: MessageRole.assistant,
+         content: content,
+         timestamp: timestamp,
+         roleTag: roleTag,
+       );
 
   /// 创建一条系统消息（可选承载骰子判定结果）
   Message.system(
@@ -125,12 +125,12 @@ class Message extends Equatable {
     DateTime? timestamp,
     List<DiceResult>? diceResults,
   }) : this(
-        id: id,
-        role: MessageRole.system,
-        content: content,
-        timestamp: timestamp,
-        diceResults: diceResults,
-      );
+         id: id,
+         role: MessageRole.system,
+         content: content,
+         timestamp: timestamp,
+         diceResults: diceResults,
+       );
 
   // 注意：props 只包含「内容值」字段，不含 id / timestamp。
   //
@@ -240,10 +240,7 @@ class Memory extends Equatable {
   static const int maxImportance = 5;
 
   /// 创建带权重/标签/置信度的记忆副本（保留 id / createdAt）。
-  Memory copyWith({
-    String? content,
-    int? importance,
-  }) {
+  Memory copyWith({String? content, int? importance}) {
     return Memory(
       id: id,
       content: content ?? this.content,

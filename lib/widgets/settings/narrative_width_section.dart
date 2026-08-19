@@ -22,10 +22,7 @@ class NarrativeWidthSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          l10n.settingsWidthDescription,
-          style: theme.textTheme.labelLarge,
-        ),
+        Text(l10n.settingsWidthDescription, style: theme.textTheme.labelLarge),
         const SizedBox(height: 12),
 
         SectionCard(

@@ -9,12 +9,6 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'Mephisto';
-
-  @override
-  String get homeTitle => '📜 Mephisto';
-
-  @override
   String get homeNewContract => '新建契约';
 
   @override
@@ -141,31 +135,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeSectionCollapse => '收起';
 
   @override
-  String stageCardCharacterCount(Object count) {
-    return '$count 位角色';
-  }
-
-  @override
   String stageCardLastModified(Object time) {
     return '最近活动：$time';
   }
 
   @override
-  String get stageCardHasSave => '有存档';
-
-  @override
   String get stageCardRestart => '重新开始（回母版）';
-
-  @override
-  String get stageCardRoleMaster => '母版';
-
-  @override
-  String stageCardRoleChild(Object role) {
-    return '$role · 子版';
-  }
-
-  @override
-  String get stageCardRoleChildSubtitle => '续玩存档';
 
   @override
   String get stageCardExport => '导出（舞台 ZIP）';
@@ -239,12 +214,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get contractCardOperations => '操作';
 
   @override
-  String get contractCardExpandChildren => '展开子版';
-
-  @override
-  String get contractCardCollapseChildren => '收起子版';
-
-  @override
   String contractBranchCount(Object count) {
     return '分支 · $count';
   }
@@ -312,6 +281,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get narrativeBranchHint => '如 dark、light、审判线';
+
+  @override
+  String get narrativeBranchChild => '存档';
 
   @override
   String get narrativeBranchTitleLabel => '命运说明';
@@ -418,7 +390,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get dashboardTitle => '仪表盘';
+  String get diceVerdictFooter => '≋ 诸神的注视落于棋盘之上 ≋';
 
   @override
   String get previewSheetClose => '关闭';
@@ -897,11 +869,70 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get languageLabel => '语言';
-
-  @override
   String get languageChinese => '简体中文';
 
   @override
   String get languageEnglish => 'English';
+
+  @override
+  String get contractPanelRoleName => '【角色名】';
+
+  @override
+  String get contractPanelState => '【状态】';
+
+  @override
+  String get contractPanelAnchor => '【锚点】';
+
+  @override
+  String get contractPanelWorldview => '【世界观】';
+
+  @override
+  String get contractPanelBackground => '【角色背景】';
+
+  @override
+  String get contractPanelOpening => '【开局场景】';
+
+  @override
+  String contractPanelRules(Object count) {
+    return '【规则】共 $count 条';
+  }
+
+  @override
+  String get contractPanelNoRules => '（无规则）';
+
+  @override
+  String get contractPanelNoState => '（无特殊状态）';
+
+  @override
+  String contractPanelMemories(Object count) {
+    return '【记忆】共 $count 条';
+  }
+
+  @override
+  String get contractPanelNoMemories => '（暂无记忆）';
+
+  @override
+  String contractPanelHistory(Object count) {
+    return '【历史】共 $count 条';
+  }
+
+  @override
+  String get contractPanelNoHistory => '（暂无历史）';
+
+  @override
+  String get contractPanelRoleFate => '命运';
+
+  @override
+  String get contractPanelRoleAssistant => '角色';
+
+  @override
+  String get emptyStateTitle => '📜 契约已立';
+
+  @override
+  String get emptyStateOpening => '【开局场景】';
+
+  @override
+  String emptyStateOpeningWithRole(Object role) {
+    return '【$role · 开局场景】';
+  }
 }

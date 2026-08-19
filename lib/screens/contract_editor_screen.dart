@@ -100,8 +100,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
   /// [targetDir] 非空时（舞台角色卡编辑）直接使用目标目录定位文件。
   Future<void> _recordOpenMtime() async {
     try {
-      final dirPath =
-          widget.targetDir ?? (await getContractsDirectory()).path;
+      final dirPath = widget.targetDir ?? (await getContractsDirectory()).path;
       final file = File('$dirPath/${widget.fileName}');
       _openMtime = file.existsSync() ? file.lastModifiedSync() : null;
     } catch (_) {
@@ -248,8 +247,7 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
     // 3. 保存冲突检测：若打开期间磁盘文件被外部修改（mtime 变化），
     //    提示用户选择「覆盖」或「重新加载」，避免静默丢失外部更改
     if (!_isNew && _openMtime != null) {
-      final dirPath =
-          widget.targetDir ?? (await getContractsDirectory()).path;
+      final dirPath = widget.targetDir ?? (await getContractsDirectory()).path;
       final file = File('$dirPath/$fileName');
       final currentMtime = file.existsSync() ? file.lastModifiedSync() : null;
       final conflictDetected =
@@ -478,8 +476,11 @@ class _ContractEditorScreenState extends State<ContractEditorScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.info_outline,
-                            size: 16, color: AppTheme.gold),
+                        const Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: AppTheme.gold,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(

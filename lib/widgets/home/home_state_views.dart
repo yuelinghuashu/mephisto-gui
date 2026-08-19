@@ -55,7 +55,9 @@ class HomeEmptyState extends StatelessWidget {
                       )
                     : const Icon(Icons.restore),
                 label: Text(
-                  isRestoring ? l10n.emptyStateRestoring : l10n.emptyStateRestoreBuiltin,
+                  isRestoring
+                      ? l10n.emptyStateRestoring
+                      : l10n.emptyStateRestoreBuiltin,
                 ),
                 style: FilledButton.styleFrom(
                   foregroundColor: AppTheme.onGold,

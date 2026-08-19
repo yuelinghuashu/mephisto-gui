@@ -120,9 +120,7 @@ Future<void> importContractFiles(
     );
   } else {
     messenger.showSnackBar(
-      SnackBar(
-        content: Text(l10n.homeImportPartial(successCount, failCount)),
-      ),
+      SnackBar(content: Text(l10n.homeImportPartial(successCount, failCount))),
     );
   }
 }
@@ -153,9 +151,7 @@ Future<void> exportContractTree(
       SnackBar(content: Text(l10n.homeExportSuccess(destination.path))),
     );
   } catch (e) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.homeExportFail('$e'))),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.homeExportFail('$e'))));
   }
 }
 
@@ -184,9 +180,7 @@ Future<void> exportStage(
       SnackBar(content: Text(l10n.homeExportSuccess(destination.path))),
     );
   } catch (e) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.homeExportFail('$e'))),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.homeExportFail('$e'))));
   }
 }
 
@@ -224,18 +218,14 @@ Future<void> editContractFile(
   final saved = await Navigator.push<String>(
     context,
     MaterialPageRoute(
-      builder: (_) => ContractEditorScreen(
-        fileName: fileName,
-        initialContent: content,
-      ),
+      builder: (_) =>
+          ContractEditorScreen(fileName: fileName, initialContent: content),
     ),
   );
 
   if (saved != null && context.mounted) {
     onRefreshLists();
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.homeContractSaved)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.homeContractSaved)));
   }
 }
 
@@ -250,9 +240,7 @@ Future<void> newContractFile(
   if (!context.mounted) return;
   final fileName = await Navigator.push<String>(
     context,
-    MaterialPageRoute(
-      builder: (_) => const ContractEditorScreen(),
-    ),
+    MaterialPageRoute(builder: (_) => const ContractEditorScreen()),
   );
 
   if (fileName == null) return; // 取消/未保存

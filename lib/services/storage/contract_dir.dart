@@ -44,6 +44,7 @@ const List<String> _builtinContracts = [
 const Map<String, List<String>> _builtinStages = {
   'Kurukshetra': ['Arjuna.meph', 'Karna.meph'],
   'Camlann': ['Arthur.meph', 'Mordred.meph'],
+  'Lundao': ['Kongzi.meph', 'Laozhi.meph', 'Shijiamouni.meph'],
 };
 
 /// 种子标记 key 前缀常量（从 [contractsSeededPrefix] 重导出）

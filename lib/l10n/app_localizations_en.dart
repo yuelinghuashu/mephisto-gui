@@ -9,12 +9,6 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Mephisto';
-
-  @override
-  String get homeTitle => '📜 Mephisto';
-
-  @override
   String get homeNewContract => 'New Contract';
 
   @override
@@ -142,31 +136,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSectionCollapse => 'Collapse';
 
   @override
-  String stageCardCharacterCount(Object count) {
-    return '$count characters';
-  }
-
-  @override
   String stageCardLastModified(Object time) {
     return 'Last activity: $time';
   }
 
   @override
-  String get stageCardHasSave => 'Has save';
-
-  @override
   String get stageCardRestart => 'Restart (master opening)';
-
-  @override
-  String get stageCardRoleMaster => 'Master';
-
-  @override
-  String stageCardRoleChild(Object role) {
-    return '$role · child version';
-  }
-
-  @override
-  String get stageCardRoleChildSubtitle => 'Continue from save';
 
   @override
   String get stageCardExport => 'Export (Stage ZIP)';
@@ -242,12 +217,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get contractCardOperations => 'Actions';
 
   @override
-  String get contractCardExpandChildren => 'Expand child versions';
-
-  @override
-  String get contractCardCollapseChildren => 'Collapse child versions';
-
-  @override
   String contractBranchCount(Object count) {
     return 'Branches · $count';
   }
@@ -320,6 +289,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get narrativeBranchHint => 'e.g. dark, light, judgment';
+
+  @override
+  String get narrativeBranchChild => 'Save';
 
   @override
   String get narrativeBranchTitleLabel => 'Fate description';
@@ -429,7 +401,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get dashboardTitle => 'Dashboard';
+  String get diceVerdictFooter => '≋ The gods\' gaze rests upon the board ≋';
 
   @override
   String get previewSheetClose => 'Close';
@@ -932,11 +904,70 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get languageLabel => 'Language';
-
-  @override
   String get languageChinese => '简体中文';
 
   @override
   String get languageEnglish => 'English';
+
+  @override
+  String get contractPanelRoleName => '【Role Name】';
+
+  @override
+  String get contractPanelState => '【State】';
+
+  @override
+  String get contractPanelAnchor => '【Anchors】';
+
+  @override
+  String get contractPanelWorldview => '【Worldview】';
+
+  @override
+  String get contractPanelBackground => '【Background】';
+
+  @override
+  String get contractPanelOpening => '【Opening Scene】';
+
+  @override
+  String contractPanelRules(Object count) {
+    return '【Rules】× $count';
+  }
+
+  @override
+  String get contractPanelNoRules => '（No rules）';
+
+  @override
+  String get contractPanelNoState => '（No special state）';
+
+  @override
+  String contractPanelMemories(Object count) {
+    return '【Memories】× $count';
+  }
+
+  @override
+  String get contractPanelNoMemories => '（No memories）';
+
+  @override
+  String contractPanelHistory(Object count) {
+    return '【History】× $count';
+  }
+
+  @override
+  String get contractPanelNoHistory => '（No history）';
+
+  @override
+  String get contractPanelRoleFate => 'Fate';
+
+  @override
+  String get contractPanelRoleAssistant => 'Character';
+
+  @override
+  String get emptyStateTitle => '📜 The Contract is Sealed';
+
+  @override
+  String get emptyStateOpening => '【Opening Scene】';
+
+  @override
+  String emptyStateOpeningWithRole(Object role) {
+    return '【$role · Opening Scene】';
+  }
 }

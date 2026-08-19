@@ -182,7 +182,7 @@ StageNarrativeState _onStageReplySucceeded(
   required List<DiceResult> diceResults,
   required String lastError,
 }) {
-  // 1. 各角色独立更新状态/记忆
+  // ---- 1. 各角色独立更新状态/记忆 ----
   var nextRoles = Map<String, RoleRunState>.from(state.roles);
   for (final entry in newStates.entries) {
     final roleName = entry.key;
@@ -197,33 +197,22 @@ StageNarrativeState _onStageReplySucceeded(
     );
   }
 
-  var next = state.copyWith(roles: nextRoles);
+  // ---- 2. 组装本轮完整共享段落（assistant / overflow） ----
+  // 各角色段落 + overflow 统一镜像到**每个角色**的 history
+  // （而非只写自己的段落），使任意角色存档都能完整重现共享对话流。
+  //
+  // v2 全景叙事去重：多角色共享同一段文本（同一篇小说，多位角色被提及）
+  // 时，只生成**一条**消息而非 N 条重复气泡。共享文本不加 `【角色名】`
+  // 前缀、roleTag 为空 → UI 以标准气泡渲染（全景视角，不附着单一角色色板）。
+  var messages = [...state.messages];
 
-  // 2. 骰子结果以系统消息展示（携带结构化数据供 UI 渲染）
+  // 骰子结果以系统消息展示（携带结构化数据供 UI 渲染）
   if (rollInfo.isNotEmpty) {
-    next = next.copyWith(
-      messages: [
-        ...next.messages,
-        Message.system(rollInfo, diceResults: diceResults),
-      ],
-      diceResults: diceResults,
-      lastRollInfo: rollInfo,
-    );
+    messages.add(Message.system(rollInfo, diceResults: diceResults));
   }
 
-  // 3. 各角色段落追加为 assistant 消息
-  //    本轮所有角色段落 + overflow 统一镜像到**每个角色**的 history
-  //    （而非只写自己的段落），使任意角色存档都能完整重现共享对话流。
-  //
-  //    v2 全景叙事去重：多角色共享同一段文本（同一篇小说，多位角色被提及）
-  //    时，只生成**一条**消息而非 N 条重复气泡。共享文本不加 `【角色名】`
-  //    前缀、roleTag 为空 → UI 以标准气泡渲染（全景视角，不附着单一角色色板）。
-  final roleHistories = Map<String, List<HistoryEntry>>.from({
-    for (final e in next.roles.entries) e.key: e.value.history,
-  });
   // 本轮产生的完整共享段落（fate 已在发消息时入史，此处只含角色段 + overflow）
   final roundEntries = <HistoryEntry>[];
-  var messages = [...next.messages];
 
   // 按文本分组：同一段文本对应的所有角色（去重边界判断）
   final textToRoles = <String, List<String>>{};
@@ -250,7 +239,7 @@ StageNarrativeState _onStageReplySucceeded(
     );
   }
 
-  // 4. 若有未归位的文本（overflow），追加为系统消息说明（可选）
+  // 若有未归位的文本（overflow），追加为系统消息说明（可选）
   if (overflow.isNotEmpty) {
     messages.add(Message.system('（额外叙事：$overflow）'));
     roundEntries.add(
@@ -258,18 +247,26 @@ StageNarrativeState _onStageReplySucceeded(
     );
   }
 
-  // 本轮完整共享段落镜像写入每个角色的 history
-  final rolesWithHistory = {
-    for (final e in roleHistories.entries)
-      e.key: nextRoles[e.key]!.copyWith(history: [...e.value, ...roundEntries]),
-  };
+  // ---- 3. 本轮完整共享段落镜像写入每个角色的 history ----
+  // 注意：`roleHistories` 与 `nextRoles` 同源于 `state.roles`（键集合一致），
+  // 因此下方 `nextRoles[e.key]!` 断言必然成立（不变量：replies 只涉及
+  // 舞台既有角色，不新增角色键）。
+  for (final e in nextRoles.entries) {
+    nextRoles[e.key] = e.value.copyWith(
+      history: [...e.value.history, ...roundEntries],
+    );
+  }
 
-  return next.copyWith(
-    roles: rolesWithHistory,
+  // ---- 4. 一次性聚合本轮所有变化（对齐单角色 _onReplySucceeded 的收敛） ----
+  // 避免多次链式 copyWith 产生中间不可变对象。
+  return state.copyWith(
+    roles: nextRoles,
     messages: messages,
     isGenerating: false,
     streamingContent: '',
     lastError: lastError,
+    diceResults: rollInfo.isNotEmpty ? diceResults : state.diceResults,
+    lastRollInfo: rollInfo.isNotEmpty ? rollInfo : state.lastRollInfo,
   );
 }
 

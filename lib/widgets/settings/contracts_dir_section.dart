@@ -61,7 +61,9 @@ class _ContractsDirSectionState extends State<ContractsDirSection> {
     // 保存新目录
     final ok = await setContractsDirectory(selected);
     if (!ok) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsDirChangeFail)));
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.settingsDirChangeFail)),
+      );
       return;
     }
 
@@ -88,7 +90,9 @@ class _ContractsDirSectionState extends State<ContractsDirSection> {
     final l10n = AppLocalizations.of(context);
     final enabled = await setMobileExternalStorage(!_useExternalStorage);
     if (!enabled) {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.settingsStorageSwitchFail)));
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.settingsStorageSwitchFail)),
+      );
       return;
     }
     await _loadContractsDir();
@@ -143,14 +147,11 @@ class _ContractsDirSectionState extends State<ContractsDirSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          switch (defaultTargetPlatform) {
-            TargetPlatform.android => l10n.settingsAndroidDirDescription,
-            TargetPlatform.iOS => l10n.settingsIosDirDescription,
-            _ => l10n.settingsDesktopDirDescription,
-          },
-          style: theme.textTheme.labelLarge,
-        ),
+        Text(switch (defaultTargetPlatform) {
+          TargetPlatform.android => l10n.settingsAndroidDirDescription,
+          TargetPlatform.iOS => l10n.settingsIosDirDescription,
+          _ => l10n.settingsDesktopDirDescription,
+        }, style: theme.textTheme.labelLarge),
         const SizedBox(height: 12),
 
         // ---- 羊皮纸卡片容器 ----
@@ -176,16 +177,18 @@ class _ContractsDirSectionState extends State<ContractsDirSection> {
                       _useExternalStorage
                           ? l10n.settingsAndroidExternalLocation
                           : l10n.settingsAndroidInternalLocation,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: theme.hintColor),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
                     ),
                   ],
                   if (defaultTargetPlatform == TargetPlatform.iOS) ...[
                     const SizedBox(height: 4),
                     Text(
                       l10n.settingsIosLocation,
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: theme.hintColor),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.hintColor,
+                      ),
                     ),
                   ],
                 ],

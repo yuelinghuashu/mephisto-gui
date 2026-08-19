@@ -65,10 +65,7 @@ class StageLoaded extends Equatable {
   /// 按字典序排列的角色列表
   final List<StageCharacter> characters;
 
-  const StageLoaded({
-    required this.info,
-    required this.characters,
-  });
+  const StageLoaded({required this.info, required this.characters});
 
   /// 公共世界观：取**第一个角色**（字典序）的【世界观】。
   ///

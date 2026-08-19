@@ -86,7 +86,9 @@ String? _blockTitleForLine(List<Block> blocks, int lineNo) {
     final block = blocks[i];
     if (lineNo <= block.line) continue; // 标题行或此前
     // 内容至下一块标题前一行为止（最后一块延伸到文档末尾）
-    final nextTitleLine = i < blocks.length - 1 ? blocks[i + 1].line : lineNo + 1;
+    final nextTitleLine = i < blocks.length - 1
+        ? blocks[i + 1].line
+        : lineNo + 1;
     if (lineNo < nextTitleLine) return block.title;
   }
   return null;
@@ -117,7 +119,9 @@ String _normalizeContentLine(String line, {required String blockTitle}) {
   // 键值对：冒号后多余空格压缩为 1 个
   final cnColonIdx = line.indexOf('：');
   if (cnColonIdx > 0) {
-    final after = line.substring(cnColonIdx + 1).replaceFirst(RegExp(r'^ +'), '');
+    final after = line
+        .substring(cnColonIdx + 1)
+        .replaceFirst(RegExp(r'^ +'), '');
     line = '${line.substring(0, cnColonIdx + 1)} $after';
   } else {
     // 英文冒号（排除 `==` 相邻）
@@ -125,7 +129,9 @@ String _normalizeContentLine(String line, {required String blockTitle}) {
     if (enColonIdx > 0 &&
         line[enColonIdx - 1] != '=' &&
         line[enColonIdx + 1] != '=') {
-      final after = line.substring(enColonIdx + 1).replaceFirst(RegExp(r'^ +'), '');
+      final after = line
+          .substring(enColonIdx + 1)
+          .replaceFirst(RegExp(r'^ +'), '');
       line = '${line.substring(0, enColonIdx + 1)} $after';
     }
   }
@@ -174,18 +180,12 @@ String _normalizeRuleLine(String line) {
   // （此时引号内容已被占位符保护，不会误伤字符串内部文字；
   //   关键词 → 正则模式统一定义在 dslKeywordFixPatterns，与 parser 共享）
   for (final entry in dslKeywordFixRegExps.entries) {
-    placeholder = placeholder.replaceAllMapped(
-      entry.value,
-      (_) => entry.key,
-    );
+    placeholder = placeholder.replaceAllMapped(entry.value, (_) => entry.key);
   }
   // 增强修复「状态 . 堕落指数」两侧空格 → `状态.堕落指数`（与 VSCode 对齐）
   // parser 校验只要求「状态」与「.」之间至少一个空格才报错（已含在 dslKeywordFixPatterns），
   // 此处用 `\s*\.\s*` 额外清理「.」与键名之间的空格（如 `状态. 堕落指数` → `状态.堕落指数`）
-  placeholder = placeholder.replaceAllMapped(
-    RegExp(r'状态\.\s*'),
-    (m) => '状态.',
-  );
+  placeholder = placeholder.replaceAllMapped(RegExp(r'状态\.\s*'), (m) => '状态.');
   // roll 表达式内部规范化：`roll (1d100)` → `roll(1d100)`；
   // 括号内及 d 两侧空格也清除（`roll( 1d100)` / `roll(1 d100)` / `roll(1d 100)` → `roll(1d100)`）
   // 保留原骰子个数与面数（m[1]=个数、m[2]=面数），只做空格清理不改语义
@@ -196,8 +196,18 @@ String _normalizeRuleLine(String line) {
 
   // 二元运算符前后插入空格
   const operators = [
-    r'\|\|', '&&', '->', '==', '!=', '>=', '<=',
-    r'\+=', '-=', r'\*=', '/=', '%=',
+    r'\|\|',
+    '&&',
+    '->',
+    '==',
+    '!=',
+    '>=',
+    '<=',
+    r'\+=',
+    '-=',
+    r'\*=',
+    '/=',
+    '%=',
   ];
   for (final op in operators) {
     final opClean = op.replaceAll('\\', '');

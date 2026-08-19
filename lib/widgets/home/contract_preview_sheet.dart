@@ -57,7 +57,6 @@ class ContractPreviewSheet {
     required String fileName,
     required String content,
   }) async {
-
     final Contract contract;
     try {
       contract = parseMeph(content);
@@ -119,9 +118,7 @@ class ContractPreviewSheet {
               ),
               const Divider(height: 1),
               // 正文内容（结构化契约数据面板）
-              Expanded(
-                child: ContractPanel(contract: contract),
-              ),
+              Expanded(child: ContractPanel(contract: contract)),
             ],
           ),
         );

@@ -246,9 +246,7 @@ List<DiceResult> extractDiceResults(
 
     // 跳过已解析部分（含自定义阈值）：`re.raw` 已包含完整的
     // `roll(...) [op 阈值]`，整体跳过后从后续部分继续扫描。
-    remaining = remaining.substring(
-      idx + re.raw.length,
-    );
+    remaining = remaining.substring(idx + re.raw.length);
     remaining = remaining.trim();
     if (remaining.startsWith('&&')) {
       remaining = remaining.substring(2).trim();

@@ -128,10 +128,7 @@ class NarrativeTurnService {
     );
 
     // 4. 调用 LLM（流式）；空响应或异常时回退本地回复
-    final invoker = LlmInvoker(
-      clientFactory: _clientFactory,
-      client: client,
-    );
+    final invoker = LlmInvoker(clientFactory: _clientFactory, client: client);
     final (reply, lastError) = await invoker.generate(
       messages: messages,
       config: config,

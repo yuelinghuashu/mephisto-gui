@@ -219,7 +219,8 @@ String? extractBranchTitle(String content) {
     final trimmed = line.trim();
 
     // 检测区块标题（@命运 或 用户 【区块】）
-    if (trimmed.startsWith('@') || (trimmed.startsWith('【') && trimmed.endsWith('】'))) {
+    if (trimmed.startsWith('@') ||
+        (trimmed.startsWith('【') && trimmed.endsWith('】'))) {
       final isFate = trimmed == fateBlockTitle;
       // 进入 @命运 区块：开始收集内容
       inFateBlock = isFate;
@@ -328,10 +329,7 @@ String updateFateBlock(String content, String newTitle) {
 ///   - newTitle: 新的命运说明；空字符串时移除整个 `@命运` 区块
 ///
 /// 返回值：是否更新成功（false 表示文件不存在或写入失败）。
-Future<bool> updateContractBranchTitle(
-  String fileName,
-  String newTitle,
-) async {
+Future<bool> updateContractBranchTitle(String fileName, String newTitle) async {
   final dir = await getContractsDirectory();
   final file = File('${dir.path}/$fileName');
   if (!await file.exists()) return false;

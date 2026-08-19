@@ -51,7 +51,9 @@ class GenerationSettings {
 ///     因此使用普通 `FutureProvider` 确保 provider 存活整个容器生命周期
 ///   - 调用方（Notifier `_generateCore`）使用 `ref.refresh(...)` 强制刷新，
 ///     确保每次生成都读取最新持久化配置（改 key 后不重启也能立即生效）
-final generationSettingsProvider = FutureProvider<GenerationSettings>((ref) async {
+final generationSettingsProvider = FutureProvider<GenerationSettings>((
+  ref,
+) async {
   // 确保每次读取最新持久化的 LLM 配置（readConfig 不写 state，避免多余重建）
   final config = await ref.read(llmConfigProvider.future);
   // 读取辅助任务模型配置（未启用/无持久化时为 null → 共用主配置）
@@ -62,9 +64,7 @@ final generationSettingsProvider = FutureProvider<GenerationSettings>((ref) asyn
   final maxHistoryMessages = ref
       .read(narrativeWindowProvider)
       .maxHistoryMessages;
-  final maxMemories = ref
-      .read(narrativeMemoryLimitProvider)
-      .maxMemories;
+  final maxMemories = ref.read(narrativeMemoryLimitProvider).maxMemories;
   return GenerationSettings(
     llmConfig: config,
     auxLlmConfig: auxConfig,

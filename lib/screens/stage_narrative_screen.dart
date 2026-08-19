@@ -101,9 +101,7 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
     // 角色色板：舞台所有角色 → 主题色（仅依赖 stage，加载后不变）
     final roleColors = stage == null
         ? const <String, Color>{}
-        : assignRoleColors(
-            stage.characters.map((c) => c.roleName).toList(),
-          );
+        : assignRoleColors(stage.characters.map((c) => c.roleName).toList());
 
     // ---- 错误监听（LLM 错误 → SnackBar）已由 [NarrativeScaffold] 统一处理 ----
 
@@ -113,11 +111,7 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
       lastError: lastError,
       scaffoldBuilder: (context) => Scaffold(
         appBar: AppBar(
-          title: Text(
-            stageName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          title: Text(stageName, maxLines: 1, overflow: TextOverflow.ellipsis),
           actions: [
             // 智能跳转：顶部附近 → 跳到底部；其余 → 跳到顶部
             // （与单角色叙事页共用，消除重复实现）
@@ -144,60 +138,60 @@ class _StageNarrativeScreenState extends ConsumerState<StageNarrativeScreen> {
             ),
           ],
         ),
-      body: Column(
-        children: [
-          // ---- 角色状态条（轻量）----
-          // 垂直滚轮委托：鼠标在状态条区域滚动时转发给消息流，
-          // 对齐单角色「屏幕任意位置滚动都生效」的桌面端体验。
-          RoleStatusBar(
-            stage: stage,
-            roles: roles,
-            onVerticalScroll: (deltaY) =>
-                _messageListKey.currentState?.scrollBy(deltaY),
-          ),
-          // ---- 消息流（独立 ConsumerWidget：窄监听，流式只重建本区域）----
-          Expanded(
-            child: _StageNarrativeMessageFlow(
-              messageListKey: _messageListKey,
-              contentMaxWidth: contentMaxWidth,
+        body: Column(
+          children: [
+            // ---- 角色状态条（轻量）----
+            // 垂直滚轮委托：鼠标在状态条区域滚动时转发给消息流，
+            // 对齐单角色「屏幕任意位置滚动都生效」的桌面端体验。
+            RoleStatusBar(
               stage: stage,
-              roleColors: roleColors,
-              isGenerating: isGenerating,
+              roles: roles,
+              onVerticalScroll: (deltaY) =>
+                  _messageListKey.currentState?.scrollBy(deltaY),
             ),
-          ),
-          // ---- 输入栏（复用 [InputBar]，与单角色叙事页一致）----
-          // 宽度约束与单角色叙事页共用 `WidthConstrainedCenter`，
-          // 保证两个页面输入框宽度/居中方式完全一致。
-          WidthConstrainedCenter(
-            contentMaxWidth: contentMaxWidth,
-            child: InputBar(
-              isGenerating: isGenerating,
-              onSend: (text) {
-                if (text.trim().isEmpty) return;
-                ref.read(stageNarrativeProvider.notifier).sendMessage(text);
-              },
-              onStop: () {
-                ref.read(stageNarrativeProvider.notifier).stopGenerating();
-              },
-              onReveal: () {
-                ref.read(stageNarrativeProvider.notifier).revealStreaming();
-              },
-              showAttachment: true,
-              attachedFileNames: attachedFileNames,
-              onAttach: (fileName, content) {
-                ref
-                    .read(stageNarrativeProvider.notifier)
-                    .attachContext(fileName, content);
-              },
-              onRemoveAttach: (index) {
-                ref
-                    .read(stageNarrativeProvider.notifier)
-                    .removeAttachedContext(index);
-              },
+            // ---- 消息流（独立 ConsumerWidget：窄监听，流式只重建本区域）----
+            Expanded(
+              child: _StageNarrativeMessageFlow(
+                messageListKey: _messageListKey,
+                contentMaxWidth: contentMaxWidth,
+                stage: stage,
+                roleColors: roleColors,
+                isGenerating: isGenerating,
+              ),
             ),
-          ),
-        ],
-      ),
+            // ---- 输入栏（复用 [InputBar]，与单角色叙事页一致）----
+            // 宽度约束与单角色叙事页共用 `WidthConstrainedCenter`，
+            // 保证两个页面输入框宽度/居中方式完全一致。
+            WidthConstrainedCenter(
+              contentMaxWidth: contentMaxWidth,
+              child: InputBar(
+                isGenerating: isGenerating,
+                onSend: (text) {
+                  if (text.trim().isEmpty) return;
+                  ref.read(stageNarrativeProvider.notifier).sendMessage(text);
+                },
+                onStop: () {
+                  ref.read(stageNarrativeProvider.notifier).stopGenerating();
+                },
+                onReveal: () {
+                  ref.read(stageNarrativeProvider.notifier).revealStreaming();
+                },
+                showAttachment: true,
+                attachedFileNames: attachedFileNames,
+                onAttach: (fileName, content) {
+                  ref
+                      .read(stageNarrativeProvider.notifier)
+                      .attachContext(fileName, content);
+                },
+                onRemoveAttach: (index) {
+                  ref
+                      .read(stageNarrativeProvider.notifier)
+                      .removeAttachedContext(index);
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -250,10 +244,7 @@ class _StageNarrativeMessageFlow extends ConsumerWidget {
       return StageEmptyState(
         openings: [
           for (final c in stage!.characters)
-            (
-              c.roleName,
-              c.contract.opening.replaceAll('{角色名}', c.roleName),
-            ),
+            (c.roleName, c.contract.opening.replaceAll('{角色名}', c.roleName)),
         ],
         roleColors: roleColors,
       );

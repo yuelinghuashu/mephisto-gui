@@ -53,10 +53,10 @@ class _SaveBranchDialogState extends State<_SaveBranchDialog> {
     final branchName = _nameController.text.trim();
     if (branchName.isEmpty) return; // 分支名必填
     final branchTitle = _titleController.text.trim();
-    Navigator.pop(
-      context,
-      (branchName, branchTitle.isEmpty ? null : branchTitle),
-    );
+    Navigator.pop(context, (
+      branchName,
+      branchTitle.isEmpty ? null : branchTitle,
+    ));
   }
 
   @override
@@ -96,10 +96,7 @@ class _SaveBranchDialogState extends State<_SaveBranchDialog> {
           onPressed: () => Navigator.pop(context),
           child: Text(l10n.textInputDialogCancel),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: Text(l10n.narrativeConfirm),
-        ),
+        FilledButton(onPressed: _submit, child: Text(l10n.narrativeConfirm)),
       ],
     );
   }

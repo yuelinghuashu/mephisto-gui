@@ -42,6 +42,16 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
   bool _testing = false;
 
   @override
+  void initState() {
+    super.initState();
+    // 懒加载移到 initState：进入设置页即加载一次持久化配置。
+    // 此前懒加载挂在各输入框 onTap 上——用户不点任何输入框直接
+    // 「保存配置」会静默用默认值覆盖已有配置（maxTokens 等数值
+    // 字段直接落盘为默认值）。
+    Future.microtask(_ensureLlmLoaded);
+  }
+
+  @override
   void dispose() {
     _apiKeyController.dispose();
     _baseUrlController.dispose();
@@ -125,9 +135,11 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
       baseUrl: _baseUrlController.text.trim(),
       model: _modelController.text.trim(),
       maxTokens: int.tryParse(_maxTokensController.text.trim()) ?? 4096,
-      timeoutSeconds: int.tryParse(_timeoutController.text.trim()) ??
+      timeoutSeconds:
+          int.tryParse(_timeoutController.text.trim()) ??
           LlmConfig.defaultTimeoutSeconds,
-      maxRetries: int.tryParse(_retriesController.text.trim()) ??
+      maxRetries:
+          int.tryParse(_retriesController.text.trim()) ??
           LlmConfig.defaultMaxRetries,
     );
 
@@ -141,9 +153,7 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     await ref.read(llmSettingsProvider.notifier).save(config);
     // 强制失效缓存：确保运行时下次请求立即用新 key（双保险，见 llmConfigProvider 的 watch）
     ref.invalidate(llmConfigProvider);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsConfigSaved)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.settingsConfigSaved)));
   }
 
   /// 从剪贴板导入 API Key（避免手输 Key 时复制到剪贴板长期残留）。
@@ -179,9 +189,11 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
       baseUrl: _baseUrlController.text.trim(),
       model: _modelController.text.trim(),
       maxTokens: int.tryParse(_maxTokensController.text.trim()) ?? 16,
-      timeoutSeconds: int.tryParse(_timeoutController.text.trim()) ??
+      timeoutSeconds:
+          int.tryParse(_timeoutController.text.trim()) ??
           LlmConfig.defaultTimeoutSeconds,
-      maxRetries: int.tryParse(_retriesController.text.trim()) ??
+      maxRetries:
+          int.tryParse(_retriesController.text.trim()) ??
           LlmConfig.defaultMaxRetries,
     );
 
@@ -206,9 +218,7 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
         maxTokens: config.maxTokens,
       );
       await client.generateStream(
-        messages: [
-          LlmMessage(role: 'user', content: 'ping'),
-        ],
+        messages: [LlmMessage(role: 'user', content: 'ping')],
         onChunk: (_) {},
         // 测试连接用较短超时，快速反馈
         timeout: const Duration(seconds: 10),
@@ -247,9 +257,7 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     _maxTokensController.text = defaults.maxTokens.toString();
     _timeoutController.text = defaults.timeoutSeconds.toString();
     _retriesController.text = defaults.maxRetries.toString();
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsConfigReset)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.settingsConfigReset)));
   }
 
   @override
@@ -261,127 +269,131 @@ class _LlmConfigSectionState extends ConsumerState<LlmConfigSection> {
     // 使用 Material 包裹 ListTile（RadioSelectionTile），确保水波纹/选中高亮能正常绘制
     return SectionCard(
       child: Column(
-          children: [
-            // 后端类型选择（复古单选，与设置页其他区块风格一致）
-            RadioSelectionTile(
-              icon: Icons.auto_stories_outlined,
-              label: l10n.settingsBackendOpenai,
-              selected: _backend == LlmBackend.openaiCompatible,
-              onTap: () => _switchBackend(LlmBackend.openaiCompatible),
-            ),
-            RadioSelectionTile(
-              icon: Icons.local_fire_department_outlined,
-              label: l10n.settingsBackendOllama,
-              selected: _backend == LlmBackend.ollama,
-              onTap: () => _switchBackend(LlmBackend.ollama),
-            ),
-            const SizedBox(height: 12),
+        children: [
+          // 后端类型选择（复古单选，与设置页其他区块风格一致）
+          RadioSelectionTile(
+            icon: Icons.auto_stories_outlined,
+            label: l10n.settingsBackendOpenai,
+            selected: _backend == LlmBackend.openaiCompatible,
+            onTap: () => _switchBackend(LlmBackend.openaiCompatible),
+          ),
+          RadioSelectionTile(
+            icon: Icons.local_fire_department_outlined,
+            label: l10n.settingsBackendOllama,
+            selected: _backend == LlmBackend.ollama,
+            onTap: () => _switchBackend(LlmBackend.ollama),
+          ),
+          const SizedBox(height: 12),
 
-            // API Key（Ollama 不需要，隐藏）
-            if (!isOllama)
-              TextField(
-                controller: _apiKeyController,
-                onTap: _ensureLlmLoaded,
-                obscureText: true,
-                decoration: InputDecoration(
-                  labelText: l10n.settingsApiKeyLabel,
-                  hintText: l10n.settingsApiKeyHint,
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.content_paste_outlined),
-                    tooltip: l10n.settingsApiKeyPaste,
-                    onPressed: _pasteApiKey,
-                  ),
+          // API Key（Ollama 不需要，隐藏）
+          if (!isOllama)
+            TextField(
+              controller: _apiKeyController,
+              onTap: _ensureLlmLoaded,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: l10n.settingsApiKeyLabel,
+                hintText: l10n.settingsApiKeyHint,
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.content_paste_outlined),
+                  tooltip: l10n.settingsApiKeyPaste,
+                  onPressed: _pasteApiKey,
                 ),
               ),
-            if (!isOllama) const SizedBox(height: 12),
-
-            // Base URL
-            TextField(
-              controller: _baseUrlController,
-              onTap: _ensureLlmLoaded,
-              decoration: InputDecoration(
-                labelText: l10n.settingsBaseUrlLabel,
-                hintText: isOllama ? LlmConfig.ollamaBaseUrl : l10n.settingsBaseUrlHint,
-              ),
             ),
-            const SizedBox(height: 12),
+          if (!isOllama) const SizedBox(height: 12),
 
-            // Model
-            TextField(
-              controller: _modelController,
-              onTap: _ensureLlmLoaded,
-              decoration: InputDecoration(
-                labelText: l10n.settingsModelLabel,
-                hintText: l10n.settingsModelHint,
-              ),
+          // Base URL
+          TextField(
+            controller: _baseUrlController,
+            onTap: _ensureLlmLoaded,
+            decoration: InputDecoration(
+              labelText: l10n.settingsBaseUrlLabel,
+              hintText: isOllama
+                  ? LlmConfig.ollamaBaseUrl
+                  : l10n.settingsBaseUrlHint,
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 12),
 
-            // Max Tokens
-            TextField(
-              controller: _maxTokensController,
-              onTap: _ensureLlmLoaded,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: l10n.settingsMaxTokensLabel,
-                hintText: l10n.settingsMaxTokensHint,
-              ),
+          // Model
+          TextField(
+            controller: _modelController,
+            onTap: _ensureLlmLoaded,
+            decoration: InputDecoration(
+              labelText: l10n.settingsModelLabel,
+              hintText: l10n.settingsModelHint,
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 12),
 
-            // 超时秒数（保护响应头到达 + 流式读取）
-            TextField(
-              controller: _timeoutController,
-              onTap: _ensureLlmLoaded,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: l10n.settingsTimeoutLabel,
-                hintText: l10n.settingsTimeoutHint,
-              ),
+          // Max Tokens
+          TextField(
+            controller: _maxTokensController,
+            onTap: _ensureLlmLoaded,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.settingsMaxTokensLabel,
+              hintText: l10n.settingsMaxTokensHint,
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 12),
 
-            // 最大重试次数（网络层瞬时故障时）
-            TextField(
-              controller: _retriesController,
-              onTap: _ensureLlmLoaded,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: l10n.settingsRetriesLabel,
-                hintText: l10n.settingsRetriesHint,
-              ),
+          // 超时秒数（保护响应头到达 + 流式读取）
+          TextField(
+            controller: _timeoutController,
+            onTap: _ensureLlmLoaded,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.settingsTimeoutLabel,
+              hintText: l10n.settingsTimeoutHint,
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 12),
 
-            // 操作按钮（右对齐；窄屏自动换行，避免第三个按钮被裁剪）
-            Wrap(
-              alignment: WrapAlignment.end,
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  icon: _testing
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.bolt, size: 18),
-                  label: Text(_testing ? l10n.settingsTesting : l10n.settingsTestConnection),
-                  onPressed: _testing ? null : _testConnection,
+          // 最大重试次数（网络层瞬时故障时）
+          TextField(
+            controller: _retriesController,
+            onTap: _ensureLlmLoaded,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: l10n.settingsRetriesLabel,
+              hintText: l10n.settingsRetriesHint,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 操作按钮（右对齐；窄屏自动换行，避免第三个按钮被裁剪）
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                icon: _testing
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.bolt, size: 18),
+                label: Text(
+                  _testing ? l10n.settingsTesting : l10n.settingsTestConnection,
                 ),
-                FilledButton.icon(
-                  icon: const Icon(Icons.save_outlined),
-                  label: Text(l10n.settingsSaveConfig),
-                  onPressed: _saveLlmConfig,
-                ),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.restart_alt),
-                  label: Text(l10n.settingsResetConfig),
-                  onPressed: _resetLlmConfig,
-                ),
-              ],
-            ),
+                onPressed: _testing ? null : _testConnection,
+              ),
+              FilledButton.icon(
+                icon: const Icon(Icons.save_outlined),
+                label: Text(l10n.settingsSaveConfig),
+                onPressed: _saveLlmConfig,
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.restart_alt),
+                label: Text(l10n.settingsResetConfig),
+                onPressed: _resetLlmConfig,
+              ),
+            ],
+          ),
         ],
       ),
     );

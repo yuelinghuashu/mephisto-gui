@@ -112,10 +112,23 @@ class StageTurnService {
     final effectiveHistory = maxHistoryMessages == null
         ? historyMessages
         : historyMessages.length > maxHistoryMessages
-        ? historyMessages.sublist(
-            historyMessages.length - maxHistoryMessages,
-          )
+        ? historyMessages.sublist(historyMessages.length - maxHistoryMessages)
         : historyMessages;
+
+    // 空舞台防御：无角色时无内容可生成。上游 [loadStage] 已保证舞台
+    // 至少一个角色，但本服务的兜底路径（[stage.characters.first]）在
+    // 空列表下会抛 RangeError——此处显式守卫使防御与上游保持一致。
+    if (stage.characters.isEmpty) {
+      return const StageTurnResult(
+        replies: {},
+        newStates: {},
+        injectedMemories: {},
+        overflow: '',
+        rollInfo: '',
+        diceResults: [],
+        lastError: '',
+      );
+    }
 
     // 1. 每位角色各自运行规则引擎（状态/记忆/骰子独立隔离）
     final newStates = <String, Map<String, StateValue>>{};
@@ -156,10 +169,7 @@ class StageTurnService {
     );
 
     // 3. 单次调用 LLM（流式）；空响应或异常时回退本地多角色回复
-    final invoker = LlmInvoker(
-      clientFactory: _clientFactory,
-      client: client,
-    );
+    final invoker = LlmInvoker(clientFactory: _clientFactory, client: client);
     final (reply, lastError) = await invoker.generate(
       messages: messages,
       config: config,
@@ -263,10 +273,7 @@ class StageTurnService {
     required LlmConfig config,
     int? maxMemories,
   }) async {
-    final invoker = LlmInvoker(
-      clientFactory: _clientFactory,
-      client: client,
-    );
+    final invoker = LlmInvoker(clientFactory: _clientFactory, client: client);
 
     // 逐角色独立生成（可并发执行缩短总等待）
     final replies = await Future.wait(
@@ -277,14 +284,9 @@ class StageTurnService {
         // 使用单角色提示词构建（复用 NarrativeTurnService 的管线）
         final messages = _buildLlmMessages(
           userInput: userInput,
-          stage: StageLoaded(
-            info: stage.info,
-            characters: [character],
-          ),
+          stage: StageLoaded(info: stage.info, characters: [character]),
           roleStates: {roleName: currentState},
-          roleMemories: {
-            roleName: roleMemories[roleName] ?? const <Memory>[],
-          },
+          roleMemories: {roleName: roleMemories[roleName] ?? const <Memory>[]},
           historyMessages: historyMessages,
           attachedContexts: attachedContexts,
           narrativeRules: narrativeRules,
@@ -343,9 +345,7 @@ class StageTurnService {
     final buffer = StringBuffer();
     for (final character in stage.characters) {
       buffer.writeln('【${character.roleName}】');
-      buffer.writeln(
-        localReply(userInput, contract: character.contract),
-      );
+      buffer.writeln(localReply(userInput, contract: character.contract));
       buffer.writeln();
     }
     return buffer.toString();

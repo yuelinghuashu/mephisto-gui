@@ -39,23 +39,21 @@ class StageEmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '📜 契约已立',
+              l10n.emptyStateTitle,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontSize: 24,
                 color: AppTheme.gold,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              l10n.narrativeEmptyHint,
-              style: theme.textTheme.labelLarge,
-            ),
+            Text(l10n.narrativeEmptyHint, style: theme.textTheme.labelLarge),
             if (openings.isNotEmpty) ...[
               const SizedBox(height: 20),
               for (final (roleName, opening) in openings)
                 if (opening.isNotEmpty) ...[
                   _buildOpeningCard(
                     theme,
+                    l10n,
                     roleName: roleName,
                     opening: opening,
                     accentColor: roleColors[roleName] ?? AppTheme.gold,
@@ -71,7 +69,8 @@ class StageEmptyState extends StatelessWidget {
 
   /// 单个角色的【开局场景】卡片（标题按角色色板着色）。
   Widget _buildOpeningCard(
-    ThemeData theme, {
+    ThemeData theme,
+    AppLocalizations l10n, {
     required String roleName,
     required String opening,
     required Color accentColor,
@@ -83,25 +82,20 @@ class StageEmptyState extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppTheme.gold.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-        border: Border.all(
-          color: AppTheme.gold.withValues(alpha: 0.2),
-        ),
+        border: Border.all(color: AppTheme.gold.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '【$roleName · 开局场景】',
+            l10n.emptyStateOpeningWithRole(roleName),
             style: theme.textTheme.labelLarge?.copyWith(
               color: accentColor,
               fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            opening,
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text(opening, style: theme.textTheme.bodyMedium),
         ],
       ),
     );

@@ -17,7 +17,8 @@ class AuxLlmConfigSection extends ConsumerStatefulWidget {
   const AuxLlmConfigSection({super.key});
 
   @override
-  ConsumerState<AuxLlmConfigSection> createState() => _AuxLlmConfigSectionState();
+  ConsumerState<AuxLlmConfigSection> createState() =>
+      _AuxLlmConfigSectionState();
 }
 
 class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
@@ -29,6 +30,23 @@ class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
 
   bool _enabled = false;
   bool _loaded = false;
+
+  /// 用户是否已手动操作过开关（防止懒加载覆盖用户交互）。
+  ///
+  /// 此前懒加载挂在 `onChanged` / `onTap` 上且未 await：异步加载完成的
+  /// `_enabled = config.enabled` 会覆盖用户刚拨动的开关值（竞态）。
+  /// 现在加载移到 [initState] 调度，但加载完成前用户仍可能点开关，
+  /// 因此记录「是否已手动操作」——已操作则加载不再覆盖开关状态。
+  bool _userTouchedToggle = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 懒加载移到 initState：进入设置页即加载一次持久化配置，
+    // 不再依赖 onTap/onChanged 触发（此前不点输入框直接保存会静默
+    // 用默认值覆盖用户配置；且 onChanged 未 await 存在覆盖竞态）。
+    Future.microtask(_ensureLoaded);
+  }
 
   @override
   void dispose() {
@@ -43,11 +61,13 @@ class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
   /// 懒加载辅助配置到表单。
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
-    final config = await ref
-        .read(llmSettingsProvider.notifier)
-        .readAuxConfig();
+    final config = await ref.read(llmSettingsProvider.notifier).readAuxConfig();
+    if (!mounted) return;
     if (config != null) {
-      _enabled = config.enabled;
+      // 用户已手动操作开关 → 保留用户选择，仅填充其余字段
+      if (!_userTouchedToggle) {
+        _enabled = config.enabled;
+      }
       _modelController.text = config.model;
       _baseUrlController.text = config.baseUrl;
       _apiKeyController.text = config.apiKey;
@@ -55,11 +75,13 @@ class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
       _timeoutController.text = config.timeoutSeconds.toString();
     } else {
       // 无持久化数据 → 默认关闭
-      _enabled = false;
+      if (!_userTouchedToggle) {
+        _enabled = false;
+      }
       _maxTokensController.text = '4096';
       _timeoutController.text = '${LlmConfig.defaultTimeoutSeconds}';
     }
-    if (mounted) setState(() => _loaded = true);
+    setState(() => _loaded = true);
   }
 
   /// 保存辅助配置。
@@ -73,7 +95,8 @@ class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
       baseUrl: _baseUrlController.text.trim(),
       apiKey: _apiKeyController.text.trim(),
       maxTokens: int.tryParse(_maxTokensController.text.trim()) ?? 4096,
-      timeoutSeconds: int.tryParse(_timeoutController.text.trim()) ??
+      timeoutSeconds:
+          int.tryParse(_timeoutController.text.trim()) ??
           LlmConfig.defaultTimeoutSeconds,
     );
 
@@ -89,9 +112,7 @@ class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
     }
 
     await ref.read(llmSettingsProvider.notifier).saveAux(config);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsAuxSaved)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.settingsAuxSaved)));
   }
 
   /// 清除辅助配置（回退共用主配置）。
@@ -109,9 +130,7 @@ class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
       _maxTokensController.text = '4096';
       _timeoutController.text = '${LlmConfig.defaultTimeoutSeconds}';
     });
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsAuxReset)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.settingsAuxReset)));
   }
 
   @override
@@ -131,8 +150,9 @@ class _AuxLlmConfigSectionState extends ConsumerState<AuxLlmConfigSection> {
             ),
             value: _enabled,
             onChanged: (value) {
-              // 首次点击时懒加载持久化配置
-              _ensureLoaded();
+              // 记录用户手动操作（懒加载已完成时无影响；若加载尚未
+              // 完成，则加载不再覆盖此开关值，消除覆盖竞态）
+              _userTouchedToggle = true;
               setState(() => _enabled = value);
             },
           ),

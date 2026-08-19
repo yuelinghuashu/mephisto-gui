@@ -96,13 +96,15 @@ class RuleEngine {
       );
       // 无论是否匹配，只要包含 roll(...) 就提取骰子信息
       if (rule.condition.contains('roll(')) {
-        rollParts.addAll(extractDiceResults(
-          rule.name,
-          rule.condition,
-          rs,
-          triggered: matched,
-          action: rule.action,
-        ));
+        rollParts.addAll(
+          extractDiceResults(
+            rule.name,
+            rule.condition,
+            rs,
+            triggered: matched,
+            action: rule.action,
+          ),
+        );
       }
       if (matched) {
         if (rule.group.isNotEmpty) passiveGroups.add(rule.group);
@@ -141,30 +143,35 @@ class RuleEngine {
         activeRule = rule;
         // 锁定互斥组，跳过同组后续规则
         if (rule.group.isNotEmpty) activeGroups.add(rule.group);
-        pendingRolls.addAll(extractDiceResults(
-          rule.name,
-          rule.condition,
-          rs,
-          action: rule.action,
-        ));
+        pendingRolls.addAll(
+          extractDiceResults(
+            rule.name,
+            rule.condition,
+            rs,
+            action: rule.action,
+          ),
+        );
         break; // 只执行第一个匹配的主动规则
       }
       // 未匹配也收集骰子信息（triggered: false，动作未执行）
       if (rule.condition.contains('roll(')) {
-        pendingRolls.addAll(extractDiceResults(
-          rule.name,
-          rule.condition,
-          rs,
-          triggered: false,
-          action: rule.action,
-        ));
+        pendingRolls.addAll(
+          extractDiceResults(
+            rule.name,
+            rule.condition,
+            rs,
+            triggered: false,
+            action: rule.action,
+          ),
+        );
       }
     }
 
     // 只保留规则真正匹配并执行的骰子结果（未匹配的规则不显示在结算界面）
-    final allDiceResults = [...rollParts, ...pendingRolls]
-        .where((d) => d.triggered)
-        .toList();
+    final allDiceResults = [
+      ...rollParts,
+      ...pendingRolls,
+    ].where((d) => d.triggered).toList();
 
     return RuleRunResult(
       newState: currentState,

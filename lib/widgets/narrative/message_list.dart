@@ -146,8 +146,7 @@ class MessageListState extends State<MessageList> {
   void didUpdateWidget(MessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!_autoFollowBottom) return;
-    final countChanged =
-        widget.messages.length != oldWidget.messages.length;
+    final countChanged = widget.messages.length != oldWidget.messages.length;
     final contentChanged =
         widget.streamingContent != oldWidget.streamingContent ||
         widget.isGenerating != oldWidget.isGenerating;
@@ -166,9 +165,7 @@ class MessageListState extends State<MessageList> {
       // 流式内容增长：jumpTo 直落底部（不触发动画，避免追尾抖动）
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scrollController.hasClients) return;
-        _scrollController.jumpTo(
-          _scrollController.position.maxScrollExtent,
-        );
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       });
     }
   }
@@ -203,8 +200,10 @@ class MessageListState extends State<MessageList> {
   void scrollBy(double deltaY) {
     if (!_scrollController.hasClients) return;
     final position = _scrollController.position;
-    final target = (position.pixels + deltaY)
-        .clamp(0.0, position.maxScrollExtent);
+    final target = (position.pixels + deltaY).clamp(
+      0.0,
+      position.maxScrollExtent,
+    );
     _scrollController.jumpTo(target);
   }
 

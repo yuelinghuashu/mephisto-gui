@@ -44,8 +44,7 @@ class AppLanguageController extends PrefsNotifier<String> {
   String get defaultValue => 'zh';
 
   @override
-  String? fromStorage(String raw) =>
-      (raw == 'zh' || raw == 'en') ? raw : null;
+  String? fromStorage(String raw) => (raw == 'zh' || raw == 'en') ? raw : null;
 
   @override
   String toStorage(String value) => value;

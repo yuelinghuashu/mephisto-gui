@@ -17,10 +17,7 @@ class SmartJumpButton extends StatelessWidget {
   /// 消息列表控制 Key（用于访问 [MessageListState] 的滚动/位置状态）
   final GlobalKey<MessageListState> messageListKey;
 
-  const SmartJumpButton({
-    super.key,
-    required this.messageListKey,
-  });
+  const SmartJumpButton({super.key, required this.messageListKey});
 
   /// 默认 Listenable（消息列表尚未挂载时使用）。
   ///

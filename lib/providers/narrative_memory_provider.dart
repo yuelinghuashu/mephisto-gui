@@ -9,12 +9,7 @@ import 'prefs_notifier.dart';
 ///   - 控制 token 消耗（API 成本）
 ///   - 防止超长记忆列表稀释模型注意力
 /// 超过上限时高权重（≥4）全部保留 + 其余按权重降序补足。
-enum NarrativeMemoryLimit {
-  compact,
-  standard,
-  extended,
-  full,
-}
+enum NarrativeMemoryLimit { compact, standard, extended, full }
 
 /// 记忆注入上限档位扩展
 extension NarrativeMemoryLimitExtension on NarrativeMemoryLimit {

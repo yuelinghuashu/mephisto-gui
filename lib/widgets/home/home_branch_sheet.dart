@@ -45,11 +45,7 @@ class HomeBranchSheet extends StatelessWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       isScrollControlled: true,
       builder: (context) => SafeArea(
-        child: HomeBranchSheet(
-          group: group,
-          onEnter: onEnter,
-          onMenu: onMenu,
-        ),
+        child: HomeBranchSheet(group: group, onEnter: onEnter, onMenu: onMenu),
       ),
     );
   }
@@ -95,8 +91,9 @@ class HomeBranchSheet extends StatelessWidget {
                   padding: const EdgeInsets.all(16),
                   child: Text(
                     l10n.homeNoBranches,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: theme.hintColor),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.hintColor,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -221,10 +218,7 @@ class _BranchTile extends StatelessWidget {
       trailing: onSelected == null
           ? null
           : buildCardMenu(
-              menuItems: buildContractMenuItems(
-                isMaster: isMaster,
-                l10n: l10n,
-              ),
+              menuItems: buildContractMenuItems(isMaster: isMaster, l10n: l10n),
               onSelected: onSelected!,
               tooltip: l10n.contractCardOperations,
             ),

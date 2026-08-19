@@ -8,19 +8,15 @@ import '../app/theme.dart';
 ///   - 金色图标 + 文字
 ///   - 直接基于 [PopupMenuItem] 构建，避免 ListTile 的额外开销
 class ContractMenuItem extends PopupMenuItem<String> {
-  ContractMenuItem(
-    String value,
-    IconData icon,
-    String label, {
-    super.key,
-  }) : super(
-          value: value,
-          child: Row(
-            children: [
-              Icon(icon, size: 16, color: AppTheme.gold),
-              const SizedBox(width: 10),
-              Text(label),
-            ],
-          ),
-        );
+  ContractMenuItem(String value, IconData icon, String label, {super.key})
+    : super(
+        value: value,
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: AppTheme.gold),
+            const SizedBox(width: 10),
+            Text(label),
+          ],
+        ),
+      );
 }

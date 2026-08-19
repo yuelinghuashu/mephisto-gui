@@ -37,11 +37,7 @@ List<CardMenuItem> buildContractMenuItems({
       l10n.contractCardPreview,
     ),
     if (isMaster) ...[
-      CardMenuItem(
-        menuActionEdit,
-        Icons.edit_outlined,
-        l10n.contractCardEdit,
-      ),
+      CardMenuItem(menuActionEdit, Icons.edit_outlined, l10n.contractCardEdit),
       // 导出（命运树 ZIP）：仅在母版根显示，导出整棵母版子树
       CardMenuItem(
         menuActionExport,
@@ -81,7 +77,11 @@ PopupMenuButton<String> buildCardMenu({
   double iconSize = 18,
 }) {
   return PopupMenuButton<String>(
-    icon: Icon(Icons.more_vert, size: iconSize, color: iconColor ?? AppTheme.gold),
+    icon: Icon(
+      Icons.more_vert,
+      size: iconSize,
+      color: iconColor ?? AppTheme.gold,
+    ),
     tooltip: tooltip,
     onSelected: onSelected,
     // 缩短动画时长，菜单弹出更快更流畅（共享样式见 AppTheme.popupAnimationStyle）

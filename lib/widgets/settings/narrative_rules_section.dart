@@ -36,12 +36,8 @@ class _NarrativeRulesSectionState extends ConsumerState<NarrativeRulesSection> {
   Future<void> _saveNarrativeRules() async {
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
-    await ref
-        .read(narrativeRuleProvider.notifier)
-        .save(_controller.text);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsRulesSaved)),
-    );
+    await ref.read(narrativeRuleProvider.notifier).save(_controller.text);
+    messenger.showSnackBar(SnackBar(content: Text(l10n.settingsRulesSaved)));
   }
 
   /// 恢复默认叙事规则
@@ -50,9 +46,7 @@ class _NarrativeRulesSectionState extends ConsumerState<NarrativeRulesSection> {
     final l10n = AppLocalizations.of(context);
     await ref.read(narrativeRuleProvider.notifier).reset();
     _controller.text = ref.read(narrativeRuleProvider);
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.settingsRulesReset)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.settingsRulesReset)));
   }
 
   @override
@@ -63,10 +57,7 @@ class _NarrativeRulesSectionState extends ConsumerState<NarrativeRulesSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          l10n.settingsRulesDescription,
-          style: theme.textTheme.labelLarge,
-        ),
+        Text(l10n.settingsRulesDescription, style: theme.textTheme.labelLarge),
         const SizedBox(height: 12),
 
         SectionCard(
@@ -81,9 +72,7 @@ class _NarrativeRulesSectionState extends ConsumerState<NarrativeRulesSection> {
                   expands: true,
                   textAlignVertical: TextAlignVertical.top,
                   style: const TextStyle(fontSize: 13, height: 1.5),
-                  decoration: InputDecoration(
-                    hintText: l10n.settingsRulesHint,
-                  ),
+                  decoration: InputDecoration(hintText: l10n.settingsRulesHint),
                 ),
               ),
               const SizedBox(height: 12),

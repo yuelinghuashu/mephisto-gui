@@ -52,7 +52,9 @@ class RadioSelectionTile extends StatelessWidget {
           const SizedBox(width: 8),
           // 选中指示（金色实心单选框 / 灰色空心单选框）
           Icon(
-            selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+            selected
+                ? Icons.radio_button_checked
+                : Icons.radio_button_unchecked,
             size: 16,
             color: selected ? AppTheme.gold : secondaryColor,
           ),

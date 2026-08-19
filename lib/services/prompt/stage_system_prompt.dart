@@ -52,7 +52,8 @@ String buildStageSystemPrompt({
   // ============================================================
   // 第一层：格式硬性要求（放在最前，强化记忆）
   // ============================================================
-  final constraints = (narrativeRules != null && narrativeRules.trim().isNotEmpty)
+  final constraints =
+      (narrativeRules != null && narrativeRules.trim().isNotEmpty)
       ? narrativeRules.trim()
       : defaultStageNarrativeRules;
   buffer.writeln('【格式要求】');

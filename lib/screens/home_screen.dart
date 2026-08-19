@@ -108,11 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _deleteSelected() async {
     // 1. 删除选中的契约文件；用户取消 → 中止整个流程（保持多选）
     if (_selection.selected.isNotEmpty) {
-      final confirmed = await deleteSelectedContract(
-        ref,
-        context,
-        _selection,
-      );
+      final confirmed = await deleteSelectedContract(ref, context, _selection);
       if (!mounted || !confirmed) return;
     }
     // 2. 删除选中的舞台目录（manageSelection: false = 由外层统一收尾）
@@ -567,6 +563,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final groupsAsync = ref.watch(contractGroupListProvider);
+    // 舞台目录列表：必须在 build 中 watch（而非 builder 内 read）——
+    // 舞台列表变化（增删舞台/刷新）时 HomeScreen 需要自动重建，
+    // 否则全选计数 totalSelectable 与 selectAll 传递的 stages 列表
+    // 会保持陈旧，直到删除流程「碰巧」触发重绘（隐式耦合）。
+    final stagesAsync = ref.watch(stageListProvider);
 
     // 通过 ListenableBuilder 监听 _selection 的变化自动重绘，
     // 替代原先手动 `setState(() => _selection.xxx())` 的样板。
@@ -579,9 +580,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // 全部舞台目录（用于全选合并计数 + 全选传递）。
         // 舞台内角色不参与全选/计数——全选只勾选「契约文件 + 舞台目录」两类实体，
         // 与 HomeSelectionController.selectAll 选中范围保持一致。
-        final stages = ref
-            .read(stageListProvider)
-            .value ?? const <StageInfo>[];
+        final stages = stagesAsync.value ?? const <StageInfo>[];
         // 全选总数 = 契约文件 + 舞台目录
         final totalSelectable = allFiles.length + stages.length;
 

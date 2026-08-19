@@ -43,14 +43,14 @@ abstract class NarrativeState with _$NarrativeState {
   /// 用于标题栏展示，帮助用户识别进入的是哪个版本。
   /// 例如：
   ///   - `faust.meph` → ''（母版，不显示）
-  ///   - `faust.child.meph` → '存档'（默认存档分支）
+  ///   - `faust.child.meph` → 'child'（默认存档分支；UI 层负责本地化
+  ///     映射为「存档」，domain 层不硬编码展示文案）
   ///   - `faust.dark.meph` → 'dark'（自定义分支）
   String get branchName {
     final base = sourceFileName.replaceAll('.meph', '');
     final dotIndex = base.indexOf('.');
     if (dotIndex == -1 || dotIndex == base.length - 1) return '';
-    final name = base.substring(dotIndex + 1);
-    return name == 'child' ? '存档' : name;
+    return base.substring(dotIndex + 1);
   }
 
   /// 规则数量

@@ -41,6 +41,8 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
   /// 流式内容写回状态（StreamingCoordinator 钩子）。
   @override
   void applyStreamingContent(String fullContent) {
+    // 已 dispose（Notifier 重建/销毁）后不再写状态（同单角色版守卫）
+    if (isGenerationDisposed) return;
     state = state.copyWith(streamingContent: fullContent);
   }
 
@@ -148,11 +150,13 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
         ),
       );
     } else {
-      _dispatch(StageLoadedEvent(
-        stage: stage,
-        stagePath: stagePath,
-        initialStates: initialStates,
-      ));
+      _dispatch(
+        StageLoadedEvent(
+          stage: stage,
+          stagePath: stagePath,
+          initialStates: initialStates,
+        ),
+      );
     }
     return true;
   }
@@ -209,8 +213,7 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
         entry.key: entry.value.currentState,
     };
     final roleMemories = <String, List<Memory>>{
-      for (final entry in state.roles.entries)
-        entry.key: entry.value.memories,
+      for (final entry in state.roles.entries) entry.key: entry.value.memories,
     };
 
     final result = await service.generate(
@@ -281,21 +284,20 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
     final effectiveConfig = config ?? const LlmConfig();
 
     // 只对「有历史且到达提取间隔」的角色发起记忆提取
-    final candidates = stage.characters
-        .where((c) {
-          final role = state.roles[c.roleName];
-          if (role == null) return false;
-          final round = role.history
-              .where((h) => h.role == MessageRole.fate)
-              .length;
-          return round > 0 && round % MemoryManager.extractInterval == 0;
-        })
-        .toList();
+    final candidates = stage.characters.where((c) {
+      final role = state.roles[c.roleName];
+      if (role == null) return false;
+      final round = role.history
+          .where((h) => h.role == MessageRole.fate)
+          .length;
+      return round > 0 && round % MemoryManager.extractInterval == 0;
+    }).toList();
     if (candidates.isEmpty) return;
 
     // 并发前快照每个候选角色的 history 长度（用于检测提取期间是否发生新对话）
     final historyLengthsAtStart = <String, int>{
-      for (final c in candidates) c.roleName: state.roles[c.roleName]!.history.length,
+      for (final c in candidates)
+        c.roleName: state.roles[c.roleName]!.history.length,
     };
     final roleHistory = <String, List<HistoryEntry>>{
       for (final c in candidates) c.roleName: state.roles[c.roleName]!.history,
@@ -460,9 +462,7 @@ class StageNarrativeNotifier extends Notifier<StageNarrativeState>
 
   /// 附加上下文（会话级，支持多选追加）。
   void attachContext(String fileName, String content) {
-    _dispatch(
-      StageContextAttached(fileName: fileName, content: content),
-    );
+    _dispatch(StageContextAttached(fileName: fileName, content: content));
   }
 
   /// 移除指定索引的附加上下文。

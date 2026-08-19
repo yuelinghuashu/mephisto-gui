@@ -209,12 +209,7 @@ List<Memory> _parsePlainList(Block block) {
     final importance =
         int.tryParse(match[1]!)?.clamp(1, Memory.maxImportance) ??
         Memory.defaultImportance;
-    memories.add(
-      Memory(
-        content: match[2]!.trim(),
-        importance: importance,
-      ),
-    );
+    memories.add(Memory(content: match[2]!.trim(), importance: importance));
   }
   return memories;
 }
@@ -254,8 +249,9 @@ final RegExp _rollSpaceParenPattern = RegExp(r'roll\s+\(');
 ///
 /// lookahead 限定 roll 后跟骰子特征（数字或 d），避免「状态.roll值」等
 /// 含 roll 子串的普通状态键被误报为缺左括号。
-final RegExp _rollMissingParenPattern =
-    RegExp(r'\broll(?=[\s]*\d|[\s]*d)(?!\s*\()');
+final RegExp _rollMissingParenPattern = RegExp(
+  r'\broll(?=[\s]*\d|[\s]*d)(?!\s*\()',
+);
 
 /// roll 左括号未闭合正则（如 `roll(1d100`、`roll(1d100 > 50`）。
 final RegExp _rollUnclosedParenPattern = RegExp(r'roll\([^)]*$');
@@ -487,11 +483,7 @@ void _validateKeywordSpacing(
 /// 与 [_validateKeywordSpacing] 一致，先屏蔽双引号字符串内容：
 /// 条件 `包含 "("`（查找含左括号的文本）中的括号是字符串数据，
 /// 不参与结构括号计数，否则会被误报「括号不匹配」。
-void _validateParenBalance(
-  String condition,
-  int lineNumber,
-  String blockName,
-) {
+void _validateParenBalance(String condition, int lineNumber, String blockName) {
   final masked = _maskQuotedStrings(condition);
   var depth = 0;
   for (var i = 0; i < masked.length; i++) {
@@ -539,7 +531,8 @@ void _validateCompoundSeparator(
   }
 }
 
-/// 解析【历史】：`- fate: 内容` / `- assistant: 内容`，支持 `\n` 转义还原。
+/// 解析【历史】：`- fate: 内容` / `- assistant: 内容` / `- system: 内容`，
+/// 支持 `\n` 转义还原。
 List<HistoryEntry> _parseHistory(Block block) {
   final result = <HistoryEntry>[];
   for (final entry in _scanEntries(block)) {
@@ -555,11 +548,17 @@ List<HistoryEntry> _parseHistory(Block block) {
         _trimOnePrefix(entry.raw, 'assistant:'),
         'assistant：',
       );
+    } else if (entry.raw.startsWith('system:') ||
+        entry.raw.startsWith('system：')) {
+      // system 条目：舞台「额外叙事」等系统消息进历史后必须原样还原
+      // 为 system 角色，否则会被当成伪造的角色对白（见序列化器）。
+      role = MessageRole.system;
+      content = _trimOnePrefix(_trimOnePrefix(entry.raw, 'system:'), 'system：');
     } else {
       throw MephParseError(
         line: entry.line,
         blockName: block.title,
-        message: "历史条目必须以 'fate:' 或 'assistant:' 开头",
+        message: "历史条目必须以 'fate:'、'assistant:' 或 'system:' 开头",
       );
     }
     result.add(

@@ -98,18 +98,6 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
-  /// No description provided for @appTitle.
-  ///
-  /// In zh, this message translates to:
-  /// **'Mephisto'**
-  String get appTitle;
-
-  /// No description provided for @homeTitle.
-  ///
-  /// In zh, this message translates to:
-  /// **'📜 Mephisto'**
-  String get homeTitle;
-
   /// No description provided for @homeNewContract.
   ///
   /// In zh, this message translates to:
@@ -320,47 +308,17 @@ abstract class AppLocalizations {
   /// **'收起'**
   String get homeSectionCollapse;
 
-  /// No description provided for @stageCardCharacterCount.
-  ///
-  /// In zh, this message translates to:
-  /// **'{count} 位角色'**
-  String stageCardCharacterCount(Object count);
-
   /// No description provided for @stageCardLastModified.
   ///
   /// In zh, this message translates to:
   /// **'最近活动：{time}'**
   String stageCardLastModified(Object time);
 
-  /// No description provided for @stageCardHasSave.
-  ///
-  /// In zh, this message translates to:
-  /// **'有存档'**
-  String get stageCardHasSave;
-
   /// No description provided for @stageCardRestart.
   ///
   /// In zh, this message translates to:
   /// **'重新开始（回母版）'**
   String get stageCardRestart;
-
-  /// No description provided for @stageCardRoleMaster.
-  ///
-  /// In zh, this message translates to:
-  /// **'母版'**
-  String get stageCardRoleMaster;
-
-  /// No description provided for @stageCardRoleChild.
-  ///
-  /// In zh, this message translates to:
-  /// **'{role} · 子版'**
-  String stageCardRoleChild(Object role);
-
-  /// No description provided for @stageCardRoleChildSubtitle.
-  ///
-  /// In zh, this message translates to:
-  /// **'续玩存档'**
-  String get stageCardRoleChildSubtitle;
 
   /// No description provided for @stageCardExport.
   ///
@@ -488,18 +446,6 @@ abstract class AppLocalizations {
   /// **'操作'**
   String get contractCardOperations;
 
-  /// No description provided for @contractCardExpandChildren.
-  ///
-  /// In zh, this message translates to:
-  /// **'展开子版'**
-  String get contractCardExpandChildren;
-
-  /// No description provided for @contractCardCollapseChildren.
-  ///
-  /// In zh, this message translates to:
-  /// **'收起子版'**
-  String get contractCardCollapseChildren;
-
   /// No description provided for @contractBranchCount.
   ///
   /// In zh, this message translates to:
@@ -625,6 +571,12 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'如 dark、light、审判线'**
   String get narrativeBranchHint;
+
+  /// No description provided for @narrativeBranchChild.
+  ///
+  /// In zh, this message translates to:
+  /// **'存档'**
+  String get narrativeBranchChild;
 
   /// No description provided for @narrativeBranchTitleLabel.
   ///
@@ -798,11 +750,11 @@ abstract class AppLocalizations {
   /// **'触发: {action}'**
   String diceVerdictTriggered(Object action);
 
-  /// No description provided for @dashboardTitle.
+  /// No description provided for @diceVerdictFooter.
   ///
   /// In zh, this message translates to:
-  /// **'仪表盘'**
-  String get dashboardTitle;
+  /// **'≋ 诸神的注视落于棋盘之上 ≋'**
+  String get diceVerdictFooter;
 
   /// No description provided for @previewSheetClose.
   ///
@@ -1672,12 +1624,6 @@ abstract class AppLocalizations {
   /// **'{days} 天前'**
   String relativeTimeDaysAgo(Object days);
 
-  /// No description provided for @languageLabel.
-  ///
-  /// In zh, this message translates to:
-  /// **'语言'**
-  String get languageLabel;
-
   /// No description provided for @languageChinese.
   ///
   /// In zh, this message translates to:
@@ -1689,6 +1635,114 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'English'**
   String get languageEnglish;
+
+  /// No description provided for @contractPanelRoleName.
+  ///
+  /// In zh, this message translates to:
+  /// **'【角色名】'**
+  String get contractPanelRoleName;
+
+  /// No description provided for @contractPanelState.
+  ///
+  /// In zh, this message translates to:
+  /// **'【状态】'**
+  String get contractPanelState;
+
+  /// No description provided for @contractPanelAnchor.
+  ///
+  /// In zh, this message translates to:
+  /// **'【锚点】'**
+  String get contractPanelAnchor;
+
+  /// No description provided for @contractPanelWorldview.
+  ///
+  /// In zh, this message translates to:
+  /// **'【世界观】'**
+  String get contractPanelWorldview;
+
+  /// No description provided for @contractPanelBackground.
+  ///
+  /// In zh, this message translates to:
+  /// **'【角色背景】'**
+  String get contractPanelBackground;
+
+  /// No description provided for @contractPanelOpening.
+  ///
+  /// In zh, this message translates to:
+  /// **'【开局场景】'**
+  String get contractPanelOpening;
+
+  /// No description provided for @contractPanelRules.
+  ///
+  /// In zh, this message translates to:
+  /// **'【规则】共 {count} 条'**
+  String contractPanelRules(Object count);
+
+  /// No description provided for @contractPanelNoRules.
+  ///
+  /// In zh, this message translates to:
+  /// **'（无规则）'**
+  String get contractPanelNoRules;
+
+  /// No description provided for @contractPanelNoState.
+  ///
+  /// In zh, this message translates to:
+  /// **'（无特殊状态）'**
+  String get contractPanelNoState;
+
+  /// No description provided for @contractPanelMemories.
+  ///
+  /// In zh, this message translates to:
+  /// **'【记忆】共 {count} 条'**
+  String contractPanelMemories(Object count);
+
+  /// No description provided for @contractPanelNoMemories.
+  ///
+  /// In zh, this message translates to:
+  /// **'（暂无记忆）'**
+  String get contractPanelNoMemories;
+
+  /// No description provided for @contractPanelHistory.
+  ///
+  /// In zh, this message translates to:
+  /// **'【历史】共 {count} 条'**
+  String contractPanelHistory(Object count);
+
+  /// No description provided for @contractPanelNoHistory.
+  ///
+  /// In zh, this message translates to:
+  /// **'（暂无历史）'**
+  String get contractPanelNoHistory;
+
+  /// No description provided for @contractPanelRoleFate.
+  ///
+  /// In zh, this message translates to:
+  /// **'命运'**
+  String get contractPanelRoleFate;
+
+  /// No description provided for @contractPanelRoleAssistant.
+  ///
+  /// In zh, this message translates to:
+  /// **'角色'**
+  String get contractPanelRoleAssistant;
+
+  /// No description provided for @emptyStateTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'📜 契约已立'**
+  String get emptyStateTitle;
+
+  /// No description provided for @emptyStateOpening.
+  ///
+  /// In zh, this message translates to:
+  /// **'【开局场景】'**
+  String get emptyStateOpening;
+
+  /// No description provided for @emptyStateOpeningWithRole.
+  ///
+  /// In zh, this message translates to:
+  /// **'【{role} · 开局场景】'**
+  String emptyStateOpeningWithRole(Object role);
 }
 
 class _AppLocalizationsDelegate

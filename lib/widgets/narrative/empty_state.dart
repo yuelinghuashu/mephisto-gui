@@ -15,6 +15,7 @@ class EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     return Center(
       child: SingleChildScrollView(
@@ -23,17 +24,14 @@ class EmptyState extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '📜 契约已立',
+              l10n.emptyStateTitle,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontSize: 24,
                 color: AppTheme.gold,
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              AppLocalizations.of(context).narrativeEmptyHint,
-              style: theme.textTheme.labelLarge,
-            ),
+            Text(l10n.narrativeEmptyHint, style: theme.textTheme.labelLarge),
             if (opening.isNotEmpty) ...[
               const SizedBox(height: 20),
               Container(
@@ -51,17 +49,14 @@ class EmptyState extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '【开局场景】',
+                      l10n.emptyStateOpening,
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: AppTheme.gold,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      opening,
-                      style: theme.textTheme.bodyMedium,
-                    ),
+                    Text(opening, style: theme.textTheme.bodyMedium),
                   ],
                 ),
               ),

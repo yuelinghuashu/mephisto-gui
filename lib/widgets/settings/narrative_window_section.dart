@@ -48,8 +48,9 @@ class NarrativeWindowSection extends ConsumerWidget {
                     NarrativeWindow.full => l10n.settingsHistoryWindowFull,
                   },
                   selected: currentWindow == window,
-                  onTap: () =>
-                      ref.read(narrativeWindowProvider.notifier).setWindow(window),
+                  onTap: () => ref
+                      .read(narrativeWindowProvider.notifier)
+                      .setWindow(window),
                 ),
                 if (window != NarrativeWindow.values.last)
                   const Divider(height: 1),

@@ -31,9 +31,7 @@ class ConfirmDeleteDialog {
             child: Text(AppLocalizations.of(context).confirmDeleteCancel),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: AppTheme.error,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.pop(context, true),
             child: Text(AppLocalizations.of(context).confirmDeleteDelete),
           ),

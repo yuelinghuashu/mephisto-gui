@@ -86,8 +86,9 @@ class _TextInputDialog extends StatefulWidget {
 }
 
 class _TextInputDialogState extends State<_TextInputDialog> {
-  late final TextEditingController _controller =
-      TextEditingController(text: widget.initialValue);
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialValue,
+  );
 
   /// 异步校验进行中标志（校验期间禁用确认按钮，防止连点重复提交）
   bool _isValidating = false;

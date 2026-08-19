@@ -156,7 +156,9 @@ class MemoryManager {
           ? history.sublist(history.length - extractWindow * 2)
           : history;
       final historyText = recent
-          .map((h) => '${h.role == MessageRole.fate ? '命运' : '角色'}: ${h.content}')
+          .map(
+            (h) => '${h.role == MessageRole.fate ? '命运' : '角色'}: ${h.content}',
+          )
           .join('\n');
       final existingText = memories.isEmpty
           ? '（无）'
@@ -335,9 +337,7 @@ $historyText
         final importance =
             int.tryParse(match[1]!)?.clamp(1, Memory.maxImportance) ??
             Memory.defaultImportance;
-        parsed.add(
-          Memory(content: match[2]!.trim(), importance: importance),
-        );
+        parsed.add(Memory(content: match[2]!.trim(), importance: importance));
       }
       if (parsed.isEmpty) return memories;
 
@@ -412,10 +412,11 @@ $historyText
 
     // 高权重记忆默认永不压缩，但超过 [highImportanceCap] 上限时，
     // 把「最低权重的高权重记忆」降级为可压缩（保护数量合理性）
-    final high = allMemories
-        .where((m) => m.importance >= Memory.highImportanceThreshold)
-        .toList()
-      ..sort((a, b) => a.importance.compareTo(b.importance)); // 权重升序：最低优先降级
+    final high =
+        allMemories
+            .where((m) => m.importance >= Memory.highImportanceThreshold)
+            .toList()
+          ..sort((a, b) => a.importance.compareTo(b.importance)); // 权重升序：最低优先降级
     var protectedHigh = high;
     var downgraded = <Memory>[];
     if (high.length > highImportanceCap) {
@@ -472,7 +473,11 @@ $compressText
         auxConfig: auxConfig,
       );
       if (lines.isEmpty) return allMemories;
-      return [...lines.map((c) => Memory(content: c)), ...protectedHigh, ...recentCompressible];
+      return [
+        ...lines.map((c) => Memory(content: c)),
+        ...protectedHigh,
+        ...recentCompressible,
+      ];
     } catch (e, st) {
       // 压缩失败时保留原列表（数据安全优先），记录堆栈便于排障
       debugPrint('记忆压缩失败（保留原列表）: $e\n$st');
@@ -508,8 +513,7 @@ $compressText
       // 确保记忆提取/压缩在服务端挂起时快速失败，不阻塞主叙事流程。
       // 重试次数沿用用户配置（默认 1 次）。
       timeout: Duration(
-        seconds:
-            config.timeoutSeconds > llmTimeout.inSeconds
+        seconds: config.timeoutSeconds > llmTimeout.inSeconds
             ? llmTimeout.inSeconds
             : config.timeoutSeconds,
       ),

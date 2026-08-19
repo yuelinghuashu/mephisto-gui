@@ -171,6 +171,16 @@ class AppTheme {
   // 主题构建
   // ============================================================
 
+  /// 亮色主题单例缓存。
+  ///
+  /// [ThemeData] 构造是重量级操作（内部构建大量派生对象）；此前
+  /// `dark()` / `light()` 每次调用都重新构造，`MyApp.build` 每执行一次
+  /// （主题/语言切换）就重建两份完整主题。缓存后全生命周期只构造一次。
+  static final ThemeData _light = _buildTheme(Brightness.light);
+
+  /// 暗色主题单例缓存。
+  static final ThemeData _dark = _buildTheme(Brightness.dark);
+
   /// 创建暗色主题
   ///
   /// 基于 Flutter 原生 ThemeData.dark()，覆盖以下自定义属性：
@@ -183,7 +193,7 @@ class AppTheme {
   ///   - 夜间阅读
   ///   - 沉浸式叙事
   ///   - 追求神秘氛围
-  static ThemeData dark() => _buildTheme(Brightness.dark);
+  static ThemeData dark() => _dark;
 
   /// 创建亮色主题
   ///
@@ -197,7 +207,7 @@ class AppTheme {
   ///   - 日间阅读
   ///   - 清晰度优先
   ///   - 追求干净、明亮的阅读体验
-  static ThemeData light() => _buildTheme(Brightness.light);
+  static ThemeData light() => _light;
 
   /// 统一的主题构建工厂方法
   ///
@@ -226,11 +236,11 @@ class AppTheme {
       colorScheme:
           (isDark ? const ColorScheme.dark() : const ColorScheme.light())
               .copyWith(
-        primary: gold,
-        secondary: goldDark,
-        surface: surface,
-        error: error,
-      ),
+                primary: gold,
+                secondary: goldDark,
+                surface: surface,
+                error: error,
+              ),
 
       // ---- 应用栏 ----
       appBarTheme: AppBarTheme(
@@ -247,7 +257,12 @@ class AppTheme {
       ),
 
       // ---- 文字主题 ----
-      textTheme: TextTheme(
+      // 注意：必须基于 `base.textTheme.copyWith(...)` 增量覆盖——
+      // 若整体替换为只含部分角色的新 `TextTheme`，未定义的角色
+      // （titleLarge / titleMedium 等）会变为 null，所有
+      // `theme.textTheme.titleLarge?.copyWith(...)` 链因 `?.` 短路
+      // 而静默失效（品牌标题/设置页标题/抽屉标题样式丢失）。
+      textTheme: base.textTheme.copyWith(
         /// 叙事正文（bodyLarge）
         ///
         /// 用于：世界观、叙事文本、角色对话
@@ -258,6 +273,24 @@ class AppTheme {
         ///
         /// 用于：状态描述、辅助信息
         bodyMedium: TextStyle(color: textPrimary, fontSize: 16, height: 1.6),
+
+        /// 大标题（titleLarge）
+        ///
+        /// 用于：品牌区标题、设置分区图标等强调级标题
+        titleLarge: TextStyle(
+          color: textPrimary,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+        ),
+
+        /// 标题（titleMedium）
+        ///
+        /// 用于：卡片标题、Sheet 标题、抽屉标题等
+        titleMedium: TextStyle(
+          color: textPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
 
         /// 小标题（titleSmall）
         ///
@@ -281,10 +314,7 @@ class AppTheme {
         /// 辅助文字（labelMedium）
         ///
         /// 用于：提示信息、状态条
-        labelMedium: TextStyle(
-          color: labelSecondary(brightness),
-          fontSize: 12,
-        ),
+        labelMedium: TextStyle(color: labelSecondary(brightness), fontSize: 12),
 
         /// 最小标签（labelSmall）
         ///

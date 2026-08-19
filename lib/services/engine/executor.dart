@@ -84,7 +84,9 @@ String executeAction(
 ///   - 当前值是 [IntValue] 时，结果保持 int（向零截断，与 Go int() 一致）
 ///   - 当前值是 [DoubleValue] 时，结果保持 double
 String setState(String action, Map<String, StateValue> state) {
-  final rest = action.substring(RuleAction.statePrefix.length).trim(); // 去掉 "状态."
+  final rest = action
+      .substring(RuleAction.statePrefix.length)
+      .trim(); // 去掉 "状态."
 
   // 兜底校验：`+ =`、`- =` 等「复合运算符符号与等号间有空格」的写法
   // 会导致 `+=` 无法识别、简单赋值分支把 `+` 并进键名（静默创建错误状态键）。

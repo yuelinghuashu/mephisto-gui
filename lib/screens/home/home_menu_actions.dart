@@ -100,9 +100,7 @@ Future<void> renameContractDialog(
   // 成功时列表已显示新文件名，无需提示；仅当重命名失败时告知
   // （对话框已拦截「目标名已存在」，此处是文件系统层面失败的兜底提示）
   if (!ok) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.homeRenameFail)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.homeRenameFail)));
   }
 }
 
@@ -134,9 +132,7 @@ Future<void> confirmAndDelete(
 
   // 成功时列表已直观反映（文件消失），无需提示；仅当删除失败时告知
   if (!ok) {
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.homeDeleteFail)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.homeDeleteFail)));
   }
 }
 
@@ -149,9 +145,9 @@ Future<void> confirmCascadeDelete(
   return confirmAndDelete(
     context,
     title: AppLocalizations.of(context).homeDeleteContractTitle,
-    message: AppLocalizations.of(context).homeDeleteMasterConfirm(
-      master.fileName,
-    ),
+    message: AppLocalizations.of(
+      context,
+    ).homeDeleteMasterConfirm(master.fileName),
     delete: () async => await deleteContractCascade(master.fileName) > 0,
     onRefreshLists: onRefreshLists,
   );
@@ -166,9 +162,9 @@ Future<void> confirmDeleteChild(
   return confirmAndDelete(
     context,
     title: AppLocalizations.of(context).homeDeleteChildTitle,
-    message: AppLocalizations.of(context).homeDeleteChildConfirm(
-      child.fileName,
-    ),
+    message: AppLocalizations.of(
+      context,
+    ).homeDeleteChildConfirm(child.fileName),
     delete: () => deleteContract(child.fileName),
     onRefreshLists: onRefreshLists,
   );

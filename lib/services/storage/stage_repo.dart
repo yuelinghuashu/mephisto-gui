@@ -57,11 +57,7 @@ Future<List<StageInfo>> listStages() async {
     if (roles.isEmpty) continue;
 
     stages.add(
-      StageInfo(
-        path: entity.path,
-        name: name,
-        characterCount: roles.length,
-      ),
+      StageInfo(path: entity.path, name: name, characterCount: roles.length),
     );
   }
 

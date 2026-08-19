@@ -86,10 +86,7 @@ class ContractFileWatcher {
   @visibleForTesting
   Map<String, String> get debugStartBaselineContents => _lastProcessedContents;
 
-  ContractFileWatcher({
-    required this.onFileChanged,
-    this.onUnavailable,
-  });
+  ContractFileWatcher({required this.onFileChanged, this.onUnavailable});
 
   /// 当前监听的文件名（当前源文件；含子版情形）
   String get watchedFileName => _watchedFileName;

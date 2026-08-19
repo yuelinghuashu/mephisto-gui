@@ -60,8 +60,9 @@ class _RenameDialog extends StatefulWidget {
 }
 
 class _RenameDialogState extends State<_RenameDialog> {
-  late final TextEditingController _nameController =
-      TextEditingController(text: widget.currentName);
+  late final TextEditingController _nameController = TextEditingController(
+    text: widget.currentName,
+  );
   late final TextEditingController _titleController = TextEditingController(
     text: widget.initialBranchTitle ?? '',
   );
@@ -103,10 +104,7 @@ class _RenameDialogState extends State<_RenameDialog> {
 
     // 3. 通过 → 返回 (新文件名, 命运说明)
     final title = _titleController.text.trim();
-    Navigator.pop(
-      context,
-      (name, title.isEmpty ? null : title),
-    );
+    Navigator.pop(context, (name, title.isEmpty ? null : title));
   }
 
   @override

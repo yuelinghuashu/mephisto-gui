@@ -18,10 +18,7 @@ class StageSectionResult {
   /// 未被任何已声明角色标题匹配的剩余文本（LLM 额外输出/前言/总结）
   final String overflow;
 
-  const StageSectionResult({
-    required this.sections,
-    required this.overflow,
-  });
+  const StageSectionResult({required this.sections, required this.overflow});
 
   /// 是否存在任何有效角色分段
   bool get isEmpty => sections.isEmpty;
@@ -123,9 +120,7 @@ StageSectionResult parseStageSections({
 ///   - 全角括号 `【】` 为主要格式；
 ///   - 半角 `[ ]` 偶发输出也做容错（`【|\[` 开头）
 ///   - 标题同行可跟内容（`【浮士德】正文…`），角色名取括号内内容
-final RegExp _sectionHeaderPattern = RegExp(
-  r'^\s*[【\[]\s*(.+?)\s*[】\]]\s*',
-);
+final RegExp _sectionHeaderPattern = RegExp(r'^\s*[【\[]\s*(.+?)\s*[】\]]\s*');
 
 /// 判断某行是否为「角色分节标题」（纯标题行，无正文内容）。
 ///

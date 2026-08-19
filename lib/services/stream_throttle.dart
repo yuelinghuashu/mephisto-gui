@@ -22,9 +22,7 @@ class StreamThrottleBuffer {
   /// 当前缓冲中是否还有未提交的内容
   bool get isDirty => _buffer.isNotEmpty;
 
-  StreamThrottleBuffer({
-    this.flushInterval = const Duration(milliseconds: 50),
-  });
+  StreamThrottleBuffer({this.flushInterval = const Duration(milliseconds: 50)});
 
   /// 追加流式 chunk：累积到缓冲，按 [flushInterval] 节流窗口统一提交。
   ///

@@ -18,10 +18,7 @@ List<HistoryEntry> _appendHistoryEntry(
   MessageRole role,
   String content,
 ) {
-  return [
-    ...state.history,
-    HistoryEntry(role: role, content: content),
-  ];
+  return [...state.history, HistoryEntry(role: role, content: content)];
 }
 
 /// 应用事件到当前状态，返回新状态（纯函数，不修改原状态）。
@@ -46,16 +43,29 @@ NarrativeState narrativeReducer(NarrativeState state, NarrativeEvent event) {
         lastError: lastError,
       ),
     GenerationFailed(:final message) => _onGenerationFailed(state, message),
-    SessionRestored(:final restored, :final fileName) =>
-      _onSessionRestored(state, restored, fileName),
+    SessionRestored(:final restored, :final fileName) => _onSessionRestored(
+      state,
+      restored,
+      fileName,
+    ),
     SessionReset() => _onSessionReset(state),
-    StateValueSet(:final key, :final value) => _onStateValueSet(state, key, value),
-    ContextAttached(:final fileName, :final content) =>
-      _onContextAttached(state, fileName, content),
+    StateValueSet(:final key, :final value) => _onStateValueSet(
+      state,
+      key,
+      value,
+    ),
+    ContextAttached(:final fileName, :final content) => _onContextAttached(
+      state,
+      fileName,
+      content,
+    ),
     ContextRemoved(:final index) => _onContextRemoved(state, index),
     ContextsCleared() => _onContextsCleared(state),
-    MessageDeleted(:final index, :final cascadeFate) =>
-      _onMessageDeleted(state, index, cascadeFate),
+    MessageDeleted(:final index, :final cascadeFate) => _onMessageDeleted(
+      state,
+      index,
+      cascadeFate,
+    ),
   };
 }
 
@@ -88,8 +98,7 @@ NarrativeState _onReplySucceeded(
   final updatedMessages = [
     ...state.messages,
     // 骰子结果以系统消息展示（携带结构化数据供 UI 渲染）
-    if (rollInfo.isNotEmpty)
-      Message.system(rollInfo, diceResults: diceResults),
+    if (rollInfo.isNotEmpty) Message.system(rollInfo, diceResults: diceResults),
     Message.assistant(reply),
   ];
 
@@ -247,10 +256,7 @@ NarrativeState _onMessageDeleted(
       (h) => h.role == role && h.content == content,
     );
     if (entryIndex != -1) {
-      history = [
-        ...history.take(entryIndex),
-        ...history.skip(entryIndex + 1),
-      ];
+      history = [...history.take(entryIndex), ...history.skip(entryIndex + 1)];
     }
   }
 

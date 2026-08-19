@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
 import '../domain/models.dart';
+import '../l10n/app_localizations.dart';
 
 /// 契约数据面板：结构化展示 .meph 契约的所有区块。
 ///
@@ -36,6 +37,7 @@ class ContractPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final state = currentState ?? contract.stateMap;
     final memList = memories;
     final histList = history;
@@ -45,16 +47,19 @@ class ContractPanel extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           // ---- 角色 ----
-          _sectionHeader(theme, '【角色名】'),
+          _sectionHeader(theme, l10n.contractPanelRoleName),
           _sectionBody(
             Text(contract.roleName, style: theme.textTheme.bodyLarge),
           ),
 
           // ---- 状态（运行时值） ----
-          _sectionHeader(theme, '【状态】'),
+          _sectionHeader(theme, l10n.contractPanelState),
           _sectionBody(
             state.isEmpty
-                ? Text('（无特殊状态）', style: theme.textTheme.labelMedium)
+                ? Text(
+                    l10n.contractPanelNoState,
+                    style: theme.textTheme.labelMedium,
+                  )
                 : _buildKeyValueList(
                     state.entries.map((e) => (e.key, e.value.value)).toList(),
                     theme,
@@ -63,7 +68,7 @@ class ContractPanel extends StatelessWidget {
 
           // ---- 锚点 ----
           if (contract.anchor.isNotEmpty) ...[
-            _sectionHeader(theme, '【锚点】'),
+            _sectionHeader(theme, l10n.contractPanelAnchor),
             _sectionBody(
               _buildKeyValueList(
                 contract.anchor.map((a) => (a.key, a.value.value)).toList(),
@@ -74,7 +79,7 @@ class ContractPanel extends StatelessWidget {
 
           // ---- 世界观 ----
           if (contract.worldview.isNotEmpty) ...[
-            _sectionHeader(theme, '【世界观】'),
+            _sectionHeader(theme, l10n.contractPanelWorldview),
             _sectionBody(
               Text(contract.worldview, style: theme.textTheme.bodyMedium),
             ),
@@ -82,7 +87,7 @@ class ContractPanel extends StatelessWidget {
 
           // ---- 角色背景 ----
           if (contract.background.isNotEmpty) ...[
-            _sectionHeader(theme, '【角色背景】'),
+            _sectionHeader(theme, l10n.contractPanelBackground),
             _sectionBody(
               Text(
                 contract.background.replaceAll('{角色名}', contract.roleName),
@@ -93,7 +98,7 @@ class ContractPanel extends StatelessWidget {
 
           // ---- 开局场景 ----
           if (contract.opening.isNotEmpty) ...[
-            _sectionHeader(theme, '【开局场景】'),
+            _sectionHeader(theme, l10n.contractPanelOpening),
             _sectionBody(
               Text(
                 contract.opening.replaceAll('{角色名}', contract.roleName),
@@ -103,10 +108,13 @@ class ContractPanel extends StatelessWidget {
           ],
 
           // ---- 规则 ----
-          _sectionHeader(theme, '【规则】共 ${contract.rules.length} 条'),
+          _sectionHeader(theme, l10n.contractPanelRules(contract.rules.length)),
           _sectionBody(
             contract.rules.isEmpty
-                ? Text('（无规则）', style: theme.textTheme.labelMedium)
+                ? Text(
+                    l10n.contractPanelNoRules,
+                    style: theme.textTheme.labelMedium,
+                  )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -127,10 +135,13 @@ class ContractPanel extends StatelessWidget {
 
           // ---- 记忆（可选） ----
           if (memList != null) ...[
-            _sectionHeader(theme, '【记忆】共 ${memList.length} 条'),
+            _sectionHeader(theme, l10n.contractPanelMemories(memList.length)),
             _sectionBody(
               memList.isEmpty
-                  ? Text('（暂无记忆）', style: theme.textTheme.labelMedium)
+                  ? Text(
+                      l10n.contractPanelNoMemories,
+                      style: theme.textTheme.labelMedium,
+                    )
                   : _buildStringList(
                       memList.map((m) => m.content).toList(),
                       theme,
@@ -140,15 +151,18 @@ class ContractPanel extends StatelessWidget {
 
           // ---- 历史（可选） ----
           if (histList != null) ...[
-            _sectionHeader(theme, '【历史】共 ${histList.length} 条'),
+            _sectionHeader(theme, l10n.contractPanelHistory(histList.length)),
             _sectionBody(
               histList.isEmpty
-                  ? Text('（暂无历史）', style: theme.textTheme.labelMedium)
+                  ? Text(
+                      l10n.contractPanelNoHistory,
+                      style: theme.textTheme.labelMedium,
+                    )
                   : _buildStringList(
                       histList
                           .map(
                             (h) =>
-                                '${h.role == MessageRole.fate ? '命运' : '角色'}: '
+                                '${h.role == MessageRole.fate ? l10n.contractPanelRoleFate : l10n.contractPanelRoleAssistant}: '
                                 '${h.content}',
                           )
                           .toList(),
@@ -179,27 +193,18 @@ class ContractPanel extends StatelessWidget {
 
   /// 区块内容（左缩进）
   Widget _sectionBody(Widget child) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: child,
-    );
+    return Padding(padding: const EdgeInsets.only(left: 4), child: child);
   }
 
   /// 渲染键值对列表（状态/锚点）
-  Widget _buildKeyValueList(
-    List<(String, Object)> entries,
-    ThemeData theme,
-  ) {
+  Widget _buildKeyValueList(List<(String, Object)> entries, ThemeData theme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final (key, value) in entries)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Text(
-              '- $key: $value',
-              style: theme.textTheme.bodyMedium,
-            ),
+            child: Text('- $key: $value', style: theme.textTheme.bodyMedium),
           ),
       ],
     );

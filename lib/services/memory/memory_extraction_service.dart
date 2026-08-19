@@ -11,6 +11,12 @@
 ///       中**当前不存在**的新条目追加到末尾
 ///   - 合并后若超过 [MemoryManager.maxLimit]，触发压缩
 ///     （低权重优先压缩/舍弃，高权重保护不丢）
+///
+/// **注意（修复要点）**：提取是异步的，`input` 中的 `history` /
+/// `historyLengthAtStart` 是**启动时快照**，无法反映提取期间的新对话。
+/// 因此「是否有新对话」必须由调用方在 `await` 提取完成**之后**，
+/// 用**当前最新**的 history 长度与记忆传入本方法判断——
+/// 否则长度比较恒真，安全合并退化为直接覆盖（提取期间新记忆丢失）。
 library;
 
 import '../../domain/models.dart';
@@ -47,6 +53,10 @@ class MemoryExtractionService {
   /// 参数：
   ///   - manager: [MemoryManager] 实例（提取/压缩的实际执行者）
   ///   - input: 提取输入（历史 + 当前记忆 + 起始行长度快照）
+  ///   - currentHistoryLength: **提取完成后**调用方的最新 history 长度
+  ///     （用于检测提取期间是否发生新对话；不得使用 `input` 内快照）
+  ///   - currentMemories: **提取完成后**调用方的最新记忆列表
+  ///     （有新对话时以它为合并基底，避免覆盖提取期间规则注入的新记忆）
   ///   - config: LLM 配置（null 时使用默认值）
   ///
   /// 返回值：
@@ -55,6 +65,8 @@ class MemoryExtractionService {
   Future<List<Memory>?> extractWithSafeMerge({
     required MemoryManager manager,
     required MemoryExtractionInput input,
+    required int currentHistoryLength,
+    required List<Memory> currentMemories,
     required LlmConfig? config,
     LlmAuxConfig? auxConfig,
   }) async {
@@ -67,20 +79,24 @@ class MemoryExtractionService {
     if (updated == null) return null;
 
     // 提取期间没有新对话 → 直接采用提取结果（无覆盖风险）
-    if (input.history.length == input.historyLengthAtStart) {
+    // 注意：必须用「提取完成后」的最新长度 [currentHistoryLength] 判断，
+    // 而非 input.history.length（快照）——后者恒等于 historyLengthAtStart，
+    // 会导致下方安全合并分支永远不执行。
+    if (currentHistoryLength == input.historyLengthAtStart) {
       return updated;
     }
 
     // 提取期间有新对话 → 安全合并：
-    // 以当前 memories 为基底，仅追加「新提取结果中当前不存在」的条目。
+    // 以「当前 memories」（提取完成后最新快照）为基底，仅追加
+    // 「新提取结果中当前不存在」的条目。
     // 利用 Memory 的 Equatable props（按 content 比较）判断是否已存在。
-    final currentContents = input.memories.map((m) => m.content).toSet();
+    final currentContents = currentMemories.map((m) => m.content).toSet();
     final fresh = updated
         .where((m) => !currentContents.contains(m.content))
         .toList();
     if (fresh.isEmpty) return null; // 无新增条目，保持现状
 
-    var combined = [...input.memories, ...fresh];
+    var combined = [...currentMemories, ...fresh];
     // 遵循权重制取舍：合并后超限触发 compress（低权重优先压缩/舍弃，
     // 高权重保护不丢）——而非无脑追加导致列表膨胀失控
     if (combined.length > MemoryManager.maxLimit) {

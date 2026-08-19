@@ -28,6 +28,20 @@ mixin GenerationCoordinator<T> {
   ///     并在生成成功/失败后统一复位
   bool _isGeneratingInFlight = false;
 
+  /// 是否已 dispose（Notifier 重建/销毁时置位）。
+  ///
+  /// 在途生成（LLM 请求未结束）的收尾路径（[runGeneration] 的 finally /
+  /// [stopGenerating] 的 flush）在 dispose 后**不得再写状态**——
+  /// 否则会 `_dispatch` 到已释放的 Notifier state 上。
+  ///
+  /// 注意：**不**在 dispose 时 complete 取消信号——那会让在途 LLM 请求
+  /// 提前结束并立即进入收尾（同样触碰已释放状态，且更不可控）；让
+  /// 请求自然结束，收尾时通过本标志短路即可。
+  bool _disposed = false;
+
+  /// 是否已 dispose（供混入方在流式写回等路径判断是否跳过状态更新）。
+  bool get isGenerationDisposed => _disposed;
+
   /// 二次守卫：生成中禁止再次发送（UI 已禁用输入，极端连点/竞态时兜底）。
   /// 返回 true 表示可以继续发送（未被拒绝）。
   bool canSend({required bool isGenerating}) {
@@ -60,8 +74,15 @@ mixin GenerationCoordinator<T> {
   /// 与 [stopGenerating] 的区别：只触发取消信号，不 flush 流式缓冲。
   /// 用于「⏩ 立即显示全文」场景——调用方已自行 flush 缓冲，
   /// 这里仅让 LlmClient 在下一条 SSE 数据行处停止读取并返回已累积内容。
+  ///
+  /// **幂等**：协作式取消窗口内（`state.isGenerating` 仍为 true，
+  /// UI 停止按钮可重复点击），[Completer.complete] 对已完成的信号
+  /// 二次调用会抛 `StateError`——快速双击「停止」或「⏩ 显示全文」
+  /// 即触发。因此先检查 [Completer.isCompleted] 再 complete。
   void cancelGeneration() {
-    _generationCancel?.complete();
+    final cancel = _generationCancel;
+    if (cancel == null || cancel.isCompleted) return;
+    cancel.complete();
   }
 
   /// 停止当前生成：立即 flush 已到达的流式内容并触发取消信号。
@@ -69,6 +90,8 @@ mixin GenerationCoordinator<T> {
   /// 协作式取消：不会中断底层 http 连接，而是让 LlmClient 在下一个
   /// SSE 数据行处停止读取并返回已累积内容，随后生成流程正常收尾。
   void stopGenerating() {
+    // 已 dispose：不再 flush 流式缓冲（避免写已释放状态）
+    if (_disposed) return;
     // 立即 flush 已到达的流式内容，避免遗留在缓冲中
     onGenerationStop();
     cancelGeneration();
@@ -102,7 +125,8 @@ mixin GenerationCoordinator<T> {
       await core(userInput);
     } catch (e, st) {
       onError(e, st);
-      onFailure();
+      // 已 dispose：不再 dispatch 失败事件（状态已释放），仅记录
+      if (!_disposed) onFailure();
     } finally {
       // 无论成功/失败/异常，都必须复位同步标志位，允许下一次发送
       endGeneration();
@@ -110,7 +134,11 @@ mixin GenerationCoordinator<T> {
   }
 
   /// Notifier dispose 清理（防止 Timer / 信号泄漏）。
+  ///
+  /// 置位 [_disposed] 使在途生成的收尾短路（不再写已释放状态），
+  /// 并清理取消信号引用与同步标志位。
   void disposeGeneration() {
+    _disposed = true;
     _generationCancel = null;
     _isGeneratingInFlight = false;
   }

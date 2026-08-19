@@ -25,16 +25,14 @@ class LanguageSection extends ConsumerWidget {
             icon: Icons.translate,
             label: l10n.languageChinese,
             selected: ref.watch(languageProvider) == 'zh',
-            onTap: () =>
-                ref.read(languageProvider.notifier).setLanguage('zh'),
+            onTap: () => ref.read(languageProvider.notifier).setLanguage('zh'),
           ),
           const Divider(height: 1),
           RadioSelectionTile(
             icon: Icons.language,
             label: l10n.languageEnglish,
             selected: ref.watch(languageProvider) == 'en',
-            onTap: () =>
-                ref.read(languageProvider.notifier).setLanguage('en'),
+            onTap: () => ref.read(languageProvider.notifier).setLanguage('en'),
           ),
         ],
       ),

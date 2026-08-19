@@ -99,10 +99,7 @@ class MessageBubble extends StatelessWidget {
         children: [
           // 流式输出与完成后的文本使用相同正体样式，
           // 生成中状态由末尾金色光标标识，避免斜体影响实时阅读。
-          ParagraphText(
-            message.content,
-            style: theme.textTheme.bodyMedium,
-          ),
+          ParagraphText(message.content, style: theme.textTheme.bodyMedium),
           // 流式打字机光标：静态竖线 + 独立 StatefulWidget 实现
           // 周期性闪烁（仅流式输出中显示；完成时随 [MessageBubble] 重建消失）
           if (isStreaming) const _BlinkingCursor(),
@@ -172,10 +169,7 @@ class MessageBubble extends StatelessWidget {
   }
 
   /// 弹出操作菜单（优先使用触发位置，否则居中显示）。
-  void _showMenu(
-    BuildContext context, [
-    Offset? position,
-  ]) async {
+  void _showMenu(BuildContext context, [Offset? position]) async {
     // 按需构建菜单项（避免每次 build 都构造）
     final items = _buildMenuItems(context);
     if (items.isEmpty) return;
@@ -199,7 +193,9 @@ class MessageBubble extends StatelessWidget {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(
-              SnackBar(content: Text(AppLocalizations.of(context).messageMenuCopied)),
+              SnackBar(
+                content: Text(AppLocalizations.of(context).messageMenuCopied),
+              ),
             );
         }
         break;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
 import '../../domain/models.dart';
+import '../../l10n/app_localizations.dart';
 
 /// 命运结算卡片
 ///
@@ -24,6 +25,7 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final successCount = widget.results.where((d) => d.success).length;
     final failCount = widget.results.length - successCount;
 
@@ -39,11 +41,11 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(theme, successCount, failCount),
+            _buildHeader(theme, l10n, successCount, failCount),
             if (_expanded) ...[
               const Divider(height: 1, indent: 14, endIndent: 14),
-              _buildDetails(theme),
-              _buildFooter(theme),
+              _buildDetails(theme, l10n),
+              _buildFooter(theme, l10n),
             ],
           ],
         ),
@@ -53,6 +55,7 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
 
   Widget _buildHeader(
     ThemeData theme,
+    AppLocalizations l10n,
     int successCount,
     int failCount,
   ) {
@@ -65,7 +68,7 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
             const Text('⚖ ', style: TextStyle(fontSize: 16)),
             Expanded(
               child: Text(
-                '命运结算 · ${widget.results.length} 回判定',
+                l10n.diceVerdictTitle(widget.results.length),
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: AppTheme.gold,
                   fontWeight: FontWeight.bold,
@@ -91,14 +94,14 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
     );
   }
 
-  Widget _buildDetails(ThemeData theme) {
+  Widget _buildDetails(ThemeData theme, AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (final d in widget.results) ...[
-            _VerdictRow(result: d),
+            _VerdictRow(result: d, l10n: l10n),
             if (d != widget.results.last) const SizedBox(height: 8),
           ],
         ],
@@ -106,18 +109,16 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
     );
   }
 
-  Widget _buildFooter(ThemeData theme) {
+  Widget _buildFooter(ThemeData theme, AppLocalizations l10n) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 6),
       color: AppTheme.gold.withValues(alpha: 0.04),
       child: Text(
-        '≋ 诸神的注视落于棋盘之上 ≋',
+        l10n.diceVerdictFooter,
         textAlign: TextAlign.center,
         // labelSmall 已含 11px + textSecondary 默认值
-        style: theme.textTheme.labelSmall?.copyWith(
-          letterSpacing: 1.2,
-        ),
+        style: theme.textTheme.labelSmall?.copyWith(letterSpacing: 1.2),
       ),
     );
   }
@@ -129,13 +130,16 @@ class _DiceVerdictCardState extends State<DiceVerdictCard> {
 /// 第二行：触发动作（仅成功时）+ 命运反馈文案（斜体）
 class _VerdictRow extends StatelessWidget {
   final DiceResult result;
+  final AppLocalizations l10n;
 
-  const _VerdictRow({required this.result});
+  const _VerdictRow({required this.result, required this.l10n});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = result.success ? AppTheme.gold : AppTheme.crimson;
+    // 阈值：字段无法在 collection-if 中做类型提升，提前提取为局部变量
+    final threshold = result.threshold;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,11 +175,11 @@ class _VerdictRow extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         // ---- 阈值（仅在自定义阈值时显示） ----
-        if (result.threshold != null)
+        if (threshold != null)
           Padding(
             padding: const EdgeInsets.only(left: 24),
             child: Text(
-              '阈值 ≥ ${result.threshold}',
+              l10n.diceVerdictThreshold(threshold),
               // labelMedium 已含 12px 默认值
               style: theme.textTheme.labelMedium?.copyWith(
                 color: AppTheme.textSecondary(theme.brightness),
@@ -187,7 +191,7 @@ class _VerdictRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 24),
             child: Text(
-              '触发: ${result.action}',
+              l10n.diceVerdictTriggered(result.action),
               // labelMedium 已含 12px 默认值
               style: theme.textTheme.labelMedium?.copyWith(
                 color: AppTheme.gold,

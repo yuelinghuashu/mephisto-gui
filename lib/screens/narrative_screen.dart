@@ -85,9 +85,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
         final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(
-            SnackBar(content: Text(l10n.narrativeRestoreFailed)),
-          );
+          ..showSnackBar(SnackBar(content: Text(l10n.narrativeRestoreFailed)));
       }
     });
   }
@@ -108,8 +106,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
   /// 具体监听/防抖/mtime 抑制逻辑已抽至 [ContractFileWatcher]。
   Future<void> _startFileWatch(String fileName) async {
     // 文件名未变化时不重复绑定
-    if (fileName.isEmpty ||
-        (_fileWatcher?.watchedFileName == fileName)) {
+    if (fileName.isEmpty || (_fileWatcher?.watchedFileName == fileName)) {
       return;
     }
 
@@ -131,7 +128,9 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(AppLocalizations.of(context).narrativeFileWatchUnavailable),
+          content: Text(
+            AppLocalizations.of(context).narrativeFileWatchUnavailable,
+          ),
         ),
       );
   }
@@ -183,8 +182,8 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     final fallbackNotice = rawFallbackNotice == null
         ? null
         : isNarrativeErrorCode(rawFallbackNotice)
-            ? localizeNarrativeError(l10n, rawFallbackNotice)
-            : rawFallbackNotice;
+        ? localizeNarrativeError(l10n, rawFallbackNotice)
+        : rawFallbackNotice;
 
     // ---- 错误监听（LLM 错误 → SnackBar）已由 [NarrativeScaffold] 统一处理 ----
 
@@ -197,16 +196,14 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
 
     // ---- 窄监听各字段 ----
     final roleName = ref.watch(narrativeProvider.select((s) => s.roleName));
-    final branchName = ref.watch(
-      narrativeProvider.select((s) => s.branchName),
-    );
+    final branchName = ref.watch(narrativeProvider.select((s) => s.branchName));
     final isGenerating = ref.watch(
       narrativeProvider.select((s) => s.isGenerating),
     );
     final lastError = ref.watch(narrativeProvider.select((s) => s.lastError));
-    final opening = ref.watch(
-      narrativeProvider.select((s) => s.contract.opening),
-    ).replaceAll('{角色名}', roleName);
+    final opening = ref
+        .watch(narrativeProvider.select((s) => s.contract.opening))
+        .replaceAll('{角色名}', roleName);
     final attachedFileNames = ref.watch(
       narrativeProvider.select((s) => s.attachedFileNames),
     );
@@ -281,7 +278,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        branchName,
+                        _localizedBranchName(branchName, l10n),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: textTheme.labelLarge?.copyWith(
@@ -470,7 +467,9 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
         messenger.showSnackBar(
           SnackBar(
             content: Text(
-              ok ? l10n.narrativeDeleteSaveSuccess : l10n.narrativeDeleteSaveNone,
+              ok
+                  ? l10n.narrativeDeleteSaveSuccess
+                  : l10n.narrativeDeleteSaveNone,
             ),
           ),
         );
@@ -496,12 +495,16 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
 
     final markdown = exportNarrativeMarkdown(
       roleName: state.roleName,
-      branchName: state.branchName.isEmpty ? null : state.branchName,
+      // 导出文档中的分支名也走本地化映射（默认存档分支显示为界面语言）
+      branchName: state.branchName.isEmpty
+          ? null
+          : _localizedBranchName(state.branchName, l10n),
       history: state.history,
     );
 
-    final baseName =
-        state.sourceFileName.replaceAll('.meph', '').replaceAll('.child', '');
+    final baseName = state.sourceFileName
+        .replaceAll('.meph', '')
+        .replaceAll('.child', '');
     final destination = await getSaveLocation(
       suggestedName: '$baseName-chronicle.md',
       acceptedTypeGroups: const [
@@ -554,6 +557,13 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
     // 文件监听已检测到写入并触发 [NarrativeNotifier.hotReloadContract]
   }
 
+  /// 分支名本地化映射：默认存档分支（`child`）在 domain 层返回原始名，
+  /// 由 UI 层翻译为界面语言（中文「存档」/ 英文 "Save"），避免 domain
+  /// 硬编码展示文案；自定义分支名原样透传。
+  String _localizedBranchName(String branchName, AppLocalizations l10n) {
+    return branchName == 'child' ? l10n.narrativeBranchChild : branchName;
+  }
+
   /// 弹出「另存为分支」对话框，输入分支名 + 可选「命运说明」，
   /// 生成 `faust.branch.meph`（命运说明以 `@命运:` 标记写入子版）。
   Future<void> _showSaveBranchDialog() async {
@@ -577,9 +587,7 @@ class _NarrativeScreenState extends ConsumerState<NarrativeScreen> {
         SnackBar(content: Text(l10n.narrativeBranchSaved(fileName))),
       );
     } else {
-      messenger.showSnackBar(
-        SnackBar(content: Text(l10n.narrativeBranchFail)),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(l10n.narrativeBranchFail)));
     }
   }
 }

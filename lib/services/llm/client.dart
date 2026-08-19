@@ -22,6 +22,24 @@ const int defaultMaxRetries = 1;
 /// 避免重试风暴同时打向 API 服务。
 const int retryBaseDelayMs = 500;
 
+/// 流式读取阶段的超时异常。
+///
+/// 与「响应头到达前的连接超时」（[TimeoutException]，可安全重试）区分：
+/// 流式读取中途超时意味着**已消费部分响应体**（部分 chunk 已通过
+/// [onChunk] 送达 UI），若整体重发请求会导致回复内容重复，因此
+/// 必须**不参与重试**，直接抛出由调用方回退本地回复。
+///
+/// 同理，非 200 响应的错误体读取超时也是业务错误，重试不会成功，
+/// 同样使用本类型标记「不重试」。
+class LlmStreamTimeoutException implements Exception {
+  final String message;
+
+  const LlmStreamTimeoutException(this.message);
+
+  @override
+  String toString() => 'LlmStreamTimeoutException: $message';
+}
+
 /// LLM 消息（API 格式）
 class LlmMessage {
   /// user、assistant、system
@@ -194,14 +212,24 @@ class LlmClient {
 
     if (response.statusCode != 200) {
       // 限制错误响应体的读取长度，防止恶意/异常服务返回超长错误体导致内存膨胀
-      final errorBody = await response.stream
-          .transform(utf8.decoder)
-          .take(maxErrorBodyBytes + 1)
-          .join()
-          .timeout(timeout);
-      final truncated = errorBody.length > maxErrorBodyBytes
-          ? '${errorBody.substring(0, maxErrorBodyBytes)}\n…（响应体已截断）'
-          : errorBody;
+      String truncated;
+      try {
+        final errorBody = await response.stream
+            .transform(utf8.decoder)
+            .take(maxErrorBodyBytes + 1)
+            .join()
+            .timeout(timeout);
+        truncated = errorBody.length > maxErrorBodyBytes
+            ? '${errorBody.substring(0, maxErrorBodyBytes)}\n…（响应体已截断）'
+            : errorBody;
+      } on TimeoutException catch (e) {
+        // 错误体读取超时：HTTP 状态码已是业务错误，重试不会成功，
+        // 以专用异常标记「不重试」（否则会被 generateStream 的重试循环
+        // 捕获并重发整个请求）。
+        throw LlmStreamTimeoutException(
+          '错误响应体读取超时（HTTP ${response.statusCode}）: $e',
+        );
+      }
       throw Exception('API 错误: ${response.statusCode}\n$truncated');
     }
 
@@ -220,40 +248,50 @@ class LlmClient {
     final nonStreamJson = StringBuffer();
 
     // 流式读取：每行数据也应用 [timeout]，防止服务端建立连接后长时间
-    // 不发数据（心跳间隔过长/挂起）导致 UI 永久卡在「生成中」
-    await for (final line in response.stream
-        .transform(utf8.decoder)
-        .transform(const LineSplitter())
-        .timeout(timeout)) {
-      if (isCancelled()) break;
+    // 不发数据（心跳间隔过长/挂起）导致 UI 永久卡在「生成中」。
+    //
+    // 注意：此阶段的超时与「响应头到达前」的连接超时不同——流式中途
+    // 超时意味着已消费部分响应体（部分 chunk 已送达 UI），整体重试会
+    // 导致回复内容重复，因此转为 [LlmStreamTimeoutException] 标记
+    // 「不重试」，由 generateStream 直接上抛、调用方回退本地回复。
+    try {
+      await for (final line
+          in response.stream
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())
+              .timeout(timeout)) {
+        if (isCancelled()) break;
 
-      // ---- SSE 格式：以 `data:` 前缀的一行 ----
-      if (line.startsWith('data:')) {
-        final data = line.substring(5).trim();
-        if (data == '[DONE]') break;
+        // ---- SSE 格式：以 `data:` 前缀的一行 ----
+        if (line.startsWith('data:')) {
+          final data = line.substring(5).trim();
+          if (data == '[DONE]') break;
 
-        try {
-          final delta = _extractNestedString(
-            jsonDecode(data) as Map<String, dynamic>,
-            'delta',
-            'content',
-          );
-          if (delta != null && delta.isNotEmpty) {
-            fullContent.write(delta);
-            onChunk(delta);
+          try {
+            final delta = _extractNestedString(
+              jsonDecode(data) as Map<String, dynamic>,
+              'delta',
+              'content',
+            );
+            if (delta != null && delta.isNotEmpty) {
+              fullContent.write(delta);
+              onChunk(delta);
+            }
+          } catch (e) {
+            debugPrint('SSE 解析失败: $data\n$e');
           }
-        } catch (e) {
-          debugPrint('SSE 解析失败: $data\n$e');
+          continue;
         }
-        continue;
-      }
 
-      // ---- 非 SSE 行：累积到 JSON 缓冲（可能是标准 JSON 响应被拆成多行）----
-      final stripped = line.trim();
-      if (stripped.isEmpty) continue;
-      // 忽略纯注释/心跳行（SSE 规范允许以 `:` 开头的事件）
-      if (stripped.startsWith(':')) continue;
-      nonStreamJson.write(stripped);
+        // ---- 非 SSE 行：累积到 JSON 缓冲（可能是标准 JSON 响应被拆成多行）----
+        final stripped = line.trim();
+        if (stripped.isEmpty) continue;
+        // 忽略纯注释/心跳行（SSE 规范允许以 `:` 开头的事件）
+        if (stripped.startsWith(':')) continue;
+        nonStreamJson.write(stripped);
+      }
+    } on TimeoutException catch (e) {
+      throw LlmStreamTimeoutException('流式读取超时（服务端长时间未发送数据）: $e');
     }
 
     // ---- 流式内容为空时，尝试从非流式 JSON 中提取完整内容 ----

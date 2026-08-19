@@ -26,10 +26,7 @@ import 'storage/contract_dir.dart';
 ///   - fileNames: 打包后的相对路径名（与 files 对齐）
 ///
 /// 仅打包仍存在的文件；缺失文件跳过不中断。
-Future<Uint8List> _buildZip(
-  List<String> files,
-  List<String> fileNames,
-) async {
+Future<Uint8List> _buildZip(List<String> files, List<String> fileNames) async {
   final archive = Archive();
 
   for (var i = 0; i < files.length; i++) {
@@ -73,10 +70,7 @@ Future<Uint8List> packContractTree(
 /// 打包整个舞台目录为 zip。
 ///
 /// 打包内容 = 舞台目录内全部 .meph（角色卡 + .child.meph 存档）。
-Future<Uint8List> packStage(
-  String stageDirPath, {
-  String? stageName,
-}) async {
+Future<Uint8List> packStage(String stageDirPath, {String? stageName}) async {
   final dir = Directory(stageDirPath);
   if (!await dir.exists()) throw Exception('舞台目录不存在: $stageDirPath');
 
@@ -100,6 +94,11 @@ Future<Uint8List> packStage(
 ///   - 舞台目录：`Kurukshetra/阿周那.meph` / `Kurukshetra/Arjuna.child.meph`
 ///     解压时保留一级目录（舞台目录自动还原）。
 ///
+/// **Zip Slip 防御**：恶意 zip 的条目名可含 `../`（或 Windows 反斜杠
+/// `..\`）试图把文件写到契约目录之外。逐段校验路径：任何一段为
+/// `..` / 空段 / 非法段都拒绝该条目——目标目录只允许由契约根
+/// 派生（一级舞台子目录），绝不拼接任意路径。
+///
 /// 返回值：成功导入的文件数。
 Future<int> unpackMeph(Uint8List bytes) async {
   final archive = ZipDecoder().decodeBytes(bytes);
@@ -111,13 +110,29 @@ Future<int> unpackMeph(Uint8List bytes) async {
     final name = entry.name;
     if (!name.endsWith('.meph')) continue;
 
-    // 目录结构：`舞台名/文件名.meph` → 创建目标子目录
-    final segments = name.replaceAll('\\', '/').split('/');
-    final fileName = segments.last;
-    final subDir = segments.length > 1 ? segments[segments.length - 2] : null;
+    // 目录结构：`舞台名/文件名.meph` → 创建目标子目录。
+    // 统一反斜杠为斜杠后按段拆分（覆盖 Windows 打包的 `..\` 写法）。
+    final segments = name
+        .replaceAll('\\', '/')
+        .split('/')
+        .where((s) => s.isNotEmpty)
+        .toList();
+    final fileName = segments.isEmpty ? null : segments.last;
+    if (fileName == null) continue;
+
+    // Zip Slip 校验：任一段为 `..`（路径穿越）或包含路径分隔符
+    // （如 `.meph/evil.meph`）都拒绝——目标路径必须完全落在契约
+    // 目录内（允许一级舞台子目录）。
+    final unsafe = segments.any((s) => s == '..');
+    if (unsafe) continue;
+
+    // 仅允许一级舞台子目录（`舞台名/文件.meph`）；更深层级拒绝
+    // （避免 `a/b/c.meph` 在契约目录内递归创建任意深层目录）。
+    if (segments.length > 2) continue;
 
     Directory targetDir = root;
-    if (subDir != null) {
+    if (segments.length == 2) {
+      final subDir = segments[0];
       targetDir = Directory('${root.path}/$subDir');
       await targetDir.create(recursive: true);
     }

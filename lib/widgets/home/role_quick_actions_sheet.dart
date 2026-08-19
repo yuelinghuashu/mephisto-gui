@@ -16,7 +16,10 @@ class RoleQuickActionsSheet {
   ///
   /// [roleName] 显示为弹层标题（不可操作，仅标识角色）。
   /// 返回用户选择的 action 字符串，关闭弹层返回 `null`。
-  static Future<String?> show(BuildContext context, {required String roleName}) {
+  static Future<String?> show(
+    BuildContext context, {
+    required String roleName,
+  }) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 

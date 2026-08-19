@@ -38,7 +38,8 @@ class NarrativeMemorySection extends ConsumerWidget {
                     // 书卷渐进：档位越高，书卷/魔力感越盛（契合浮士德契约风格）
                     NarrativeMemoryLimit.compact => Icons.bookmark_border,
                     NarrativeMemoryLimit.standard => Icons.menu_book_outlined,
-                    NarrativeMemoryLimit.extended => Icons.auto_stories_outlined,
+                    NarrativeMemoryLimit.extended =>
+                      Icons.auto_stories_outlined,
                     NarrativeMemoryLimit.full => Icons.auto_awesome,
                   },
                   // 档位文案走 ARB 国际化（10 条 / 20 条 / 30 条 / 全部注入）
@@ -52,8 +53,9 @@ class NarrativeMemorySection extends ConsumerWidget {
                     NarrativeMemoryLimit.full => l10n.settingsMemoryLimitFull,
                   },
                   selected: currentLimit == limit,
-                  onTap: () =>
-                      ref.read(narrativeMemoryLimitProvider.notifier).setLimit(limit),
+                  onTap: () => ref
+                      .read(narrativeMemoryLimitProvider.notifier)
+                      .setLimit(limit),
                 ),
                 if (limit != NarrativeMemoryLimit.values.last)
                   const Divider(height: 1),

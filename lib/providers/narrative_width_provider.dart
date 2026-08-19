@@ -22,7 +22,6 @@ extension NarrativeWidthExtension on NarrativeWidth {
     NarrativeWidth.wide => 960,
     NarrativeWidth.full => null,
   };
-
 }
 
 /// 叙事宽度偏好控制器

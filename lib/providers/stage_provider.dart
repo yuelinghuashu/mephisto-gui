@@ -15,11 +15,10 @@ import '../services/storage/stage_repo.dart';
 /// 指定舞台目录的加载 Provider（autoDispose：无监听时释放，舞台切换不常驻）
 ///
 /// 使用 family 变体：以舞台目录绝对路径为参数，显式加载对应舞台。
-final stageProvider =
-    FutureProvider.autoDispose.family<StageLoaded?, String>((
-      ref,
-      dirPath,
-    ) async {
+final stageProvider = FutureProvider.autoDispose.family<StageLoaded?, String>((
+  ref,
+  dirPath,
+) async {
   return loadStage(dirPath);
 });
 
@@ -29,16 +28,14 @@ final stageProvider =
 /// `stageLastModified(dirPath)` 磁盘读取；改用 Riverpod 缓存后，
 /// 仅在 [invalidate]（如舞台列表刷新）时重新读取，避免 UI 重建造成的
 /// 无效 IO。舞台目录不存在/无 .meph 时返回 null。
-final stageLastModifiedProvider =
-    FutureProvider.autoDispose.family<DateTime?, String>((
-      ref,
-      dirPath,
-    ) async {
-  return stageLastModified(dirPath);
-});
+final stageLastModifiedProvider = FutureProvider.autoDispose
+    .family<DateTime?, String>((ref, dirPath) async {
+      return stageLastModified(dirPath);
+    });
 
 /// 契约根目录下所有舞台的列表 Provider（用于首页聚合卡）
-final stageListProvider =
-    FutureProvider.autoDispose<List<StageInfo>>((ref) async {
+final stageListProvider = FutureProvider.autoDispose<List<StageInfo>>((
+  ref,
+) async {
   return listStages();
 });

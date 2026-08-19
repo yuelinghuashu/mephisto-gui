@@ -41,8 +41,9 @@ class ParagraphText extends StatelessWidget {
   static final RegExp _headingPattern = RegExp(r'^(#{1,6})\s+(.+)$');
 
   /// 行内 Markdown 标记检测正则（粗斜体/粗体/代码/斜体）
-  static final RegExp _inlineMarkupPattern =
-      RegExp(r'\*\*\*.+?\*\*\*|\*\*.+?\*\*|`[^`]+`|(?<!\*)\*[^*\n]+\*(?!\*)');
+  static final RegExp _inlineMarkupPattern = RegExp(
+    r'\*\*\*.+?\*\*\*|\*\*.+?\*\*|`[^`]+`|(?<!\*)\*[^*\n]+\*(?!\*)',
+  );
 
   /// 粗斜体标记正则（`***xxx***`）
   static final RegExp _boldItalicPattern = RegExp(r'\*\*\*(.+?)\*\*\*');
@@ -54,8 +55,7 @@ class ParagraphText extends StatelessWidget {
   static final RegExp _codePattern = RegExp(r'`([^`]+)`');
 
   /// 斜体标记正则（`*xxx*`，单星号需前后都有文本避免误匹配）
-  static final RegExp _italicPattern =
-      RegExp(r'(?<!\*)\*([^*\n]+)\*(?!\*)');
+  static final RegExp _italicPattern = RegExp(r'(?<!\*)\*([^*\n]+)\*(?!\*)');
 
   @override
   Widget build(BuildContext context) {
@@ -112,11 +112,7 @@ class ParagraphText extends StatelessWidget {
       );
       return Padding(
         padding: const EdgeInsets.only(top: 8, bottom: 4),
-        child: Text(
-          titleText,
-          style: titleStyle,
-          textAlign: textAlign,
-        ),
+        child: Text(titleText, style: titleStyle, textAlign: textAlign),
       );
     }
 
@@ -142,9 +138,7 @@ class ParagraphText extends StatelessWidget {
             quoteLines.join('\n'),
             baseStyle?.copyWith(
               fontStyle: FontStyle.italic,
-              color: AppTheme.textSecondary(
-                Theme.of(context).brightness,
-              ),
+              color: AppTheme.textSecondary(Theme.of(context).brightness),
             ),
           ),
           textAlign: textAlign,
@@ -172,8 +166,7 @@ class ParagraphText extends StatelessWidget {
       } else if (inList) {
         // 列表中的续行（换行文本）追加到前一项
         if (listItems.isNotEmpty) {
-          listItems[listItems.length - 1] =
-              '${listItems.last}\n$trimmed';
+          listItems[listItems.length - 1] = '${listItems.last}\n$trimmed';
         }
         consumedLines++;
       }
@@ -217,11 +210,7 @@ class ParagraphText extends StatelessWidget {
     // 无 Markdown 标记时直接渲染纯文本（保持原有 Text widget 行为，
     // 兼容 `find.text()` 测试断言与无障碍文本选择）
     if (!_hasInlineMarkup(text)) {
-      return Text(
-        text,
-        style: baseStyle,
-        textAlign: textAlign,
-      );
+      return Text(text, style: baseStyle, textAlign: textAlign);
     }
     return RichText(
       text: _buildInlineRichText(text, baseStyle),
@@ -266,13 +255,29 @@ class ParagraphText extends StatelessWidget {
       // 找到最早出现的匹配
       final matches = <(int, Match, TextSpan Function(Match, TextStyle))>[
         if (boldItalicMatch != null)
-          (boldItalicMatch.start, boldItalicMatch, (m, s) => _parseInlineWithStyle(m, s, bold: true, italic: true)),
+          (
+            boldItalicMatch.start,
+            boldItalicMatch,
+            (m, s) => _parseInlineWithStyle(m, s, bold: true, italic: true),
+          ),
         if (boldMatch != null)
-          (boldMatch.start, boldMatch, (m, s) => _parseInlineWithStyle(m, s, bold: true)),
+          (
+            boldMatch.start,
+            boldMatch,
+            (m, s) => _parseInlineWithStyle(m, s, bold: true),
+          ),
         if (codeMatch != null)
-          (codeMatch.start, codeMatch, (m, s) => _parseInlineCode(m, s, baseStyle: style)),
+          (
+            codeMatch.start,
+            codeMatch,
+            (m, s) => _parseInlineCode(m, s, baseStyle: style),
+          ),
         if (italicMatch != null)
-          (italicMatch.start, italicMatch, (m, s) => _parseInlineWithStyle(m, s, italic: true)),
+          (
+            italicMatch.start,
+            italicMatch,
+            (m, s) => _parseInlineWithStyle(m, s, italic: true),
+          ),
       ];
 
       if (matches.isEmpty) {

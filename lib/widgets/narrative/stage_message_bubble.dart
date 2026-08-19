@@ -91,9 +91,7 @@ class StageMessageBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: theme.cardColor.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(assistantBubbleRadius),
-                  border: Border(
-                    left: BorderSide(color: roleColor, width: 3),
-                  ),
+                  border: Border(left: BorderSide(color: roleColor, width: 3)),
                 ),
                 child: ParagraphText(
                   // 剥离 content 开头的 `【角色名】` 前缀：

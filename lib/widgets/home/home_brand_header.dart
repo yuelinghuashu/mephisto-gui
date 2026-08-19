@@ -39,10 +39,7 @@ class HomeBrandHeader extends StatelessWidget {
   /// 最近编辑入口（契约或舞台）；null 时不显示快捷入口。
   final RecentEditEntry? recentEntry;
 
-  const HomeBrandHeader({
-    super.key,
-    this.recentEntry,
-  });
+  const HomeBrandHeader({super.key, this.recentEntry});
 
   @override
   Widget build(BuildContext context) {
@@ -87,10 +84,7 @@ class HomeBrandHeader extends StatelessWidget {
       children: [
         header,
         const SizedBox(height: 2),
-        Text(
-          l10n.homeBrandSubtitle,
-          style: theme.textTheme.labelMedium,
-        ),
+        Text(l10n.homeBrandSubtitle, style: theme.textTheme.labelMedium),
         const SizedBox(height: 16),
       ],
     );
@@ -112,9 +106,7 @@ class HomeBrandHeader extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppTheme.gold.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: AppTheme.gold.withValues(alpha: 0.4),
-          ),
+          border: Border.all(color: AppTheme.gold.withValues(alpha: 0.4)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

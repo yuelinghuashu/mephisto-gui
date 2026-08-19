@@ -1,9 +1,7 @@
 {
   "@@locale": "zh",
 
-  "appTitle": "Mephisto",
 
-  "homeTitle": "📜 Mephisto",
   "homeNewContract": "新建契约",
   "homeImportContract": "导入契约",
   "homeSettings": "设置",
@@ -41,13 +39,8 @@
   "homeContractSectionTitle": "单角色契约",
   "homeSectionExpand": "展开",
   "homeSectionCollapse": "收起",
-  "stageCardCharacterCount": "{count} 位角色",
   "stageCardLastModified": "最近活动：{time}",
-  "stageCardHasSave": "有存档",
   "stageCardRestart": "重新开始（回母版）",
-  "stageCardRoleMaster": "母版",
-  "stageCardRoleChild": "{role} · 子版",
-  "stageCardRoleChildSubtitle": "续玩存档",
   "stageCardExport": "导出（舞台 ZIP）",
   "stageCardDeleteRole": "删除母版角色卡",
   "stageCardDeleteChild": "删除存档",
@@ -70,8 +63,6 @@
   "contractCardRename": "重命名",
   "contractCardDelete": "删除",
   "contractCardOperations": "操作",
-  "contractCardExpandChildren": "展开子版",
-  "contractCardCollapseChildren": "收起子版",
   "contractBranchCount": "分支 · {count}",
 
   "narrativeSaveMenu": "存档",
@@ -94,6 +85,7 @@
   "narrativeBranchDialogTitle": "✏️ 另存为分支",
   "narrativeBranchLabel": "分支名",
   "narrativeBranchHint": "如 dark、light、审判线",
+  "narrativeBranchChild": "存档",
   "narrativeBranchTitleLabel": "命运说明",
   "narrativeBranchTitleHint": "描述这条支流将走向何方（可留空），首页将以此命名枝桠",
   "narrativeStopGenerating": "停止生成",
@@ -126,8 +118,8 @@
   "diceVerdictTitle": "命运结算 · {count} 回判定",
   "diceVerdictThreshold": "阈值 ≥ {threshold}",
   "diceVerdictTriggered": "触发: {action}",
+  "diceVerdictFooter": "≋ 诸神的注视落于棋盘之上 ≋",
 
-  "dashboardTitle": "仪表盘",
 
   "previewSheetClose": "关闭",
 
@@ -282,7 +274,26 @@
   "relativeTimeHoursAgo": "{hours} 小时前",
   "relativeTimeDaysAgo": "{days} 天前",
 
-  "languageLabel": "语言",
   "languageChinese": "简体中文",
-  "languageEnglish": "English"
+  "languageEnglish": "English",
+
+  "contractPanelRoleName": "【角色名】",
+  "contractPanelState": "【状态】",
+  "contractPanelAnchor": "【锚点】",
+  "contractPanelWorldview": "【世界观】",
+  "contractPanelBackground": "【角色背景】",
+  "contractPanelOpening": "【开局场景】",
+  "contractPanelRules": "【规则】共 {count} 条",
+  "contractPanelNoRules": "（无规则）",
+  "contractPanelNoState": "（无特殊状态）",
+  "contractPanelMemories": "【记忆】共 {count} 条",
+  "contractPanelNoMemories": "（暂无记忆）",
+  "contractPanelHistory": "【历史】共 {count} 条",
+  "contractPanelNoHistory": "（暂无历史）",
+  "contractPanelRoleFate": "命运",
+  "contractPanelRoleAssistant": "角色",
+
+  "emptyStateTitle": "📜 契约已立",
+  "emptyStateOpening": "【开局场景】",
+  "emptyStateOpeningWithRole": "【{role} · 开局场景】"
 }

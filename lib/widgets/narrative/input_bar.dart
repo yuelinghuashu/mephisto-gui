@@ -128,7 +128,12 @@ class _InputBarState extends ConsumerState<InputBar> {
   }
 
   /// 当前全局持久化输入历史（跨会话保留，最多 5 条）。
-  List<String> get _history => ref.watch(inputHistoryProvider);
+  ///
+  /// 注意：本 getter 只在键盘事件回调（↑/↓）中读取，**不在 build 阶段**。
+  /// 因此必须用 [WidgetRef.read] 而非 [WidgetRef.watch]——watch 在事件
+  /// 路径上注册订阅违反 Riverpod 契约（只允许在 build 中使用），
+  /// 且 widget 卸载后调用会触发 StateError。
+  List<String> get _history => ref.read(inputHistoryProvider);
 
   /// ↑ 回溯上一条历史输入。
   void _historyBack() {
@@ -218,9 +223,7 @@ class _InputBarState extends ConsumerState<InputBar> {
       } catch (e) {
         // 单个文件非文本则跳过，不影响其他
         messenger.showSnackBar(
-          SnackBar(
-            content: Text(l10n.inputBarInvalidAttachment(file.name)),
-          ),
+          SnackBar(content: Text(l10n.inputBarInvalidAttachment(file.name))),
         );
       }
     }
@@ -254,8 +257,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                   if (i > 0) const SizedBox(height: 2),
                   _AttachmentChip(
                     name: widget.attachedFileNames[i],
-                    onRemove: () =>
-                        widget.onRemoveAttach?.call(i),
+                    onRemove: () => widget.onRemoveAttach?.call(i),
                   ),
                 ],
               ],
@@ -315,8 +317,7 @@ class _InputBarState extends ConsumerState<InputBar> {
                           : AppTheme.textSecondary(theme.brightness),
                     ),
                     border: InputBorder.none,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
                   onSubmitted: _isDesktop ? null : (_) => _sendMessage(),
                 ),
@@ -327,7 +328,10 @@ class _InputBarState extends ConsumerState<InputBar> {
               // 空闲时：仅「发送」。
               if (isGenerating && widget.onReveal != null) ...[
                 IconButton(
-                  icon: const Icon(Icons.fast_forward_outlined, color: AppTheme.gold),
+                  icon: const Icon(
+                    Icons.fast_forward_outlined,
+                    color: AppTheme.gold,
+                  ),
                   onPressed: widget.onReveal,
                   tooltip: l10n.inputBarRevealFull,
                 ),
@@ -335,7 +339,10 @@ class _InputBarState extends ConsumerState<InputBar> {
               ],
               IconButton(
                 icon: isGenerating
-                    ? const Icon(Icons.stop_circle_outlined, color: AppTheme.crimson)
+                    ? const Icon(
+                        Icons.stop_circle_outlined,
+                        color: AppTheme.crimson,
+                      )
                     : const Icon(Icons.send, color: AppTheme.gold),
                 onPressed: isGenerating ? widget.onStop : _sendMessage,
                 tooltip: isGenerating
@@ -376,10 +383,7 @@ class _AttachmentChip extends StatelessWidget {
         // 移除按钮：外层 ConstrainedBox 保证 ≥32px 热区（满足触屏最小
         // 点击目标）；视觉仅 14px 图标 + 4px padding，热区扩大不改变外观
         ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: 32,
-            minHeight: 32,
-          ),
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           child: InkWell(
             onTap: onRemove,
             child: const Padding(

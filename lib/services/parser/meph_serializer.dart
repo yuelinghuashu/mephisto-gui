@@ -81,7 +81,9 @@ String serializeMeph(
     buffer.writeln('【规则】');
     for (final rule in contract.rules) {
       final groupPart = rule.group.isNotEmpty ? '[group:${rule.group}] ' : '';
-      buffer.writeln('[${rule.name}] if ${rule.condition} -> $groupPart${rule.action}');
+      buffer.writeln(
+        '[${rule.name}] if ${rule.condition} -> $groupPart${rule.action}',
+      );
     }
     buffer.writeln();
   }
@@ -105,7 +107,14 @@ String serializeMeph(
   if (effectiveHistory.isNotEmpty) {
     buffer.writeln('【历史】');
     for (final entry in effectiveHistory) {
-      final role = entry.role == MessageRole.fate ? 'fate' : 'assistant';
+      // 三态角色前缀：fate / assistant / system。
+      // system 条目（舞台「额外叙事」等）此前被错误写成 assistant:，
+      // 读档后会被解析成伪造的角色对白——必须独立前缀才能完整还原。
+      final role = switch (entry.role) {
+        MessageRole.fate => 'fate',
+        MessageRole.system => 'system',
+        MessageRole.assistant => 'assistant',
+      };
       buffer.writeln('- $role: ${entry.content.replaceAll('\n', r'\n')}');
     }
     buffer.writeln();

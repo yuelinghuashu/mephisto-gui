@@ -7,9 +7,12 @@ import '../../providers/contract_provider.dart';
 import '../../providers/home_section_visibility_provider.dart';
 import '../../providers/home_selection_controller.dart';
 import '../../providers/recent_edit_provider.dart';
+import '../../providers/stage_provider.dart';
+import '../../services/storage/stage_repo.dart';
 import 'contract_card.dart';
 import 'home_brand_header.dart';
 import 'section_header.dart';
+import 'stage_card_with_meta.dart';
 import 'stage_section.dart';
 
 /// 首页契约树 + 舞台聚合 + 最近编辑（只读渲染区）
@@ -124,6 +127,7 @@ class ContractTreeSection extends ConsumerWidget {
     final visibility = ref.watch(homeSectionVisibilityProvider);
     // 多选模式下强制展开（折叠状态下看不到卡片就无法勾选）
     final contractCollapsed = !isSelectMode && visibility.contractCollapsed;
+    final stageCollapsed = !isSelectMode && visibility.stageCollapsed;
     // 预先计算每棵契约树的全部节点信息（一次性递归收集），
     // 避免在 childSelection 构建与 onLongPress 回调中对同一棵树反复递归遍历。
     final groupInfosCache = <String, List<ContractInfo>>{
@@ -135,19 +139,30 @@ class ContractTreeSection extends ConsumerWidget {
       for (final infos in groupInfosCache.values) ...infos,
     ]);
 
-    // ---- 惰性列表：固定头部（品牌/舞台/契约标题）按索引映射，契约卡片懒构建 ----
+    // ---- 惰性列表：固定头部 + 契约卡按索引懒构建 ----
     // 旧实现用 `ListView(children: [...])` 一次性构建全部契约卡；契约库上百时
     // 首帧 build 与内存 O(N)、滚动无懒加载。改用 `ListView.builder`：
-    //   - 头部固定项（品牌/舞台/标题）少而稳定，作为前 N 个索引
-    //   - 契约卡按 `groups[index - headerCount]` 懒构建，视口外不实例化
-    // StageSection 内部舞台数通常个位数，保持整块构建（不拆散其独立滚动语义）。
+    //   - 头部固定项（品牌/舞台标题/契约标题）按索引映射
+    //   - 舞台卡与契约卡都按索引懒构建，视口外不实例化
+    //     （此前舞台卡在单个 header item 内用 Column 一次性构建全部，
+    //     每张卡还各自 watch 两个 family provider，舞台多时首帧 O(N)）
+    // 索引布局：
+    //   [0..headerCount)  头部固定项（品牌/舞台标题/契约标题/间距）
+    //   [headerCount..headerCount+stageCount)  舞台卡（折叠时 0 张）
+    //   之后                             契约卡（折叠时 0 张）
+    final stageList = ref.watch(stageListProvider).value ?? const <StageInfo>[];
     final headerCount = isSelectMode ? 1 : 4; // 多选时隐藏品牌/标题区
+    final visibleStages = stageCollapsed ? 0 : stageList.length;
+    final stageCardStart = headerCount;
+    final cardStart = stageCardStart + visibleStages;
     final cardCount = contractCollapsed ? 0 : groups.length;
+    final itemCount = cardStart + cardCount;
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-      itemCount: headerCount + cardCount,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
+        // ---- 头部固定项 ----
         if (index < headerCount) {
           return _buildHeaderItem(
             context,
@@ -157,10 +172,45 @@ class ContractTreeSection extends ConsumerWidget {
             recentEntry,
             isSelectMode,
             contractCollapsed,
+            stageCollapsed,
+            stageList,
+            visibleStages,
+          );
+        }
+        // ---- 舞台卡片（懒构建：仅视口内实例化） ----
+        if (index < cardStart) {
+          final stage = stageList[index - stageCardStart];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: StageCardWithMeta(
+              stage: stage,
+              onTap: () => onStageTap(stage.path),
+              onLongPress: isSelectMode
+                  ? null
+                  : () => onStageLongPress!(stage.path),
+              isSelectMode: isSelectMode,
+              isSelected: selection.isStageSelected(stage.path),
+              onToggleSelect: isSelectMode
+                  ? () => onStageToggleSelect!(stage.path)
+                  : null,
+              onMenu: isSelectMode
+                  ? null
+                  : (action) => onStageMenu!(stage.path, action),
+              onRoleTap: isSelectMode || onRoleTap == null
+                  ? null
+                  : (roleName, {restoreSave = false}) => onRoleTap!(
+                      stage.path,
+                      roleName,
+                      restoreSave: restoreSave,
+                    ),
+              onRoleLongPress: isSelectMode || onRoleLongPress == null
+                  ? null
+                  : (roleName) => onRoleLongPress!(stage.path, roleName),
+            ),
           );
         }
         // ---- 契约卡片（懒构建：仅视口内实例化） ----
-        final group = groups[index - headerCount];
+        final group = groups[index - cardStart];
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: ContractCard(
@@ -204,8 +254,11 @@ class ContractTreeSection extends ConsumerWidget {
   /// 构建列表头部的固定项（按索引映射）。
   ///
   /// [index] 为列表索引；头部项数由 [headerCount] 决定：
-  ///   - 普通模式（headerCount=4）：0=品牌区，1=舞台区，2=契约标题，3=间距
-  ///   - 多选模式（headerCount=1）：0=舞台区（品牌/标题隐藏，聚焦操作）
+  ///   - 普通模式（headerCount=4）：0=品牌区，1=舞台标题，2=契约标题，3=间距
+  ///   - 多选模式（headerCount=1）：0=舞台标题（品牌/标题隐藏，聚焦操作）
+  ///
+  /// [stageList] / [visibleStages] 仅用于多选模式判定舞台区是否需渲染
+  /// 标题（舞台为空时隐藏整区）。
   Widget _buildHeaderItem(
     BuildContext context,
     WidgetRef ref,
@@ -214,17 +267,21 @@ class ContractTreeSection extends ConsumerWidget {
     RecentEditEntry? recentEntry,
     bool isSelectMode,
     bool contractCollapsed,
+    bool stageCollapsed,
+    List<StageInfo> stageList,
+    int visibleStages,
   ) {
     if (isSelectMode) {
-      // 多选模式：仅舞台区（强制展开）
-      return _buildStageSection(ref, isSelectMode, contractCollapsed);
+      // 多选模式：仅舞台标题（强制展开，舞台卡由外层按索引渲染）
+      return const StageSection(isSelectMode: true);
     }
     switch (index) {
       case 0:
         // ---- 品牌展示区（多选模式下隐藏，聚焦操作） ----
         return HomeBrandHeader(recentEntry: recentEntry);
       case 1:
-        return _buildStageSection(ref, isSelectMode, contractCollapsed);
+        // ---- 舞台标题（舞台卡由外层按索引懒构建） ----
+        return const StageSection();
       case 2:
         // ---- 单角色契约分区标题（仅普通模式显示，多选时聚焦操作） ----
         return SectionHeader(
@@ -248,26 +305,5 @@ class ContractTreeSection extends ConsumerWidget {
       default:
         return const SizedBox(height: 4);
     }
-  }
-
-  /// 构建舞台聚合入口（普通/多选模式共用；舞台数通常个位数，整块构建）。
-  Widget _buildStageSection(
-    WidgetRef ref,
-    bool isSelectMode,
-    bool contractCollapsed,
-  ) {
-    return StageSection(
-      onStageTap: onStageTap,
-      onStageLongPress: isSelectMode ? null : onStageLongPress,
-      onStageToggleSelect: isSelectMode ? onStageToggleSelect : null,
-      onStageMenu: isSelectMode ? null : onStageMenu,
-      isSelectMode: isSelectMode,
-      isStageSelected: selection.isStageSelected,
-      onRoleTap: isSelectMode
-          ? null
-          : (stagePath, roleName, {restoreSave = false}) =>
-                onRoleTap!(stagePath, roleName, restoreSave: restoreSave),
-      onRoleLongPress: isSelectMode ? null : onRoleLongPress,
-    );
   }
 }

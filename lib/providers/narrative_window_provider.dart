@@ -8,12 +8,7 @@ import 'prefs_notifier.dart';
 /// 对话无限增长时，保留最近 N 条可以：
 ///   - 控制 token 消耗（API 成本）
 ///   - 防止超长上下文稀释模型注意力、降低响应质量
-enum NarrativeWindow {
-  narrow,
-  medium,
-  wide,
-  full,
-}
+enum NarrativeWindow { narrow, medium, wide, full }
 
 /// 历史窗口档位扩展
 extension NarrativeWindowExtension on NarrativeWindow {

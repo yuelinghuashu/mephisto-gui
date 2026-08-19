@@ -20,9 +20,7 @@ class SelectCheckbox extends StatelessWidget {
   Widget build(BuildContext context) {
     return Icon(
       isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-      color: isSelected
-          ? AppTheme.gold
-          : AppTheme.textSecondary(brightness),
+      color: isSelected ? AppTheme.gold : AppTheme.textSecondary(brightness),
     );
   }
 }
@@ -219,4 +217,3 @@ class HomeCardShell extends StatelessWidget {
     );
   }
 }
-

@@ -98,10 +98,14 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final isNarrow = MediaQuery.sizeOf(context).width < AppTheme.mobileBreakpoint;
+    final isNarrow =
+        MediaQuery.sizeOf(context).width < AppTheme.mobileBreakpoint;
 
     return Scaffold(
-      appBar: AppBar(title: Text('📜 ${l10n.homeSettings}'), centerTitle: false),
+      appBar: AppBar(
+        title: Text('📜 ${l10n.homeSettings}'),
+        centerTitle: false,
+      ),
       body: isNarrow
           ? _buildNarrowList(context, l10n)
           : _buildWideList(context, l10n),
@@ -156,14 +160,14 @@ class SettingsScreen extends ConsumerWidget {
             leading: Text(
               section.icon,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
             title: Text(
               section.title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             subtitle: Text(
               section.subtitle,

@@ -39,15 +39,28 @@ import 'streaming_coordinator.dart';
 ///   - 流式输出状态机由 [StreamingCoordinator] mixin 管理。
 class NarrativeNotifier extends Notifier<NarrativeState>
     with GenerationCoordinator<NarrativeState>, StreamingCoordinator {
+  /// 会话变更版本号（任何状态迁移 / 新消息发送时递增）。
+  ///
+  /// 用于 [regenerateMessage] 的「删除 → 存档 → 重新发送」三步间的
+  /// 并发守卫：删除消息后若用户又发送了新消息（或发生其他状态迁移），
+  /// 版本号变化 → 放弃重新发送，避免重生成叠在用户新对话之上造成
+  /// 状态错乱（此前三步无守卫，`await _autoSaveChild()` 期间用户
+  /// 输入可插入，重生成基于错误状态继续）。
+  int _mutationCount = 0;
+
   /// 流式内容写回状态（StreamingCoordinator 钩子）。
   @override
   void applyStreamingContent(String fullContent) {
+    // 已 dispose（Notifier 重建/销毁）后不再写状态——在途生成可能
+    // 仍在 flush 流式缓冲，写已释放的 state 会触发断言/状态错乱
+    if (isGenerationDisposed) return;
     state = state.copyWith(streamingContent: fullContent);
   }
 
   /// 状态迁移统一走 [narrativeReducer]
   void _dispatch(NarrativeEvent event) {
     state = narrativeReducer(state, event);
+    _mutationCount++;
   }
 
   @override
@@ -344,15 +357,20 @@ class NarrativeNotifier extends Notifier<NarrativeState>
     final updated = await ref
         .read(memoryExtractionServiceProvider)
         .extractWithSafeMerge(
-      manager: manager,
-      input: MemoryExtractionInput(
-        history: state.history,
-        memories: state.memories,
-        historyLengthAtStart: historyLengthAtStart,
-      ),
-      config: config,
-      auxConfig: auxConfig,
-    );
+          manager: manager,
+          input: MemoryExtractionInput(
+            history: state.history,
+            memories: state.memories,
+            historyLengthAtStart: historyLengthAtStart,
+          ),
+          // 提取完成后用「当前最新」长度与记忆做合并判断：
+          // input 内是提取启动时的快照，若用它比较则长度恒等，
+          // 安全合并会退化为直接覆盖（提取期间新记忆丢失）。
+          currentHistoryLength: state.history.length,
+          currentMemories: state.memories,
+          config: config,
+          auxConfig: auxConfig,
+        );
     if (updated == null) return;
 
     state = state.copyWith(memories: updated);
@@ -375,6 +393,12 @@ class NarrativeNotifier extends Notifier<NarrativeState>
   ///
   /// 流程：删除该回复 + 其前一条命运指引（`cascadeFate: true`）
   /// → 再以同一条指引内容重新发送，触发新一轮生成。
+  ///
+  /// **并发守卫**：删除 → 存档 → 重新发送三步间存在 await 间隙，
+  /// 用户可能在此期间发送新消息（或发生其他状态迁移）。通过
+  /// [_mutationCount] 版本号检测：删除后版本号若已变化，说明会话
+  /// 已不在「刚删除该回复」的状态，放弃重新发送——避免重生成叠在
+  /// 用户新对话之上造成消息错位。
   Future<void> regenerateMessage(int index) async {
     if (state.isGenerating) return;
     if (index < 0 || index >= state.messages.length) return;
@@ -391,10 +415,17 @@ class NarrativeNotifier extends Notifier<NarrativeState>
     }
     if (fateContent == null) return;
 
-    // 删除回复 + 指引（级联）
+    // 删除回复 + 指引（级联）；_dispatch 会递增 _mutationCount
     _dispatch(MessageDeleted(index, cascadeFate: true));
+    // 记录删除后的版本号：await 存档后若已变化 → 有并发修改，放弃重发
+    final versionAfterDelete = _mutationCount;
+
     // 删除后更新当前状态引用（_dispatch 已更新 state）
     await _autoSaveChild();
+
+    // 并发守卫：存档期间用户发了新消息 / 状态被迁移 → 放弃重新发送
+    if (_mutationCount != versionAfterDelete) return;
+    if (!canSend(isGenerating: state.isGenerating)) return;
 
     // 重新发送同一条命运指引
     sendMessage(fateContent);
@@ -480,7 +511,9 @@ final memoryManagerProvider = Provider<MemoryManager>((ref) {
 /// 记忆提取编排服务 Provider
 ///
 /// 轻量无状态单例，单角色与多角色 Notifier 共享「记忆提取 → 安全合并」管线。
-final memoryExtractionServiceProvider = Provider<MemoryExtractionService>((ref) {
+final memoryExtractionServiceProvider = Provider<MemoryExtractionService>((
+  ref,
+) {
   return const MemoryExtractionService();
 });
 

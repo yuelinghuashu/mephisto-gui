@@ -176,8 +176,7 @@ class LlmSettingsController extends AutoLoadNotifier<LlmConfig?> {
       model: model ?? '',
       baseUrl: baseUrl ?? '',
       maxTokens: maxTokens ?? 4096,
-      timeoutSeconds:
-          timeoutSeconds ?? LlmConfig.defaultTimeoutSeconds,
+      timeoutSeconds: timeoutSeconds ?? LlmConfig.defaultTimeoutSeconds,
     );
   }
 
