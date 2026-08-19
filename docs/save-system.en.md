@@ -2,7 +2,7 @@
 
 > Mephisto uses a "read-only master + child snapshot" save model: the master contract is a fixed "soul framework,"
 > and each session's dialogue, state changes, memories, and history are saved as **child version files**—independent snapshots.
-
+>
 > **中文版：[简体中文](save-system.md)**
 
 ## 1. Core Concepts
@@ -21,7 +21,7 @@ Three runtime data blocks are injected during serialization:
 
 1. **【状态】(State)**: state values after runtime changes (e.g., soul integrity dropping from 100 to 60)
 2. **【记忆】(Memory)**: long-term memories extracted by MemoryManager
-3. **【历史】(History)**: the complete dialogue history of this session (fate / assistant)
+3. **【历史】(History)**: the complete dialogue history of this session (fate / assistant / system; the `system:` prefix carries stage-mode "extra narration" system messages, restored as system messages on load)
 
 ## 2.1 Fate Description (One-Line Branch Title)
 

@@ -2,7 +2,7 @@
 
 > The memory system lets AI narratives stay consistent **across individual conversations**: it automatically extracts key events, deduplicates, compresses,
 > and injects them into the system prompt as "memories," shaping the character's long-term continuity.
-
+>
 > **中文版：[简体中文](memory-system.md)**
 
 ## 1. Memory Lifecycle

@@ -5,7 +5,67 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [1.4.1] - 浮士德帝国线 · 流式立即显示 · 输入历史 · 导出叙事 · 解析器健壮性 · 主题令牌收敛 · 无障碍增强
+## [1.4.2] - 三教论道 · 模板数值审计 · 文档沉淀 · 工程化
+
+### ✨ 新特性
+
+- **新舞台「三教论道」（Lundao/）**：孔子、老子、释迦牟尼三位宗师于梦中嵩山论道，辩题「智慧」——三位主演各持独立状态机（辩势/仁德/道心/觉悟），引经据典成句触发、点名交锋、骰子点睛；一方胜出的三选一终局。梦境框架由一位通晓三教的大宗师所起，使三圣同台自洽
+- **一键格式化**：`make format` 一键格式化全部 Dart 代码（`make format-check` 检查）；CI 新增格式一致性检查，未格式化提交会失败
+
+### 🐛 修复
+
+- **序列化 system 历史条目**：`system:` 前缀（舞台「额外叙事」）此前被序列化为 `assistant:`，存档→读档后变成伪造角色对白——parser/serializer 现支持三态前缀（fate/assistant/system）且往返可逆
+- **记忆「安全合并」死代码**：`MemoryExtractionService` 用启动时快照做长度比较恒真，安全合并分支永不执行（提取期间新记忆有覆盖风险）——改为调用方在 `await` 后用最新状态判断（对齐多角色版）
+- **LLM 流式超时误重试**：流式读取中途超时被误判为连接失败→整体重发请求→回复内容重复——新增 `LlmStreamTimeoutException` 标记「不重试」（流式阶段/错误体读取阶段的超时均不参与重试）
+- **`stopGenerating` 二次点击 StateError**：取消信号 `Completer.complete()` 无幂等守卫（快速双击停止按钮即抛错）——加 `isCompleted` 检查
+- **空舞台越界**：`StageTurnService.generate` 降级兜底路径访问 `stage.characters.first` 在空舞台下抛 RangeError——入口显式守卫（对齐上游 `loadStage` 防御）
+- **Zip Slip 路径穿越**：`unpackMeph` 未校验 zip 条目名 `../` 可写穿契约目录——逐段校验（任一段 `..` 拒绝、仅允许一级舞台子目录）
+- **TextTheme 整体替换**：只定义 7 个角色使 `titleLarge/titleMedium` 为 null，10 处组件 `?.copyWith` 静默失效——改为 `base.textTheme.copyWith` 增量覆盖并补全缺失角色
+- **InputBar 事件回调 `ref.watch`**：`_history` getter 被键盘回调调用违反 Riverpod 契约——改为 `ref.read`
+- **HomeScreen 陈旧计数**：`ref.read(stageListProvider)` 不响应舞台列表变化，全选计数靠删除流程「碰巧」刷新——提升为 build 顶层 `ref.watch`
+- **regenerateMessage 非原子**：删除→存档→发送三步间无守卫，`await` 期间用户新消息可插入——新增 `_mutationCount` 版本号守卫，删除后版本号变化则放弃重发
+- **Notifier dispose 后在途生成写已释放状态**：`disposeGeneration` 只丢引用，在途 `runGeneration` 收尾仍 `_dispatch`——新增 `_disposed` 标志短路（不 complete 取消信号，避免「已释放 Notifier 执行收尾」的连锁问题）
+- **aux/LLM 配置懒加载竞态**：`onChanged` 未 await 懒加载，异步完成覆盖用户刚拨动的开关；且不点输入框直接保存会静默写默认值——懒加载移到 `initState` + 用户已操作守卫
+- **模板终局注入无限重复**：faust/dantes 终局规则无一次性锁，条件持续满足时每轮重复注入同一句结局文本——加状态锁（`情绪 != "终局"` / `归途 == "未决"` / `归乡 == "未归"`），终局只触发一次且双终局互斥
+- **模板数值无上限暴涨**：dantes 仇恨 80→250、joan 士气 85→325、arthur 信心 60→210、gilgamesh 求索 80→155——增长规则加软上限守卫、衰减规则加下限守卫（生命/哀恸不为负）
+- **gilgamesh 终局卡死**：`[归来]` 触发词只认「回归/回家/归来」，玩家不提就永远卡在世界尽头——放宽为求索完成语境（仙草/永生/明白/解脱）
+
+### 🧹 重构
+
+- 舞台 `StageReplySucceeded` reducer 三次链式 `copyWith` 收敛为单次（对齐单角色 v1.4.1 收敛，无行为变化）
+- 舞台区惰性化：舞台卡并入外层 `ListView.builder` 索引区间按需懒构建（此前在单个 header item 内整块 Column 构建全部舞台卡）
+- `branchName` 的「存档」映射从 domain 层移除（domain 返回原始名 `child`），UI 层经 l10n 键映射
+
+### 🌐 本地化
+
+- `dice_verdict_card` / `contract_panel` / `empty_state` / `stage_empty_state` 硬编码中文迁入 ARB（新增 19 键）
+- 清理 11 个死键（UI 重构后遗留，zh/en 同步移除）
+
+### 🔧 工程化
+
+- `validate_build_config.py` 接入 CI（此前 docstring 自称「在 CI 中执行」但未被任何 workflow 引用）；新增「内置舞台已登记 _builtinStages」断言——实盘舞台目录 ↔ 恢复内置清单自动校验，杜绝「恢复内置角色缺舞台」类遗漏
+- CI 双 job 合并：`analyze-and-test` 与 `coverage`（各跑一遍全量测试）合并为单 job `analyze-test-coverage`，`flutter test --coverage` 一次完成测试 + 覆盖率
+- 条件编译缓存测试隔离：`rule_engine_test` 每用例前 `clearConditionCache`（不做注入式改造——`condition.dart` 保持纯引擎层模块级缓存）
+- 文件监听测试：缩短「非监听目标写入」路径的等待（该路径不进入防抖）
+- 测试套件补齐（+25 用例）：`StageSessionRestored` 读档 reducer、`extractForRoles` 跨角色记忆提取、`clipMemories` 灌窗裁剪、`contract_repo` CRUD（importContract / deleteContractCascade / updateContractBranchTitle / extractRoleName）
+- 5 个单角色模板数值节奏审计（引擎模拟 30 轮）：发现并修复「终局注入无限重复」「数值无上限暴涨」「终局卡死/双终局互斥破坏」三类跨模板问题，新增 3 个回归测试
+
+### 📝 决策记录（明确不做）
+
+- **文件监听测试 FakeAsync 提速**：`ContractFileWatcher` 依赖真实 `FileSystemEntity.watch` 平台事件流，FakeAsync 只能虚拟化 Timer/异步、无法虚拟化真实文件系统事件；加速需把事件源抽象为注入式接口并重写全部测试——与「轻量简洁、无副作用」冲突，收益（约 7s）不成比例。核实后多数 700ms 等待为串行必要（第二次写入依赖第一次处理完成），仅可缩短非防抖路径一段（约 0.6s）
+- **dispose 时 complete 取消信号**：会让在途 LLM 请求提前结束并立即进入收尾（同样触碰已释放状态且更不可控），让请求自然结束 + `_disposed` 短路即可
+- **条件缓存注入化**：`condition.dart` 是纯引擎层（无 Riverpod 依赖），保持模块级缓存是「轻量、可独立单测」定位的一部分，仅做测试侧隔离
+
+### 📚 文档
+
+- **舞台规则设计要点（踩坑实录）**：`docs/stage-system.md` 新增「舞台角色规则设计要点」章节——沉淀三教论道舞台开发中实测复现的 4 条舞台专属约束（共享输入下「拆招」规则失效 / 泛词被所有角色同时匹配 / 终局必须一次性 / 数值需设软上限），并同步英文版
+- **规则书写指南第 5 节**：`docs/rule-writing-guide.md` 新增「舞台模式：共享输入下的额外约束」，与反模式 9 互补、交叉引用舞台文档
+- **README 补全**：功能列表补 3 项遗漏特性（输入历史 / 导出叙事 / 双语界面），中英同步
+
+---
+
+<details>
+<summary>## [1.4.1] - 浮士德帝国线 · 流式立即显示 · 输入历史 · 导出叙事 · 解析器健壮性 · 主题令牌收敛 · 无障碍增强</summary>
 
 ### ✨ 新特性
 
@@ -62,6 +122,10 @@
 - 规则书写指南新增**反模式 8：LLM 指令触发条件过宽 → 高频误触发**（含 `faust.imperial.meph` / Kurukshetra 真实修复案例）
 - README / README.en 内置契约列表补充示范子版说明；docs 内置模板与文档中心同步更新
 
+</details>
+
+---
+
 <details>
 <summary>## [1.4.0] - 多模型路由 · 首页信息密度优化 · 消息操作 · Markdown 渲染 · 流式性能提升</summary>
 
@@ -106,6 +170,8 @@
 - `home_screen_test.dart` 重写匹配新 UI（10 用例）；`rename_contract_dialog_test.dart` 适配真实异步 IO（8 用例）；`contract_provider_test.dart` 新增孤儿节点 + 深度守卫边界用例
 
 </details>
+
+---
 
 <details>
 <summary>## [1.3.0] - 新内置契约 · Android 正式签名 · 多角色舞台 · 界面与代码精简</summary>
@@ -152,6 +218,8 @@
 - docs/platform-storage 新增「卸载风险与备份指引」
 
 </details>
+
+---
 
 <details>
 <summary>## [1.2.0] - 上下文窗口 · 记忆权重体系 · 编辑器健壮性 · API Key加密</summary>
@@ -215,6 +283,8 @@
 
 </details>
 
+---
+
 <details>
 <summary>## [1.1.0] - 规则热重载 · 国际化 · 文档</summary>
 
@@ -264,6 +334,8 @@
 - README 补充中英文赞助区块，修复收款码路径
 
 </details>
+
+---
 
 <details>
 <summary>## [1.0.0] - 首个正式发布</summary>

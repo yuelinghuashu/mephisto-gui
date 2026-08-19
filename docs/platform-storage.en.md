@@ -2,7 +2,7 @@
 
 > Mephisto's contracts (`.meph`) are stored in a "contract directory." Storage schemes differ across platforms
 > due to system sandbox mechanisms and permission models; this documentation helps you understand where contract files actually reside.
-
+>
 > **中文版：[简体中文](platform-storage.md)**
 
 ## 1. Contract Directory by Platform

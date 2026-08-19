@@ -2,7 +2,7 @@
 
 > Mephisto's _Contract_ is a plain-text file with the `.meph` extension.
 > It defines the character's soul anchors, worldview, initial state, and behavioral rules—the "framework of fate" for the narrative engine.
-
+>
 > **中文版：[简体中文](contract-syntax.md)**
 
 ## 1. File Structure
@@ -29,17 +29,17 @@ A `.meph` file consists of several **sections** (`区块`). Each section starts 
 
 ## 2. Section Overview
 
-| Section                            | Required    | Description                                                    |
-| ---------------------------------- | ----------- | -------------------------------------------------------------- |
-| 【角色名】(Role Name)              | ✅          | Character name (affects the appellation in the system prompt)  |
-| 【锚点】(Anchors)                  | Recommended | Core personality settings (list items)                         |
-| 【状态】(State)                    | Optional    | Initial state variables (list items, type inference supported) |
-| 【世界观】(Worldview)              | Optional    | World background description (free text)                       |
-| 【角色背景】(Character Background) | Optional    | Character's past experience / backstory (free text)            |
-| 【开局场景】(Opening Scene)        | Optional    | Narrative starting scene (free text)                           |
-| 【历史】(History)                  | Optional    | Historical message snapshot (`fate` / `assistant` roles)       |
-| 【记忆】(Memory)                   | Optional    | Long-term memory entries (list items)                          |
-| 【规则】(Rules)                    | Optional    | Behavior rules: `[Rule Name] if Condition -> Action`           |
+| Section                            | Required    | Description                                                         |
+| ---------------------------------- | ----------- | ------------------------------------------------------------------- |
+| 【角色名】(Role Name)              | ✅          | Character name (affects the appellation in the system prompt)       |
+| 【锚点】(Anchors)                  | Recommended | Core personality settings (list items)                              |
+| 【状态】(State)                    | Optional    | Initial state variables (list items, type inference supported)      |
+| 【世界观】(Worldview)              | Optional    | World background description (free text)                            |
+| 【角色背景】(Character Background) | Optional    | Character's past experience / backstory (free text)                 |
+| 【开局场景】(Opening Scene)        | Optional    | Narrative starting scene (free text)                                |
+| 【历史】(History)                  | Optional    | Historical message snapshot (`fate` / `assistant` / `system` roles) |
+| 【记忆】(Memory)                   | Optional    | Long-term memory entries (list items)                               |
+| 【规则】(Rules)                    | Optional    | Behavior rules: `[Rule Name] if Condition -> Action`                |
 
 ### Constraints
 
@@ -126,9 +126,11 @@ The rule engine executes in **two phases** within a single round:
 【历史】
 - fate: 第一行\n第二行
 - assistant：回应
+- system: (extra narration: birds pass overhead)
 ```
 
 - `fate:` fate (player) messages, `assistant:` narrative responses
+- `system:` system messages (e.g. stage-mode "extra narration" overflow text); restored as system messages on load — never mistaken for character dialogue
 - The `\n` escape is converted to a real newline
 
 ### Memory (【记忆】section)
