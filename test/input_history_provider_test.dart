@@ -61,10 +61,13 @@ void main() {
     }
 
     // 上限 5 条，第 1 条被挤出
-    expect(
-      container.read(inputHistoryProvider),
-      ['第2条', '第3条', '第4条', '第5条', '第6条'],
-    );
+    expect(container.read(inputHistoryProvider), [
+      '第2条',
+      '第3条',
+      '第4条',
+      '第5条',
+      '第6条',
+    ]);
   });
 
   test('持久化 round-trip：重建容器后历史仍可恢复', () async {

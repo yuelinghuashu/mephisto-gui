@@ -68,9 +68,7 @@ void main() {
       stage: stage,
       stagePath: '/tmp/test_stage',
       roles: const {
-        '浮士德': RoleRunState(
-          currentState: {'灵魂完整度': IntValue(100)},
-        ),
+        '浮士德': RoleRunState(currentState: {'灵魂完整度': IntValue(100)}),
         '梅菲斯特': RoleRunState(),
       },
       messages: messages,
@@ -88,9 +86,7 @@ void main() {
         ),
       ],
       child: localizedAppWithRoutes(
-        routes: {
-          '/settings': (_) => const Scaffold(body: Text('设置页')),
-        },
+        routes: {'/settings': (_) => const Scaffold(body: Text('设置页'))},
         home: const StageNarrativeScreen(stagePath: '/tmp/test_stage'),
       ),
     );
@@ -157,14 +153,8 @@ void main() {
   testWidgets('消息流：命运消息 + 角色着色气泡渲染', (tester) async {
     final messages = [
       Message.fate('命运降临'),
-      Message.assistant(
-        '浮士德站在书斋窗前。',
-        roleTag: '浮士德',
-      ),
-      Message.assistant(
-        '梅菲斯特从阴影中走出。',
-        roleTag: '梅菲斯特',
-      ),
+      Message.assistant('浮士德站在书斋窗前。', roleTag: '浮士德'),
+      Message.assistant('梅菲斯特从阴影中走出。', roleTag: '梅菲斯特'),
     ];
     await tester.pumpWidget(
       buildScreen(initialState: loadedState(messages: messages)),
@@ -236,13 +226,9 @@ void main() {
     final notifier = _FakeStageNotifier(loadedState());
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          stageNarrativeProvider.overrideWith(() => notifier),
-        ],
+        overrides: [stageNarrativeProvider.overrideWith(() => notifier)],
         child: localizedAppWithRoutes(
-          routes: {
-            '/settings': (_) => const Scaffold(body: Text('设置页')),
-          },
+          routes: {'/settings': (_) => const Scaffold(body: Text('设置页'))},
           home: const StageNarrativeScreen(stagePath: '/tmp/test_stage'),
         ),
       ),
@@ -262,13 +248,9 @@ void main() {
     final notifier = _FakeStageNotifier(loadedState());
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          stageNarrativeProvider.overrideWith(() => notifier),
-        ],
+        overrides: [stageNarrativeProvider.overrideWith(() => notifier)],
         child: localizedAppWithRoutes(
-          routes: {
-            '/settings': (_) => const Scaffold(body: Text('设置页')),
-          },
+          routes: {'/settings': (_) => const Scaffold(body: Text('设置页'))},
           home: const StageNarrativeScreen(stagePath: '/tmp/test_stage'),
         ),
       ),
@@ -290,13 +272,9 @@ void main() {
     final notifier = _FakeStageNotifier(loadedState());
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [
-          stageNarrativeProvider.overrideWith(() => notifier),
-        ],
+        overrides: [stageNarrativeProvider.overrideWith(() => notifier)],
         child: localizedAppWithRoutes(
-          routes: {
-            '/settings': (_) => const Scaffold(body: Text('设置页')),
-          },
+          routes: {'/settings': (_) => const Scaffold(body: Text('设置页'))},
           home: const StageNarrativeScreen(stagePath: '/tmp/test_stage'),
         ),
       ),

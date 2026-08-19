@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -205,10 +206,7 @@ void main() {
           jsonEncode({
             'choices': [
               {
-                'message': {
-                  'role': 'assistant',
-                  'content': '这是模拟的非流式响应内容。',
-                },
+                'message': {'role': 'assistant', 'content': '这是模拟的非流式响应内容。'},
               },
             ],
           }),
@@ -293,7 +291,104 @@ void main() {
       expect(chunks, ['你好，', '世界']);
       expect(result, '你好，世界');
     });
+
+    test('流式读取中途超时不重试（已输出 chunk 不重复），抛流式超时异常', () async {
+      // 模拟服务端在流式输出中途挂起：已发送部分内容后不再发数据。
+      // 若被误判为「连接超时」整体重试，已送达 UI 的 chunk 会重复。
+      var callCount = 0;
+      final controller = StreamController<List<int>>();
+      final hangingClient = _StreamHangMockClient(
+        onSend: () => callCount++,
+        stream: controller.stream,
+      );
+      // 发送第一个 chunk 后保持流打开（不再 close）→ 下一行 await 超时
+      controller.add(
+        utf8.encode('data: {"choices":[{"delta":{"content":"你好"}}]}\n\n'),
+      );
+
+      final client = LlmClient(
+        apiKey: 'test-key',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-v4-flash',
+        client: hangingClient,
+      );
+
+      final chunks = <String>[];
+      await expectLater(
+        client.generateStream(
+          messages: [LlmMessage(role: 'user', content: 'hi')],
+          onChunk: chunks.add,
+          timeout: const Duration(milliseconds: 50),
+        ),
+        // 流式阶段超时 = 已消费部分响应，重试会导致内容重复，
+        // 因此包装为专用异常类型抛出（LlmInvoker 捕获后回退本地回复）
+        throwsA(isA<LlmStreamTimeoutException>()),
+      );
+
+      // 关键断言：绝不重发整个请求
+      expect(callCount, 1);
+      // 已输出的 chunk 保持原样（未因重试重复）
+      expect(chunks, ['你好']);
+      await controller.close();
+    });
+
+    test('非 200 错误体读取超时不重试（业务错误重试无意义）', () async {
+      var callCount = 0;
+      final controller = StreamController<List<int>>();
+      final hangingClient = _StreamHangMockClient(
+        onSend: () => callCount++,
+        stream: controller.stream,
+        statusCode: 500,
+      );
+      // 不发送任何错误体数据 → 读取错误体超时
+
+      final client = LlmClient(
+        apiKey: 'test-key',
+        baseUrl: 'https://api.deepseek.com/v1',
+        model: 'deepseek-v4-flash',
+        client: hangingClient,
+      );
+
+      await expectLater(
+        client.generateStream(
+          messages: [LlmMessage(role: 'user', content: 'hi')],
+          onChunk: (_) {},
+          timeout: const Duration(milliseconds: 50),
+        ),
+        throwsA(isA<LlmStreamTimeoutException>()),
+      );
+
+      // 非 200 是业务错误，重试不会成功 → 不重试
+      expect(callCount, 1);
+      await controller.close();
+    });
   });
+}
+
+/// 模拟服务端挂起（发送部分数据后不再继续）的 mock 客户端。
+///
+/// 用于验证「流式读取阶段超时」与「响应头到达前连接超时」的区分：
+/// 前者不应触发整体重试（已输出的 chunk 会重复）。
+class _StreamHangMockClient extends http.BaseClient {
+  final void Function() onSend;
+  final Stream<List<int>> stream;
+  final int statusCode;
+
+  _StreamHangMockClient({
+    required this.onSend,
+    required this.stream,
+    this.statusCode = 200,
+  });
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    onSend();
+    return http.StreamedResponse(
+      stream,
+      statusCode,
+      headers: {'content-type': 'text/event-stream; charset=utf-8'},
+    );
+  }
 }
 
 /// 模拟真实 TCP 分片的 mock 客户端。

@@ -53,9 +53,7 @@ void main() {
           fileName: '浮士德.meph',
           contract: Contract(
             roleName: '浮士德',
-            history: [
-              HistoryEntry(role: MessageRole.fate, content: '第一轮指引'),
-            ],
+            history: [HistoryEntry(role: MessageRole.fate, content: '第一轮指引')],
           ),
         ),
         StageCharacter(
@@ -65,7 +63,10 @@ void main() {
             history: [
               HistoryEntry(role: MessageRole.fate, content: '第一轮指引'),
               HistoryEntry(role: MessageRole.assistant, content: '【浮士德】浮士德回应。'),
-              HistoryEntry(role: MessageRole.assistant, content: '【梅菲斯特】梅菲斯特回应。'),
+              HistoryEntry(
+                role: MessageRole.assistant,
+                content: '【梅菲斯特】梅菲斯特回应。',
+              ),
             ],
           ),
         ),
@@ -127,18 +128,12 @@ void main() {
     final replied = stageNarrativeReducer(
       sent,
       const StageReplySucceeded(
-        replies: {
-          '浮士德': '浮士德回应。',
-          '梅菲斯特': '梅菲斯特回应。',
-        },
+        replies: {'浮士德': '浮士德回应。', '梅菲斯特': '梅菲斯特回应。'},
         newStates: {
           '浮士德': {'灵魂完整度': IntValue(70)},
           '梅菲斯特': <String, StateValue>{},
         },
-        injectedMemories: {
-          '浮士德': <Memory>[],
-          '梅菲斯特': <Memory>[],
-        },
+        injectedMemories: {'浮士德': <Memory>[], '梅菲斯特': <Memory>[]},
         overflow: '',
         rollInfo: '',
         diceResults: [],
@@ -159,9 +154,7 @@ void main() {
     }
 
     // 3. 用任一角色 history 重建消息流 → 完整重现（fate + 双段）
-    final rebuilt = stageHistoryToMessages(
-      replied.roles['梅菲斯特']!.history,
-    );
+    final rebuilt = stageHistoryToMessages(replied.roles['梅菲斯特']!.history);
     expect(rebuilt, hasLength(3));
     expect(rebuilt[0].role, MessageRole.fate);
     expect(rebuilt[1].content, contains('浮士德'));
@@ -253,8 +246,7 @@ void main() {
       ),
     );
     // v2 全景叙事：两个角色被提及，turn service 给两者映射同一段全文
-    const sharedText =
-        '浮士德站在书斋窗前喃喃自语。梅菲斯特从阴影中走出，笑道："那么，让我与你做一场交易如何？"';
+    const sharedText = '浮士德站在书斋窗前喃喃自语。梅菲斯特从阴影中走出，笑道："那么，让我与你做一场交易如何？"';
     final replied = stageNarrativeReducer(
       loaded,
       const StageReplySucceeded(
@@ -384,5 +376,128 @@ void main() {
     expect(reset.isGenerating, isFalse);
     expect(reset.attachedFileNames, isEmpty);
     expect(reset.attachedContexts, isEmpty);
+  });
+
+  test('StageSessionRestored：按角色恢复存档（状态/记忆/历史），消息流重建，附件清空', () {
+    // 先加载舞台并产生运行时数据（状态变化 + 记忆 + 对话）
+    final loaded = stageNarrativeReducer(
+      const StageNarrativeState(),
+      const StageLoadedEvent(
+        stage: stage,
+        stagePath: '/tmp/stages/test',
+        initialStates: {
+          '浮士德': {'灵魂完整度': IntValue(80)},
+          '梅菲斯特': <String, StateValue>{},
+        },
+      ),
+    );
+    final replied = stageNarrativeReducer(
+      loaded,
+      StageReplySucceeded(
+        replies: {'浮士德': '【浮士德】浮士德回应。', '梅菲斯特': '【梅菲斯特】梅菲斯特回应。'},
+        newStates: {
+          '浮士德': const {'灵魂完整度': IntValue(60)},
+          '梅菲斯特': const <String, StateValue>{},
+        },
+        injectedMemories: {
+          '浮士德': [Memory(content: '契约已成', importance: 4)],
+          '梅菲斯特': const <Memory>[],
+        },
+        overflow: '',
+        rollInfo: '',
+        diceResults: const [],
+        lastError: '',
+      ),
+    );
+    final withAttachment = stageNarrativeReducer(
+      replied,
+      const StageContextAttached(fileName: '设定.txt', content: '世界观补充'),
+    );
+    expect(withAttachment.attachedFileNames, ['设定.txt']);
+    expect(withAttachment.roles['浮士德']!.memories, hasLength(1));
+
+    // 恢复：每个角色从各自存档 contract 恢复状态/记忆/历史
+    final restored = stageNarrativeReducer(
+      withAttachment,
+      StageSessionRestored(
+        restoredByRole: {
+          '浮士德': Contract(
+            roleName: '浮士德',
+            state: const [StateItem(key: '灵魂完整度', value: IntValue(45))],
+            memories: [
+              Memory(content: '存档中的旧记忆'),
+              Memory(content: '另一条记忆', importance: 5),
+            ],
+            history: const [
+              HistoryEntry(role: MessageRole.fate, content: '存档中的指引'),
+              HistoryEntry(role: MessageRole.assistant, content: '【浮士德】存档回复。'),
+            ],
+          ),
+          // 未提供的角色（如梅菲斯特）：保持原状态不变
+        },
+        messages: [Message.fate('存档中的指引'), Message.assistant('【浮士德】存档回复。')],
+      ),
+    );
+
+    // 恢复后：浮士德用存档数据覆盖运行时数据
+    expect(
+      restored.roles['浮士德']!.currentState['灵魂完整度'],
+      const IntValue(45),
+      reason: '恢复的 currentState 应来自存档 contract',
+    );
+    expect(
+      restored.roles['浮士德']!.memories.map((m) => m.content),
+      ['存档中的旧记忆', '另一条记忆'],
+      reason: '恢复的记忆应完全替换运行时记忆',
+    );
+    expect(
+      restored.roles['浮士德']!.history.map((h) => h.content),
+      ['存档中的指引', '【浮士德】存档回复。'],
+      reason: '恢复的历史应来自存档 contract',
+    );
+    // 未在 restoredByRole 中的角色：保留原状态
+    expect(restored.roles['梅菲斯特'], isNotNull);
+    // 消息流 = 传入的恢复消息
+    expect(restored.messages, hasLength(2));
+    expect(restored.messages.first.content, '存档中的指引');
+    expect(restored.messages[1].content, '【浮士德】存档回复。');
+    // 恢复后清空会话级附件（避免残留旧附件引用）
+    expect(restored.attachedFileNames, isEmpty);
+    expect(restored.attachedContexts, isEmpty);
+    // 生成状态复位
+    expect(restored.isGenerating, isFalse);
+    expect(restored.streamingContent, isEmpty);
+  });
+
+  test('StageSessionRestored：仅部分角色有存档时，未存档角色保留运行状态', () {
+    final loaded = stageNarrativeReducer(
+      const StageNarrativeState(),
+      const StageLoadedEvent(
+        stage: stage,
+        stagePath: '/tmp/stages/test',
+        initialStates: {
+          '浮士德': {'灵魂完整度': IntValue(80)},
+          '梅菲斯特': <String, StateValue>{},
+        },
+      ),
+    );
+    final restored = stageNarrativeReducer(
+      loaded,
+      const StageSessionRestored(
+        restoredByRole: {
+          '浮士德': Contract(
+            roleName: '浮士德',
+            state: [StateItem(key: '灵魂完整度', value: IntValue(30))],
+          ),
+        },
+        messages: [],
+      ),
+    );
+    // 浮士德被恢复为存档状态
+    expect(restored.roles['浮士德']!.currentState['灵魂完整度'], const IntValue(30));
+    // 梅菲斯特无存档：保持舞台初始状态（空）
+    expect(restored.roles['梅菲斯特']!.currentState, isEmpty);
+    // 恢复后生成状态复位
+    expect(restored.isGenerating, isFalse);
   });
 }

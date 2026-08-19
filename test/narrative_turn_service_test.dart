@@ -1,4 +1,3 @@
-
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:mephisto/domain/models.dart';
@@ -39,10 +38,8 @@ void main() {
   // 固定 LLM 返回，记录收到的消息
   final capturedMessages = <List<LlmMessage>>[];
   NarrativeTurnService serviceReturning(String reply) => NarrativeTurnService(
-    clientFactory: (config) => MockLlmClient(
-      reply: reply,
-      capturedMessages: capturedMessages,
-    ),
+    clientFactory: (config) =>
+        MockLlmClient(reply: reply, capturedMessages: capturedMessages),
   );
 
   test('规则引擎状态变更被写回', () async {
@@ -118,10 +115,7 @@ void main() {
       onChunk: (_) {},
     );
     expect(result.rollInfo, isNotEmpty);
-    expect(
-      result.injectedMemories.map((m) => m.content),
-      contains('命运骰已掷'),
-    );
+    expect(result.injectedMemories.map((m) => m.content), contains('命运骰已掷'));
   });
 
   test('LLM 异常时回退本地回复并记录错误', () async {
@@ -247,12 +241,15 @@ class MockLlmClient extends LlmClient {
   final String reply;
   final List<List<LlmMessage>> capturedMessages;
 
-  MockLlmClient({required this.reply, required this.capturedMessages, String? model})
-      : super(
-          apiKey: '',
-          baseUrl: 'http://localhost:9999',
-          model: model ?? 'mock',
-        );
+  MockLlmClient({
+    required this.reply,
+    required this.capturedMessages,
+    String? model,
+  }) : super(
+         apiKey: '',
+         baseUrl: 'http://localhost:9999',
+         model: model ?? 'mock',
+       );
 
   @override
   Future<String> generateStream({
@@ -271,11 +268,7 @@ class MockLlmClient extends LlmClient {
 /// 直接抛异常的 mock LLM 客户端
 class ThrowingLlmClient extends LlmClient {
   ThrowingLlmClient()
-      : super(
-          apiKey: '',
-          baseUrl: 'http://localhost:9999',
-          model: 'mock',
-        );
+    : super(apiKey: '', baseUrl: 'http://localhost:9999', model: 'mock');
 
   @override
   Future<String> generateStream({

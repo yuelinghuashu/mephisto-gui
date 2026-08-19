@@ -33,11 +33,7 @@ void main() {
     });
 
     test('注释行保留并缩进', () {
-      final input = [
-        '【角色名】',
-        '# 这是一个注释',
-        '测试角色',
-      ].join('\n');
+      final input = ['【角色名】', '# 这是一个注释', '测试角色'].join('\n');
 
       final formatted = formatMephText(input);
       final lines = formatted.split('\n');
@@ -46,10 +42,7 @@ void main() {
     });
 
     test('压缩多余缩进', () {
-      final input = [
-        '【角色名】',
-        '    测试角色（缩进过多）',
-      ].join('\n');
+      final input = ['【角色名】', '    测试角色（缩进过多）'].join('\n');
 
       final formatted = formatMephText(input);
       final lines = formatted.split('\n');
@@ -86,11 +79,7 @@ void main() {
 
   group('格式化 - 内容行规范化', () {
     test('列表项 - 后单空格、键值冒号后单空格', () {
-      final input = [
-        '【状态】',
-        '-    灵魂完整度：  50',
-        '-   体力:   100',
-      ].join('\n');
+      final input = ['【状态】', '-    灵魂完整度：  50', '-   体力:   100'].join('\n');
 
       final formatted = formatMephText(input);
       final lines = formatted.split('\n');
@@ -229,10 +218,7 @@ void main() {
 
     test('格式化合并关键词空格后可被 parseMeph 解析', () {
       // 原文本含 `不 包含`（parseMeph 会拒绝），格式化后应修复
-      final input = [
-        '【规则】',
-        '[低语] if 不 包含 "真实" -> 注入 "阴影"',
-      ].join('\n');
+      final input = ['【规则】', '[低语] if 不 包含 "真实" -> 注入 "阴影"'].join('\n');
 
       final formatted = formatMephText(input);
       expect(formatted, contains('不包含 "真实"'));

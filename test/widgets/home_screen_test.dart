@@ -80,9 +80,7 @@ void main() {
       children: [
         ContractGroup(
           master: info('faust.dark.meph', branch: 'dark'),
-          children: [
-            child('faust.dark.light.meph', branch: 'light'),
-          ],
+          children: [child('faust.dark.light.meph', branch: 'light')],
         ),
       ],
     ),
@@ -182,7 +180,8 @@ void main() {
             'faust.verylongbranchnamechild.this-file-name-is-far-longer-than-'
             'any-card-can-fit-in-a-single-row-meph.meph',
             branch: 'very-long-branch-name',
-            branchTitle: '命运：理想国支线里浮士德在边际海岸望向乌托邦的那一天，'
+            branchTitle:
+                '命运：理想国支线里浮士德在边际海岸望向乌托邦的那一天，'
                 '天上的云像极了他年轻时追求的知识之海',
           ),
         ],
@@ -211,10 +210,12 @@ void main() {
 
     // 文件名同样被省略号截断
     final fileNameText = tester.widget<Text>(
-      find.byWidgetPredicate((w) =>
-          w is Text &&
-          w.data != null &&
-          w.data!.startsWith('faust.verylongbranchnamechild.this-file-name')),
+      find.byWidgetPredicate(
+        (w) =>
+            w is Text &&
+            w.data != null &&
+            w.data!.startsWith('faust.verylongbranchnamechild.this-file-name'),
+      ),
     );
     expect(fileNameText.maxLines, 1);
     expect(fileNameText.overflow, TextOverflow.ellipsis);

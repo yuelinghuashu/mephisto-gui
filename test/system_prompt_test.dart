@@ -14,11 +14,14 @@ void main() {
     worldview: '一个充满神秘学与契约的世界',
     background: '曾以灵魂换取无限体验的学者',
     opening: '书斋的烛火在夜风中摇曳',
-    state: [
-      StateItem(key: '灵魂完整度', value: IntValue(50)),
-    ],
+    state: [StateItem(key: '灵魂完整度', value: IntValue(50))],
     rules: [
-      Rule(name: '契约激活', condition: '包含 "契约"', action: '状态.灵魂完整度 -= 10', line: 1),
+      Rule(
+        name: '契约激活',
+        condition: '包含 "契约"',
+        action: '状态.灵魂完整度 -= 10',
+        line: 1,
+      ),
     ],
   );
 
@@ -241,10 +244,7 @@ void main() {
         contract: baseContract,
         currentState: const {},
       );
-      final dantes = buildSystemPrompt(
-        contract: other,
-        currentState: const {},
-      );
+      final dantes = buildSystemPrompt(contract: other, currentState: const {});
       // 角色定义行是缓存专属内容；默认叙事约束示例含「浮士德」字样，
       // 故用「你是XX」定位而非全局 contains
       expect(faust, contains('你是浮士德'));

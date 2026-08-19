@@ -44,9 +44,7 @@ void main() {
     /// "disposed during loading state" 的伪失败。
     ProviderContainer makeContainer() {
       final container = ProviderContainer(
-        overrides: [
-          secureKeyValueStoreProvider.overrideWithValue(secureStore),
-        ],
+        overrides: [secureKeyValueStoreProvider.overrideWithValue(secureStore)],
       );
       final sub = container.listen(llmConfigProvider, (_, _) {});
       addTearDown(() {
@@ -74,9 +72,7 @@ void main() {
         model: 'custom-model',
         maxTokens: 2048,
       );
-      await container
-          .read(llmSettingsProvider.notifier)
-          .save(userConfig);
+      await container.read(llmSettingsProvider.notifier).save(userConfig);
 
       final config = await container.read(llmConfigProvider.future);
 
@@ -101,9 +97,7 @@ void main() {
         timeoutSeconds: 120,
         maxRetries: 3,
       );
-      await container
-          .read(llmSettingsProvider.notifier)
-          .save(userConfig);
+      await container.read(llmSettingsProvider.notifier).save(userConfig);
 
       final config = await container.read(llmConfigProvider.future);
       expect(config.timeoutSeconds, 120);
@@ -252,7 +246,9 @@ void main() {
       // 保存：安全存储不可用 → 明文写入 SharedPreferences（功能不受损）
       await container
           .read(llmSettingsProvider.notifier)
-          .save(const LlmConfig(apiKey: 'degraded-key', baseUrl: 'https://x/v1'));
+          .save(
+            const LlmConfig(apiKey: 'degraded-key', baseUrl: 'https://x/v1'),
+          );
 
       // 读取：安全存储不可用 → 读到明文中保存的 Key
       final config = await container.read(llmConfigProvider.future);

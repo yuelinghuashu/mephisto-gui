@@ -118,16 +118,12 @@ void main() {
     expect(state.isGenerating, isFalse);
 
     // 各角色存档独立写入舞台目录
-    expect(
-      File('${stageDir.path}/浮士德.child.meph').existsSync(),
-      isTrue,
-    );
-    expect(
-      File('${stageDir.path}/梅菲斯特.child.meph').existsSync(),
-      isTrue,
-    );
+    expect(File('${stageDir.path}/浮士德.child.meph').existsSync(), isTrue);
+    expect(File('${stageDir.path}/梅菲斯特.child.meph').existsSync(), isTrue);
     // 各自存档包含该角色的历史
-    final faustSave = await File('${stageDir.path}/浮士德.child.meph').readAsString();
+    final faustSave = await File(
+      '${stageDir.path}/浮士德.child.meph',
+    ).readAsString();
     expect(faustSave, contains('【历史】'));
   });
 
@@ -141,10 +137,7 @@ void main() {
 
     final state = container.read(stageNarrativeProvider);
     // 浮士德规则触发：80 - 10 = 70；梅菲斯特无规则 → 状态不变
-    expect(
-      state.roles['浮士德']!.currentState['灵魂完整度'],
-      const IntValue(70),
-    );
+    expect(state.roles['浮士德']!.currentState['灵魂完整度'], const IntValue(70));
   });
 
   test('loadStage restoreSaves=false → 跳过存档、直接进入母版空开局', () async {
@@ -155,10 +148,7 @@ void main() {
     await notifier.loadStage(stageDir.path);
     await notifier.sendMessage('命运降临');
     await waitForGeneration(container);
-    expect(
-      File('${stageDir.path}/浮士德.child.meph').existsSync(),
-      isTrue,
-    );
+    expect(File('${stageDir.path}/浮士德.child.meph').existsSync(), isTrue);
 
     // 重新开始：restoreSaves=false → 不恢复存档 → 母版空开局
     notifier.resetSession();
@@ -173,10 +163,7 @@ void main() {
     expect(state.roles['浮士德']!.history, isEmpty);
     expect(state.roles['梅菲斯特']!.history, isEmpty);
     // 角色状态回契约初始值
-    expect(
-      state.roles['浮士德']!.currentState['灵魂完整度'],
-      const IntValue(80),
-    );
+    expect(state.roles['浮士德']!.currentState['灵魂完整度'], const IntValue(80));
   });
 
   test('reloadStage 恢复各角色存档', () async {

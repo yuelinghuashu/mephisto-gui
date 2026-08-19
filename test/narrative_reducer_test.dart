@@ -86,9 +86,7 @@ void main() {
       const restored = Contract(
         roleName: '恢复角色',
         state: [StateItem(key: '等级', value: IntValue(5))],
-        history: [
-          HistoryEntry(role: MessageRole.fate, content: '恢复前对话'),
-        ],
+        history: [HistoryEntry(role: MessageRole.fate, content: '恢复前对话')],
       );
       final s = narrativeReducer(
         base(),
@@ -116,5 +114,4 @@ void main() {
       expect(s.attachedContexts, isEmpty);
     });
   });
-
 }

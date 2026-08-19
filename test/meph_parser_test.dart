@@ -42,8 +42,9 @@ void main() {
       // 行号递增
       expect(contract.rules[0].line, lessThan(contract.rules[1].line));
       // 「侵蚀」互斥组包含两条规则（暗影缠身 + 烛火映心）
-      final erosionRules =
-          contract.rules.where((r) => r.group == '侵蚀').toList();
+      final erosionRules = contract.rules
+          .where((r) => r.group == '侵蚀')
+          .toList();
       expect(erosionRules, hasLength(2));
     });
 
@@ -55,7 +56,7 @@ void main() {
       expect(contract.anchor, hasLength(6));
 
       // 数值类型推断
-      expect(contract.state, hasLength(5));
+      expect(contract.state, hasLength(6));
       final hp = contract.state.firstWhere((s) => s.key == '生命');
       expect(hp.value, const IntValue(100));
       final hatred = contract.state.firstWhere((s) => s.key == '仇恨');
@@ -188,7 +189,7 @@ void main() {
 
       expect(contract.roleName, '吉尔伽美什');
       // 状态
-      expect(contract.state, hasLength(5));
+      expect(contract.state, hasLength(6));
       final sovereignty = contract.state.firstWhere((s) => s.key == '王权');
       expect(sovereignty.value, const IntValue(90));
       final pursuit = contract.state.firstWhere((s) => s.key == '求索');
@@ -269,6 +270,70 @@ void main() {
       final helen = contract.rules.firstWhere((r) => r.name == '美之降临');
       expect(helen.condition, contains('roll(1d100)'));
     });
+
+    test('解析 Lundao/Kongzi.meph（三教论道：儒家 · 梦境世界观）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/Lundao/Kongzi.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '孔子');
+      // 梦境框架承载于公共世界观（Kongzi 为字典序首卡）
+      expect(contract.worldview, contains('嵩山'));
+      expect(contract.worldview, contains('入梦'));
+      // 状态：辩势/仁德/执念
+      final state = {for (final s in contract.state) s.key: s.value};
+      expect(state['辩势'], const IntValue(50));
+      expect(state['仁德'], const IntValue(60));
+      // 终局规则（儒道胜）绑定双阈值
+      final win = contract.rules.firstWhere((r) => r.name == '儒道胜');
+      expect(win.condition, contains('状态.辩势 >= 80'));
+      expect(win.condition, contains('状态.仁德 >= 70'));
+      // 点名交锋（应答规则）：只加维度不加辩势（推动胜利的只有本家规则）
+      final respond = contract.rules.firstWhere((r) => r.name == '应答老子');
+      expect(respond.action, contains('仁德'), reason: '应答只加维度，不推辩势');
+      // 记忆/历史为运行时产物，契约模板不应预置
+      expect(contract.memories, isEmpty);
+      expect(contract.history, isEmpty);
+    });
+
+    test('解析 Lundao/Laozhi.meph（三教论道：道家）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/Lundao/Laozhi.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '老子');
+      final state = {for (final s in contract.state) s.key: s.value};
+      expect(state['辩势'], const IntValue(50));
+      expect(state['道心'], const IntValue(60));
+      // 终局规则（道胜）
+      final win = contract.rules.firstWhere((r) => r.name == '道胜');
+      expect(win.condition, contains('状态.辩势 >= 80'));
+      expect(win.condition, contains('状态.道心 >= 70'));
+      // 点名交锋（应答规则）：只加维度不加辩势
+      final respond = contract.rules.firstWhere((r) => r.name == '应答孔子');
+      expect(respond.action, contains('道心'), reason: '应答只加维度，不推辩势');
+    });
+
+    test('解析 Lundao/Shijiamouni.meph（三教论道：佛家）', () async {
+      final text = await rootBundle.loadString(
+        'assets/contracts/Lundao/Shijiamouni.meph',
+      );
+      final contract = parseMeph(text);
+
+      expect(contract.roleName, '释迦牟尼');
+      final state = {for (final s in contract.state) s.key: s.value};
+      expect(state['辩势'], const IntValue(50));
+      expect(state['觉悟'], const IntValue(60));
+      // 终局规则（佛胜）
+      final win = contract.rules.firstWhere((r) => r.name == '佛胜');
+      expect(win.condition, contains('状态.辩势 >= 80'));
+      expect(win.condition, contains('状态.觉悟 >= 70'));
+      // 点名交锋（应答规则）：只加维度不加辩势
+      final respond = contract.rules.firstWhere((r) => r.name == '应答孔子');
+      expect(respond.action, contains('觉悟'), reason: '应答只加维度，不推辩势');
+    });
   });
 
   group('MephParser - 值类型推断', () {
@@ -323,6 +388,40 @@ void main() {
       expect(contract.history[0].content, '第一行\n第二行');
       expect(contract.history[1].role, MessageRole.assistant);
       expect(contract.history[1].content, '回应');
+    });
+
+    test('解析历史（system 前缀，舞台额外叙事）', () {
+      final contract = parseMeph('''
+【角色名】
+测试
+
+【历史】
+- fate: 出发
+- assistant：回应
+- system: （额外叙事：群鸟掠过）
+''');
+      expect(contract.history, hasLength(3));
+      expect(contract.history[2].role, MessageRole.system);
+      expect(contract.history[2].content, '（额外叙事：群鸟掠过）');
+    });
+
+    test('解析历史：非法前缀报错（fate/assistant/system 之外）', () {
+      expect(
+        () => parseMeph('''
+【角色名】
+测试
+
+【历史】
+- 用户: 你好
+'''),
+        throwsA(
+          isA<MephParseError>().having(
+            (e) => e.message,
+            'message',
+            contains("'fate:'"),
+          ),
+        ),
+      );
     });
 
     test('解析记忆', () {
@@ -917,11 +1016,7 @@ void main() {
         contains('有一位以灵魂换取知识的学者'),
         reason: '未知区块内容应并入前一个文本型区块，而非静默丢失',
       );
-      expect(
-        contract.worldview,
-        contains('【传说】'),
-        reason: '未知区块标题行作为散文的一部分保留',
-      );
+      expect(contract.worldview, contains('【传说】'), reason: '未知区块标题行作为散文的一部分保留');
     });
 
     test('结构化区块（规则/记忆）后的未知区块仍静默忽略（草稿宽容）', () {
@@ -954,18 +1049,14 @@ void main() {
 【状态】
 - 灵魂完整度: 85
 ''');
-      final anchorByKey = {
-        for (final a in contract.anchor) a.key: a.value,
-      };
+      final anchorByKey = {for (final a in contract.anchor) a.key: a.value};
       expect(anchorByKey['核心信念'], isA<StringValue>());
       expect(anchorByKey['核心信念']!.value, '10');
       expect(anchorByKey['口头禅']!.value, '他说道：你好');
 
       // 序列化 → 解析往返：类型与内容完整保留
       final roundtrip = parseMeph(serializeMeph(contract));
-      final roundtripByKey = {
-        for (final a in roundtrip.anchor) a.key: a.value,
-      };
+      final roundtripByKey = {for (final a in roundtrip.anchor) a.key: a.value};
       expect(roundtripByKey['核心信念'], isA<StringValue>());
       expect(roundtripByKey['核心信念']!.value, '10');
       expect(roundtripByKey['口头禅']!.value, '他说道：你好');

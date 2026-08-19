@@ -22,9 +22,7 @@ import 'test_helpers.dart';
 void main() {
   Widget wrap(Widget child) {
     return localizedApp(
-      home: Scaffold(
-        body: Center(child: child),
-      ),
+      home: Scaffold(body: Center(child: child)),
     );
   }
 
@@ -100,7 +98,10 @@ void main() {
       final labels = collectSemanticLabels(tester, find.byType(RoleStatusChip));
       expect(
         // 状态计数 = 状态条目数（1），记忆计数 = 记忆条数（1）
-        labels.any((l) => l.contains('浮士德') && l.contains('状态 1 项') && l.contains('记忆 1 条')),
+        labels.any(
+          (l) =>
+              l.contains('浮士德') && l.contains('状态 1 项') && l.contains('记忆 1 条'),
+        ),
         isTrue,
         reason: '读屏应朗读「浮士德 状态 1 项，记忆 1 条」类合并标签',
       );
@@ -157,10 +158,9 @@ void main() {
       final closeIcon = find.byIcon(Icons.close);
       expect(closeIcon, findsOneWidget);
       final removeHitArea = tester.getSize(
-        find.ancestor(
-          of: closeIcon,
-          matching: find.byType(ConstrainedBox),
-        ).first,
+        find
+            .ancestor(of: closeIcon, matching: find.byType(ConstrainedBox))
+            .first,
       );
       expect(removeHitArea.width, greaterThanOrEqualTo(32));
       expect(removeHitArea.height, greaterThanOrEqualTo(32));
@@ -179,10 +179,9 @@ void main() {
       );
       // 芯片的 InkWell 命中区域应 ≥ 32px 高（内部 Container 有 minHeight）
       final chip = tester.getSize(
-        find.ancestor(
-          of: find.text('阿周那'),
-          matching: find.byType(InkWell),
-        ).first,
+        find
+            .ancestor(of: find.text('阿周那'), matching: find.byType(InkWell))
+            .first,
       );
       expect(chip.height, greaterThanOrEqualTo(32));
     });

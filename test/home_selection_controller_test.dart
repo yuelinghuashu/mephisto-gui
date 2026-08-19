@@ -108,9 +108,7 @@ void main() {
       final controller = HomeSelectionController();
       final tree = treeGroup(
         master: info('faust.meph'),
-        children: [
-          treeGroup(master: info('faust.dark.meph', isChild: true)),
-        ],
+        children: [treeGroup(master: info('faust.dark.meph', isChild: true))],
       );
 
       // 先选整棵子树，再额外选中另一个文件
@@ -327,8 +325,16 @@ void main() {
         treeGroup(master: info('dantes.meph')),
       ];
       final stages = [
-        const StageInfo(path: '/contracts/Kurukshetra', name: 'Kurukshetra', characterCount: 2),
-        const StageInfo(path: '/contracts/Camlann', name: 'Camlann', characterCount: 2),
+        const StageInfo(
+          path: '/contracts/Kurukshetra',
+          name: 'Kurukshetra',
+          characterCount: 2,
+        ),
+        const StageInfo(
+          path: '/contracts/Camlann',
+          name: 'Camlann',
+          characterCount: 2,
+        ),
       ];
 
       controller.selectAll(trees, stages);

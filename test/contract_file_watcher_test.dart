@@ -147,9 +147,7 @@ void main() {
 
     // 用一个可观测的副作用验证是否重新订阅：
     // 通过 destroy 后再次 start 观察 watchedFileName 是否重置再赋值。
-    final watcher = ContractFileWatcher(
-      onFileChanged: (_) async {},
-    );
+    final watcher = ContractFileWatcher(onFileChanged: (_) async {});
     await watcher.start('faust.meph');
     expect(watcher.watchedFileName, 'faust.meph');
 
@@ -262,9 +260,11 @@ void main() {
     await watcher.start('faust.meph');
     addTearDown(watcher.dispose);
 
-    // 写另一个契约（非监听目标）——不应触发回调
+    // 写另一个契约（非监听目标）——不应触发回调。
+    // 注意：非监听目标在 _onDirEvent 入口就被过滤（不进入 500ms 防抖），
+    // 因此无需等满一个防抖窗口；短等待仅让目录事件流处理完即可。
     await other.writeAsString('dantes 修改内容');
-    await Future<void>.delayed(const Duration(milliseconds: 700));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     expect(count, 0);
 
     // 确认监听仍正常：写入监听目标文件应触发

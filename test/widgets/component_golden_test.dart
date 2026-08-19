@@ -33,11 +33,7 @@ void main() {
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: child,
-          ),
+          child: SizedBox(width: width, height: height, child: child),
         ),
       ),
     );
@@ -78,10 +74,7 @@ void main() {
   group('ContractCard golden', () {
     testWidgets('契约卡：单行紧凑（母版 + 分支徽标）', (tester) async {
       final group = ContractGroup(
-        master: ContractInfo(
-          fileName: 'faust.meph',
-          roleName: '浮士德',
-        ),
+        master: ContractInfo(fileName: 'faust.meph', roleName: '浮士德'),
         children: [
           ContractGroup(
             master: ContractInfo(

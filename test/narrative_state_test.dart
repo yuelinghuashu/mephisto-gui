@@ -11,9 +11,7 @@ void main() {
   group('NarrativeState.branchName', () {
     NarrativeState state(String sourceFileName, {String roleName = '浮士德'}) {
       return NarrativeState(
-        contract: Contract(
-          roleName: roleName,
-        ),
+        contract: Contract(roleName: roleName),
         sourceFileName: sourceFileName,
       );
     }
@@ -23,9 +21,11 @@ void main() {
       expect(state('dantes.meph').branchName, '');
     });
 
-    test('默认子版返回「存档」', () {
-      expect(state('faust.child.meph').branchName, '存档');
-      expect(state('dantes.child.meph').branchName, '存档');
+    test('默认子版返回原始分支名 child（本地化由 UI 层映射）', () {
+      // domain 层不硬编码展示文案：child 原样返回，
+      // UI 层通过 AppLocalizations.narrativeBranchChild 翻译为「存档」/ "Save"
+      expect(state('faust.child.meph').branchName, 'child');
+      expect(state('dantes.child.meph').branchName, 'child');
     });
 
     test('自定义分支返回分支名', () {
@@ -85,9 +85,7 @@ void main() {
     test('count 访问器', () {
       const contract = Contract(
         roleName: '浮士德',
-        rules: [
-          Rule(name: 'r1', condition: '包含 "x"', action: 'y', line: 1),
-        ],
+        rules: [Rule(name: 'r1', condition: '包含 "x"', action: 'y', line: 1)],
       );
       const state = NarrativeState(contract: contract);
       expect(state.ruleCount, 1);

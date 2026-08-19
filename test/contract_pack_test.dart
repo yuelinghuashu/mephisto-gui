@@ -32,6 +32,11 @@ void main() {
     if (contractsDir.existsSync()) {
       await contractsDir.delete(recursive: true);
     }
+    // 清理 Zip Slip 防御测试可能写入的父目录残留（防御测试运行前写入）
+    final stale = File('${contractsDir.parent.path}/evil.meph');
+    if (stale.existsSync()) {
+      await stale.delete();
+    }
   });
 
   File touch(String name, {String content = 'content'}) {
@@ -48,10 +53,7 @@ void main() {
       touch('faust.child.meph');
       touch('gilgamesh.meph');
 
-      final bytes = await packContractTree(
-        'faust.meph',
-        dir: contractsDir,
-      );
+      final bytes = await packContractTree('faust.meph', dir: contractsDir);
       final entries = ZipDecoder()
           .decodeBytes(bytes)
           .map((e) => e.name)
@@ -60,8 +62,11 @@ void main() {
       expect(entries, contains('faust.meph'));
       expect(entries, contains('faust.dark.meph'));
       expect(entries, contains('faust.child.meph'));
-      expect(entries, isNot(contains('gilgamesh.meph')),
-          reason: '只打包含目标母版前缀的契约，其他母版不进入包');
+      expect(
+        entries,
+        isNot(contains('gilgamesh.meph')),
+        reason: '只打包含目标母版前缀的契约，其他母版不进入包',
+      );
     });
 
     test('缺失的文件跳过不中断；非 .meph 文件不参与打包', () async {
@@ -86,8 +91,7 @@ void main() {
 
   group('packStage（舞台目录打包）', () {
     test('打包全部角色卡 + 存档，以舞台名前缀组织', () async {
-      final stage = Directory('${contractsDir.path}/Kurukshetra')
-        ..createSync();
+      final stage = Directory('${contractsDir.path}/Kurukshetra')..createSync();
       // 舞台内角色卡 + .child 存档 + 应被忽略的非 .meph
       File('${stage.path}/Arjuna.meph').writeAsStringSync('阿周那');
       File('${stage.path}/Arjuna.child.meph').writeAsStringSync('存档');
@@ -101,18 +105,23 @@ void main() {
 
       expect(entries, contains('Kurukshetra/Arjuna.meph'));
       expect(entries, contains('Kurukshetra/Arjuna.child.meph'));
-      expect(entries, isNot(anyElement(contains('readme.txt'))),
-          reason: '非 .meph 不入包');
+      expect(
+        entries,
+        isNot(anyElement(contains('readme.txt'))),
+        reason: '非 .meph 不入包',
+      );
     });
 
     test('舞台目录不存在时抛异常', () {
       expect(
         () => packStage('${contractsDir.path}/Nope'),
-        throwsA(isA<Exception>().having(
-          (e) => e.toString(),
-          'message',
-          contains('舞台目录不存在'),
-        )),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('舞台目录不存在'),
+          ),
+        ),
       );
     });
   });
@@ -132,16 +141,19 @@ void main() {
       expect(count, 2);
       expect(File('${contractsDir.path}/faust.meph').existsSync(), isTrue);
       expect(File('${contractsDir.path}/faust.dark.meph').existsSync(), isTrue);
-      expect(File('${contractsDir.path}/faust.meph').readAsStringSync(),
-          'content');
+      expect(
+        File('${contractsDir.path}/faust.meph').readAsStringSync(),
+        'content',
+      );
     });
 
     test('舞台目录布局：保留一级目录（舞台自动还原）', () async {
       // 手工构造「舞台名/角色.meph」布局的 zip（内容用 UTF-8 编码）
       final content = utf8.encode('阿周那原子');
       final archive = Archive();
-      archive.addFile(ArchiveFile('Kurukshetra/Arjuna.meph', content.length,
-          content));
+      archive.addFile(
+        ArchiveFile('Kurukshetra/Arjuna.meph', content.length, content),
+      );
       final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
 
       final count = await unpackMeph(bytes);
@@ -183,6 +195,48 @@ void main() {
       expect(count, 1, reason: '只导入 .meph，忽略 .txt');
       expect(File('${contractsDir.path}/faust.meph').existsSync(), isTrue);
       expect(File('${contractsDir.path}/readme.txt').existsSync(), isFalse);
+    });
+
+    test('Zip Slip 防御：路径穿越条目（../ 跳出契约目录）被拒绝', () async {
+      // 恶意 zip：条目名使用 ../ 试图写入契约目录之外
+      final archive = Archive()
+        ..addFile(ArchiveFile('../evil.meph', 3, 'x'.codeUnits))
+        ..addFile(ArchiveFile('../../evil2.meph', 3, 'x'.codeUnits))
+        ..addFile(
+          ArchiveFile('Kurukshetra/../../evil3.meph', 3, 'x'.codeUnits),
+        );
+      final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+
+      final count = await unpackMeph(bytes);
+
+      // 恶意条目全部被拒绝（不写入契约目录，也不写入外部）
+      expect(count, 0, reason: '路径穿越条目应被拒绝，不导入');
+      expect(File('${contractsDir.path}/evil.meph').existsSync(), isFalse);
+      expect(
+        File('${contractsDir.parent.path}/evil.meph').existsSync(),
+        isFalse,
+        reason: '不得写入契约目录的父目录（Zip Slip）',
+      );
+      expect(
+        File('${contractsDir.path}/Kurukshetra/evil3.meph').existsSync(),
+        isFalse,
+      );
+    });
+
+    test('合法舞台目录路径（Kurukshetra/Arjuna.meph）不受影响', () async {
+      final content = utf8.encode('正常内容');
+      final archive = Archive()
+        ..addFile(ArchiveFile('Camlann/Arthur.meph', content.length, content));
+      final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+
+      final count = await unpackMeph(bytes);
+
+      expect(count, 1);
+      expect(
+        File('${contractsDir.path}/Camlann/Arthur.meph').existsSync(),
+        isTrue,
+        reason: '合法的一级舞台子目录应正常还原',
+      );
     });
   });
 }

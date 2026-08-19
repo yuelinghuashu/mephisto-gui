@@ -77,10 +77,7 @@ void main() {
     expect(find.text('浮士德站在书斋窗前。'), findsOneWidget);
     // 收集所有 span 并断言：整体作为单个无样式 span 存在
     final spans = collectAllSpans(tester);
-    expect(
-      findSpan(spans, '浮士德站在书斋窗前。'),
-      isNotNull,
-    );
+    expect(findSpan(spans, '浮士德站在书斋窗前。'), isNotNull);
     // 无任何 Markdown 样式标记：
     //   - fontWeight 不是 bold（Text 默认可能是 w400，但不会是 bold）
     //   - fontStyle 不是 italic
@@ -190,16 +187,11 @@ void main() {
   });
 
   testWidgets('引用块：> 引用 → 引用文本可被渲染', (tester) async {
-    await tester.pumpWidget(
-      buildParagraph('> 知识就像火焰——越靠近，越能感受它的灼热。'),
-    );
+    await tester.pumpWidget(buildParagraph('> 知识就像火焰——越靠近，越能感受它的灼热。'));
 
     // 引用块使用 RichText 渲染，文本以 span 形式存在
     final spans = collectAllSpans(tester);
-    expect(
-      findSpan(spans, '知识就像火焰——越靠近，越能感受它的灼热。'),
-      isNotNull,
-    );
+    expect(findSpan(spans, '知识就像火焰——越靠近，越能感受它的灼热。'), isNotNull);
   });
 
   testWidgets('无序列表：- 项1 / - 项2 → 两个列表项渲染', (tester) async {

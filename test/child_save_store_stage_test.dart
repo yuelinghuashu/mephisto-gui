@@ -34,9 +34,7 @@ void main() {
   const contract = Contract(
     roleName: '浮士德',
     worldview: '充满契约的世界',
-    state: [
-      StateItem(key: '灵魂完整度', value: IntValue(50)),
-    ],
+    state: [StateItem(key: '灵魂完整度', value: IntValue(50))],
   );
 
   test('targetDir 保存到舞台目录', () async {
@@ -66,7 +64,10 @@ void main() {
       ],
       targetDir: stageDir,
     );
-    final restored = await ChildSaveStore.restore(fileName, dirPath: stageDir.path);
+    final restored = await ChildSaveStore.restore(
+      fileName,
+      dirPath: stageDir.path,
+    );
     expect(restored, isNotNull);
     expect(restored!.stateMap['灵魂完整度'], const IntValue(30));
     expect(restored.memories.first.content, '舞台事件');
@@ -106,10 +107,7 @@ void main() {
       await ChildSaveStore.exists('浮士德.child.meph', dirPath: stageDir.path),
       isTrue,
     );
-    expect(
-      await ChildSaveStore.exists('浮士德.child.meph'),
-      isFalse,
-    );
+    expect(await ChildSaveStore.exists('浮士德.child.meph'), isFalse);
 
     expect(
       await ChildSaveStore.delete('浮士德.child.meph', dirPath: stageDir.path),

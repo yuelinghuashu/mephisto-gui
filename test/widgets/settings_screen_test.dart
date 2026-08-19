@@ -30,9 +30,7 @@ void main() {
   });
 
   Widget buildSettings() {
-    return ProviderScope(
-      child: localizedApp(home: const SettingsScreen()),
-    );
+    return ProviderScope(child: localizedApp(home: const SettingsScreen()));
   }
 
   testWidgets('宽屏：单页渲染全部配置区块', (tester) async {
@@ -258,10 +256,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Android 分支的说明文案
-      expect(
-        find.textContaining('契约保存在应用的私有空间'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('契约保存在应用的私有空间'), findsOneWidget);
       // 存储切换按钮存在（而非隐藏/删除）
       await tester.ensureVisible(find.text('切换为外部存储'));
       await tester.pumpAndSettle();
@@ -280,10 +275,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // iOS 分支的说明文案
-      expect(
-        find.textContaining('iOS 系统沙盒限制'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('iOS 系统沙盒限制'), findsOneWidget);
       // 「更改目录」按钮存在
       await tester.ensureVisible(find.text('更改目录'));
       await tester.pumpAndSettle();

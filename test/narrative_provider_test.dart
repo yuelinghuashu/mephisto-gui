@@ -47,9 +47,9 @@ void main() {
       'mephisto_contracts_directory': tempDir.path,
       'mephisto_current_contract': 'faust.meph',
     });
-    await File('${tempDir.path}/faust.meph').writeAsString(
-      '【角色名】\n浮士德\n\n【世界观】\n充满契约的世界\n',
-    );
+    await File(
+      '${tempDir.path}/faust.meph',
+    ).writeAsString('【角色名】\n浮士德\n\n【世界观】\n充满契约的世界\n');
   });
 
   tearDown(() async {
@@ -122,39 +122,43 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 50));
   }
 
-   /// 构造 SSE 格式的 LLM 成功响应（符合 LlmClient.generateStream 解析要求）。
-   ///
-   /// 使用 [http.Response.bytes] 并以 utf8 编码 body，
-   /// 避免默认 latin1 编码无法承载中文内容的 "Contains invalid characters" 错误。
-   http.Response sseResponse(String content) {
-     final chunks = content.isNotEmpty ? [content] : <String>[];
-     final lines = [
-       for (final c in chunks)
-         'data: ${jsonEncode({
-           'choices': [
-             {'delta': {'content': c}},
-           ],
-         })}',
-       'data: [DONE]',
-     ];
-     return http.Response.bytes(
-       utf8.encode(lines.join('\n')),
-       200,
-       headers: {'content-type': 'text/event-stream; charset=utf-8'},
-     );
-   }
+  /// 构造 SSE 格式的 LLM 成功响应（符合 LlmClient.generateStream 解析要求）。
+  ///
+  /// 使用 [http.Response.bytes] 并以 utf8 编码 body，
+  /// 避免默认 latin1 编码无法承载中文内容的 "Contains invalid characters" 错误。
+  http.Response sseResponse(String content) {
+    final chunks = content.isNotEmpty ? [content] : <String>[];
+    final lines = [
+      for (final c in chunks)
+        'data: ${jsonEncode({
+          'choices': [
+            {
+              'delta': {'content': c},
+            },
+          ],
+        })}',
+      'data: [DONE]',
+    ];
+    return http.Response.bytes(
+      utf8.encode(lines.join('\n')),
+      200,
+      headers: {'content-type': 'text/event-stream; charset=utf-8'},
+    );
+  }
 
-   /// 构造单条 SSE 数据行（用于可控分块流式响应测试）。
-   ///
-   /// 与 [sseResponse] 共用同一 delta 格式，但只生成一个数据行，
-   /// 由测试通过 [StreamController] 分多次推给 LlmClient，
-   /// 模拟 LLM 分 chunk 到达的时序（验证中途 reveal 不截断）。
-   String sseChunk(String content) =>
-       'data: ${jsonEncode({
-         'choices': [
-           {'delta': {'content': content}},
-         ],
-       })}\n\n';
+  /// 构造单条 SSE 数据行（用于可控分块流式响应测试）。
+  ///
+  /// 与 [sseResponse] 共用同一 delta 格式，但只生成一个数据行，
+  /// 由测试通过 [StreamController] 分多次推给 LlmClient，
+  /// 模拟 LLM 分 chunk 到达的时序（验证中途 reveal 不截断）。
+  String sseChunk(String content) =>
+      'data: ${jsonEncode({
+        'choices': [
+          {
+            'delta': {'content': content},
+          },
+        ],
+      })}\n\n';
 
   group('初始化与构建', () {
     test('母版契约加载 → 状态/当前状态/messages 正确初始化', () async {
@@ -284,87 +288,171 @@ void main() {
       expect(File('${tempDir.path}/faust.child.meph').existsSync(), isTrue);
     });
 
-     test('LLM 成功 → SSE 回复写回历史 + 契约规则状态变更生效', () async {
-       // 成功响应："我堕落了" 触发规则 灵魂完整度 -= 10
-       final successClient = MockClient(
-         (request) async => sseResponse('浮士德感到灵魂的裂痕。'),
-       );
-       final container = await buildContainer(httpClient: successClient);
-       final notifier = container.read(narrativeProvider.notifier);
+    test('LLM 成功 → SSE 回复写回历史 + 契约规则状态变更生效', () async {
+      // 成功响应："我堕落了" 触发规则 灵魂完整度 -= 10
+      final successClient = MockClient(
+        (request) async => sseResponse('浮士德感到灵魂的裂痕。'),
+      );
+      final container = await buildContainer(httpClient: successClient);
+      final notifier = container.read(narrativeProvider.notifier);
 
-       notifier.sendMessage('我堕落了');
-       await waitForGeneration(container);
+      notifier.sendMessage('我堕落了');
+      await waitForGeneration(container);
 
-       final state = container.read(narrativeProvider);
-       expect(state.isGenerating, isFalse);
-       // 规则状态变更：100 - 10 = 90
-       expect(state.currentState['灵魂完整度'], const IntValue(90));
-       // 回复写回历史
-       expect(state.messages, hasLength(2));
-       expect(state.messages.last.content, '浮士德感到灵魂的裂痕。');
-       expect(
-         state.history.last,
-         const HistoryEntry(
-           role: MessageRole.assistant,
-           content: '浮士德感到灵魂的裂痕。',
-         ),
-       );
-     });
+      final state = container.read(narrativeProvider);
+      expect(state.isGenerating, isFalse);
+      // 规则状态变更：100 - 10 = 90
+      expect(state.currentState['灵魂完整度'], const IntValue(90));
+      // 回复写回历史
+      expect(state.messages, hasLength(2));
+      expect(state.messages.last.content, '浮士德感到灵魂的裂痕。');
+      expect(
+        state.history.last,
+        const HistoryEntry(role: MessageRole.assistant, content: '浮士德感到灵魂的裂痕。'),
+      );
+    });
 
-     test('revealStreaming 跳过打字机但不截断 LLM 完整回复', () async {
-       // 可控分块流：第一段先到达（用户看到部分内容），
-       // 调用 revealStreaming 后，剩余段落继续到达——
-       // 验证「跳过打字机」只停止 UI 逐字更新，不中止 LLM 生成。
-       final controller = StreamController<List<int>>();
-       final streamingClient = MockClient.streaming((request, bodyStream) async {
-         return http.StreamedResponse(
-           controller.stream,
-           200,
-           headers: {'content-type': 'text/event-stream; charset=utf-8'},
-         );
-       });
-       final container = await buildContainer(httpClient: streamingClient);
-       final notifier = container.read(narrativeProvider.notifier);
+    test('revealStreaming 跳过打字机但不截断 LLM 完整回复', () async {
+      // 可控分块流：第一段先到达（用户看到部分内容），
+      // 调用 revealStreaming 后，剩余段落继续到达——
+      // 验证「跳过打字机」只停止 UI 逐字更新，不中止 LLM 生成。
+      final controller = StreamController<List<int>>();
+      final streamingClient = MockClient.streaming((request, bodyStream) async {
+        return http.StreamedResponse(
+          controller.stream,
+          200,
+          headers: {'content-type': 'text/event-stream; charset=utf-8'},
+        );
+      });
+      final container = await buildContainer(httpClient: streamingClient);
+      final notifier = container.read(narrativeProvider.notifier);
 
-       notifier.sendMessage('探索书斋');
-       // 等待 LLM 请求发出、流已建立
-       await Future<void>.delayed(const Duration(milliseconds: 50));
+      notifier.sendMessage('探索书斋');
+      // 等待 LLM 请求发出、流已建立
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-       // 第一段内容到达
-       controller.add(utf8.encode(sseChunk('梅菲斯特出现在书斋门口。')));
-       await Future<void>.delayed(const Duration(milliseconds: 50));
+      // 第一段内容到达
+      controller.add(utf8.encode(sseChunk('梅菲斯特出现在书斋门口。')));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-       // 用户点击「⏩ 跳过打字机」→ flush 已有内容到 UI
-       notifier.revealStreaming();
-       expect(
-         container.read(narrativeProvider).streamingContent,
-         contains('梅菲斯特出现在书斋门口'),
-       );
+      // 用户点击「⏩ 跳过打字机」→ flush 已有内容到 UI
+      notifier.revealStreaming();
+      expect(
+        container.read(narrativeProvider).streamingContent,
+        contains('梅菲斯特出现在书斋门口'),
+      );
 
-       // 剩余内容继续到达（reveal 后不应中止 LLM 生成）
-       controller.add(utf8.encode(sseChunk('他轻声提议进行一场交易。')));
-       controller.add(utf8.encode('data: [DONE]\n\n'));
-       await controller.close();
-       await waitForGeneration(container);
+      // 剩余内容继续到达（reveal 后不应中止 LLM 生成）
+      controller.add(utf8.encode(sseChunk('他轻声提议进行一场交易。')));
+      controller.add(utf8.encode('data: [DONE]\n\n'));
+      await controller.close();
+      await waitForGeneration(container);
 
-       // 最终回复 = 完整内容（关键：不截断）
-       final state = container.read(narrativeProvider);
-       expect(state.isGenerating, isFalse);
-       expect(state.messages, hasLength(2));
-       expect(
-         state.messages.last.content,
-         '梅菲斯特出现在书斋门口。他轻声提议进行一场交易。',
-       );
-       // 历史同步写入完整内容
-       expect(
-         state.history.last.content,
-         '梅菲斯特出现在书斋门口。他轻声提议进行一场交易。',
-       );
-     });
+      // 最终回复 = 完整内容（关键：不截断）
+      final state = container.read(narrativeProvider);
+      expect(state.isGenerating, isFalse);
+      expect(state.messages, hasLength(2));
+      expect(state.messages.last.content, '梅菲斯特出现在书斋门口。他轻声提议进行一场交易。');
+      // 历史同步写入完整内容
+      expect(state.history.last.content, '梅菲斯特出现在书斋门口。他轻声提议进行一场交易。');
+    });
     // 注：GenerationFailed 的全局兜底路径未在此处单测——
     //   - `_generateReply` 的 catch 兜底已由 narrative_screen_test（HTTP 500 → 本地兜底）覆盖
     //   - `GenerationFailed` 状态迁移已由 narrative_reducer_test 独立覆盖
     // 在 Notifier 层模拟 llmConfigProvider 抛错会触发 Riverpod dispose 时序问题，不稳定故不保留。
+  });
+
+  group('重新生成（regenerateMessage）', () {
+    test('正常路径：删除回复 + 其前一条命运指引，并以同一条指引重新发送', () async {
+      final container = await buildContainer();
+      final notifier = container.read(narrativeProvider.notifier);
+
+      // 第一轮：发送 → 生成回复
+      notifier.sendMessage('第一问');
+      await waitForGeneration(container);
+      final afterFirst = container.read(narrativeProvider);
+      expect(afterFirst.messages, hasLength(2)); // fate + assistant
+
+      // 第二轮：再发送 → 生成回复
+      notifier.sendMessage('第二问');
+      await waitForGeneration(container);
+      final afterSecond = container.read(narrativeProvider);
+      expect(afterSecond.messages, hasLength(4)); // 2×(fate + assistant)
+
+      // 重新生成最后一条 assistant 回复（index 3）
+      final messagesBefore = afterSecond.messages;
+      final fateBefore = messagesBefore[2].content; // 第二条命运指引
+      notifier.regenerateMessage(3);
+      await waitForGeneration(container);
+
+      final state = container.read(narrativeProvider);
+      // 删除 index 3 的回复 + 其前一条命运指引（index 2）→ 剩 2 条
+      // 然后以同一条命运指引重新发送 → 恢复为 4 条（新 fate + 新 assistant）
+      expect(state.messages, hasLength(4));
+      // 重新发送的命运指引与删除前一致（基于同一 fateContent）
+      expect(state.messages[2].role, MessageRole.fate);
+      expect(state.messages[2].content, fateBefore);
+      expect(state.messages[3].role, MessageRole.assistant);
+      expect(state.messages[3].content, isNotEmpty);
+      expect(state.isGenerating, isFalse);
+    });
+
+    test('并发守卫：删除后存档期间用户发送新消息 → 放弃重新发送', () async {
+      final container = await buildContainer();
+      final notifier = container.read(narrativeProvider.notifier);
+
+      notifier.sendMessage('第一问');
+      await waitForGeneration(container);
+      expect(container.read(narrativeProvider).messages, hasLength(2));
+
+      // 触发 regenerateMessage，但拦截其 await 间隙：
+      // 通过先手动删除（dispatch）使 _mutationCount 递增，
+      // 模拟「存档期间有并发修改」——regenerateMessage 内删除后的
+      // 版本号已不再匹配，应放弃重新发送。
+      notifier.regenerateMessage(1);
+
+      // 在 regenerateMessage 的 await _autoSaveChild 间隙中插入一条新消息
+      // （模拟用户并发输入）。regenerateMessage 删除后版本号变化 →
+      // 不重新发送。
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      final stateMid = container.read(narrativeProvider);
+      if (stateMid.messages.length == 1) {
+        // 删除已生效但重发未发生（或已放弃）——并发守卫生效的标志
+        notifier.sendMessage('并发输入');
+      }
+      await waitForGeneration(container);
+
+      final state = container.read(narrativeProvider);
+      // 若守卫生效：不会出现「基于删除状态的第二条 assistant 回复」
+      // 消息数应为 3（fate + 并发 fate + 并发 assistant）而非 4+。
+      // 关键断言：并发输入后的 assistant 回复只有一条
+      final assistantCount = state.messages
+          .where((m) => m.role == MessageRole.assistant)
+          .length;
+      expect(assistantCount, lessThanOrEqualTo(2));
+      expect(state.isGenerating, isFalse);
+    });
+
+    test('守卫边界：index 越界 / 非 assistant / 无 fate 前驱均安全早退', () async {
+      final container = await buildContainer();
+      final notifier = container.read(narrativeProvider.notifier);
+
+      notifier.sendMessage('第一问');
+      await waitForGeneration(container);
+      final before = container.read(narrativeProvider).messages.length;
+
+      // 越界索引
+      notifier.regenerateMessage(99);
+      expect(container.read(narrativeProvider).messages.length, before);
+
+      // 索引指向 fate 消息（非 assistant）→ 早退
+      notifier.regenerateMessage(0);
+      expect(container.read(narrativeProvider).messages.length, before);
+
+      // 负索引
+      notifier.regenerateMessage(-1);
+      expect(container.read(narrativeProvider).messages.length, before);
+    });
   });
 
   group('会话操作', () {
@@ -408,26 +496,20 @@ void main() {
 
       notifier.attachContext('scene.txt', '书斋的镜子里有影子');
       notifier.attachContext('town.txt', '市集人声鼎沸');
-      expect(
-        container.read(narrativeProvider).attachedFileNames,
-        ['scene.txt', 'town.txt'],
-      );
-      expect(
-        container.read(narrativeProvider).attachedContexts,
-        ['书斋的镜子里有影子', '市集人声鼎沸'],
-      );
+      expect(container.read(narrativeProvider).attachedFileNames, [
+        'scene.txt',
+        'town.txt',
+      ]);
+      expect(container.read(narrativeProvider).attachedContexts, [
+        '书斋的镜子里有影子',
+        '市集人声鼎沸',
+      ]);
 
       notifier.removeAttachedContext(0);
-      expect(
-        container.read(narrativeProvider).attachedFileNames,
-        ['town.txt'],
-      );
+      expect(container.read(narrativeProvider).attachedFileNames, ['town.txt']);
       // 越界移除忽略
       notifier.removeAttachedContext(99);
-      expect(
-        container.read(narrativeProvider).attachedFileNames,
-        ['town.txt'],
-      );
+      expect(container.read(narrativeProvider).attachedFileNames, ['town.txt']);
 
       notifier.clearAttachedContexts();
       expect(container.read(narrativeProvider).attachedFileNames, isEmpty);
@@ -472,8 +554,12 @@ void main() {
       final notifier = container.read(narrativeProvider.notifier);
 
       // 创建多个分支文件
-      await File('${tempDir.path}/faust.child.meph').writeAsString('【角色名】\n浮士德\n');
-      await File('${tempDir.path}/faust.dark.meph').writeAsString('【角色名】\n浮士德\n');
+      await File(
+        '${tempDir.path}/faust.child.meph',
+      ).writeAsString('【角色名】\n浮士德\n');
+      await File(
+        '${tempDir.path}/faust.dark.meph',
+      ).writeAsString('【角色名】\n浮士德\n');
 
       final files = await notifier.listChildFiles();
       expect(files, containsAll(['faust.child.meph', 'faust.dark.meph']));

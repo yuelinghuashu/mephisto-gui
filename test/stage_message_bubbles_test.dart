@@ -27,10 +27,7 @@ void main() {
   });
 
   test('StageMessageBubble：roleTag 打标正确（供 UI 按角色着色）', () {
-    final assistant = Message.assistant(
-      '【浮士德】\n浮士德站在书斋窗前。',
-      roleTag: '浮士德',
-    );
+    final assistant = Message.assistant('【浮士德】\n浮士德站在书斋窗前。', roleTag: '浮士德');
     expect(assistant.roleTag, '浮士德');
     expect(assistant.role, MessageRole.assistant);
   });
@@ -90,10 +87,7 @@ void main() {
         ),
         StageCharacter(
           fileName: '梅菲斯特.meph',
-          contract: Contract(
-            roleName: '梅菲斯特',
-            background: '来自深渊',
-          ),
+          contract: Contract(roleName: '梅菲斯特', background: '来自深渊'),
         ),
       ],
     );
@@ -110,10 +104,7 @@ void main() {
   test('stripRoleHeader 剥离【角色名】前缀（气泡左侧已有角色名标签）', () {
     // 舞台 reducer 写入 history 时保留 `【角色名】` 头（存档可读），
     // 但 UI 气泡左侧已有竖排角色名标签，正文不应重复显示。
-    expect(
-      stripRoleHeader('【浮士德】\n浮士德站在书斋窗前。'),
-      '浮士德站在书斋窗前。',
-    );
+    expect(stripRoleHeader('【浮士德】\n浮士德站在书斋窗前。'), '浮士德站在书斋窗前。');
     // 无前缀内容原样返回
     expect(stripRoleHeader('普通消息'), '普通消息');
     // 仅剩标题行（空正文）→ 剥离后为空字符串
@@ -121,18 +112,12 @@ void main() {
   });
 
   test('角色消息气泡：roleTag 命中色板时不退化（纯渲染由 widget 测试覆盖）', () {
-    final assistant = Message.assistant(
-      '【浮士德】\n浮士德站在书斋窗前。',
-      roleTag: '浮士德',
-    );
+    final assistant = Message.assistant('【浮士德】\n浮士德站在书斋窗前。', roleTag: '浮士德');
     // 色板可查（与 UI 一致：字典序分配）
     final colors = assignRoleColors(['浮士德', '梅菲斯特']);
     expect(colors.containsKey(assistant.roleTag), isTrue);
     // roleTag 存在 + content 带头部 → stripRoleHeader 负责去重展示
-    expect(
-      stripRoleHeader(assistant.content),
-      '浮士德站在书斋窗前。',
-    );
+    expect(stripRoleHeader(assistant.content), '浮士德站在书斋窗前。');
   });
 
   test('色板分配与角色消息关联：色板稳定、可查', () {

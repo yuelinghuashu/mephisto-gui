@@ -94,9 +94,9 @@ void main() {
     test('用户文件正常加载 → 兜底提示为空', () async {
       await seedPrefs();
       // 写入合法的 faust.meph
-      await File('${tempDir.path}/faust.meph').writeAsString(
-        '【角色名】\n浮士德\n\n【世界观】\n充满契约的世界\n',
-      );
+      await File(
+        '${tempDir.path}/faust.meph',
+      ).writeAsString('【角色名】\n浮士德\n\n【世界观】\n充满契约的世界\n');
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
@@ -147,10 +147,7 @@ void main() {
       expect(groups, hasLength(1));
       expect(groups.first.master.fileName, 'faust.meph');
       expect(groups.first.hasChildren, isTrue);
-      expect(
-        groups.first.children.first.master.fileName,
-        'faust.dark.meph',
-      );
+      expect(groups.first.children.first.master.fileName, 'faust.dark.meph');
     });
 
     test('孤儿深链 → 占位根 + 多级子树', () {
@@ -183,11 +180,7 @@ void main() {
       final segments = List.generate(maxContractDepth + 1, (i) => 'x$i');
       final deepName = '${segments.join('.')}.meph';
       final infos = [
-        ContractInfo(
-          fileName: deepName,
-          roleName: '深度角色',
-          isChild: true,
-        ),
+        ContractInfo(fileName: deepName, roleName: '深度角色', isChild: true),
       ];
 
       final groups = buildContractTree(infos);
@@ -205,12 +198,12 @@ void main() {
       await File('${tempDir.path}/dantes.meph').writeAsString('【角色名】\n唐泰斯\n');
       // 调整 mtime：dantes 最新，faust 较旧
       final now = DateTime.now();
-      await File('${tempDir.path}/faust.meph').setLastModified(
-        now.subtract(const Duration(days: 2)),
-      );
-      await File('${tempDir.path}/dantes.meph').setLastModified(
-        now.subtract(const Duration(hours: 1)),
-      );
+      await File(
+        '${tempDir.path}/faust.meph',
+      ).setLastModified(now.subtract(const Duration(days: 2)));
+      await File(
+        '${tempDir.path}/dantes.meph',
+      ).setLastModified(now.subtract(const Duration(hours: 1)));
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
@@ -229,17 +222,19 @@ void main() {
       await File('${tempDir.path}/dantes.meph').writeAsString('【角色名】\n唐泰斯\n');
       // dantes 母版最近编辑（更"新"）
       final now = DateTime.now();
-      await File('${tempDir.path}/dantes.meph').setLastModified(
-        now.subtract(const Duration(hours: 2)),
-      );
-      await File('${tempDir.path}/faust.meph').setLastModified(
-        now.subtract(const Duration(days: 2)),
-      );
+      await File(
+        '${tempDir.path}/dantes.meph',
+      ).setLastModified(now.subtract(const Duration(hours: 2)));
+      await File(
+        '${tempDir.path}/faust.meph',
+      ).setLastModified(now.subtract(const Duration(days: 2)));
       // faust 的子版在 1 小时前被编辑（自动保存）→ 整棵 faust 树比 dantes 新
-      await File('${tempDir.path}/faust.child.meph').writeAsString('【角色名】\n浮士德\n【历史】\n');
-      await File('${tempDir.path}/faust.child.meph').setLastModified(
-        now.subtract(const Duration(hours: 1)),
-      );
+      await File(
+        '${tempDir.path}/faust.child.meph',
+      ).writeAsString('【角色名】\n浮士德\n【历史】\n');
+      await File(
+        '${tempDir.path}/faust.child.meph',
+      ).setLastModified(now.subtract(const Duration(hours: 1)));
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
@@ -248,10 +243,7 @@ void main() {
       expect(groups, hasLength(2));
       // faust 树整体比 dantes 新（因为子版刚被自动保存过）→ faust 排前
       expect(groups.first.master.fileName, 'faust.meph');
-      expect(
-        groups.first.latestModified,
-        isNotNull,
-      );
+      expect(groups.first.latestModified, isNotNull);
     });
   });
 }

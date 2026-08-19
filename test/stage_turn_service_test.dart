@@ -24,21 +24,12 @@ void main() {
     roleName: '梅菲斯特',
     background: '来自深渊的契约者',
     rules: [
-      Rule(
-        name: '注入记忆',
-        condition: '包含 "背叛"',
-        action: '注入 "契约的裂痕"',
-        line: 1,
-      ),
+      Rule(name: '注入记忆', condition: '包含 "背叛"', action: '注入 "契约的裂痕"', line: 1),
     ],
   );
 
   const stage = StageLoaded(
-    info: StageInfo(
-      path: '/tmp/stages/test',
-      name: 'test',
-      characterCount: 2,
-    ),
+    info: StageInfo(path: '/tmp/stages/test', name: 'test', characterCount: 2),
     characters: [
       StageCharacter(fileName: '浮士德.meph', contract: contract1),
       StageCharacter(fileName: '梅菲斯特.meph', contract: contract2),
@@ -53,10 +44,8 @@ void main() {
   // 固定 LLM 返回，记录收到的消息
   final capturedMessages = <List<LlmMessage>>[];
   StageTurnService serviceReturning(String reply) => StageTurnService(
-    clientFactory: (config) => MockLlmClient(
-      reply: reply,
-      capturedMessages: capturedMessages,
-    ),
+    clientFactory: (config) =>
+        MockLlmClient(reply: reply, capturedMessages: capturedMessages),
   );
 
   final Map<String, Map<String, StateValue>> emptyStates = {};
@@ -122,16 +111,16 @@ void main() {
       config: config,
       onChunk: (_) {},
     );
-    expect(result.injectedMemories['梅菲斯特']!.map((m) => m.content),
-        contains('契约的裂痕'));
+    expect(
+      result.injectedMemories['梅菲斯特']!.map((m) => m.content),
+      contains('契约的裂痕'),
+    );
     // 浮士德无「背叛」规则 → 无注入
     expect(result.injectedMemories['浮士德'], isEmpty);
   });
 
   test('LLM 异常时回退本地多角色回复并记录错误', () async {
-    final s = StageTurnService(
-      clientFactory: (config) => ThrowingLlmClient(),
-    );
+    final s = StageTurnService(clientFactory: (config) => ThrowingLlmClient());
     final result = await s.generate(
       userInput: '为何如此',
       stage: stage,
@@ -235,8 +224,7 @@ void main() {
   });
 
   test('全景叙事提及分发：一篇小说同时提及多位角色 → 各自获得全文', () async {
-    const reply =
-        '浮士德站在书斋窗前喃喃自语。梅菲斯特从阴影中走出，笑道："那么，与我做一场交易如何？"';
+    const reply = '浮士德站在书斋窗前喃喃自语。梅菲斯特从阴影中走出，笑道："那么，与我做一场交易如何？"';
     final s = serviceReturning(reply);
     final result = await s.generate(
       userInput: '交易',
@@ -296,6 +284,31 @@ void main() {
     expect(result.replies.containsKey('浮士德'), isTrue);
     expect(result.replies.containsKey('梅菲斯特'), isTrue);
   });
+
+  test('空舞台（无角色）不崩溃：不访问 characters.first，返回空结果', () async {
+    const emptyStage = StageLoaded(
+      info: StageInfo(
+        path: '/tmp/stages/empty',
+        name: 'empty',
+        characterCount: 0,
+      ),
+      characters: [],
+    );
+    final s = serviceReturning('一段无法分节的溢出文本');
+    final result = await s.generate(
+      userInput: '继续',
+      stage: emptyStage,
+      roleStates: const {},
+      roleMemories: const {},
+      historyMessages: const [],
+      narrativeRules: '默认',
+      config: config,
+      onChunk: (_) {},
+    );
+    // 空舞台防御：返回空 replies，不抛 RangeError（characters.first）
+    expect(result.replies, isEmpty);
+    expect(result.newStates, isEmpty);
+  });
 }
 
 /// 固定返回指定文本的 mock LLM 客户端
@@ -303,12 +316,15 @@ class MockLlmClient extends LlmClient {
   final String reply;
   final List<List<LlmMessage>> capturedMessages;
 
-  MockLlmClient({required this.reply, required this.capturedMessages, String? model})
-      : super(
-          apiKey: '',
-          baseUrl: 'http://localhost:9999',
-          model: model ?? 'mock',
-        );
+  MockLlmClient({
+    required this.reply,
+    required this.capturedMessages,
+    String? model,
+  }) : super(
+         apiKey: '',
+         baseUrl: 'http://localhost:9999',
+         model: model ?? 'mock',
+       );
 
   @override
   Future<String> generateStream({
@@ -327,11 +343,7 @@ class MockLlmClient extends LlmClient {
 /// 直接抛异常的 mock LLM 客户端
 class ThrowingLlmClient extends LlmClient {
   ThrowingLlmClient()
-      : super(
-          apiKey: '',
-          baseUrl: 'http://localhost:9999',
-          model: 'mock',
-        );
+    : super(apiKey: '', baseUrl: 'http://localhost:9999', model: 'mock');
 
   @override
   Future<String> generateStream({

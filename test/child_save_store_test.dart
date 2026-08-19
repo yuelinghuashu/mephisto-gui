@@ -31,9 +31,7 @@ void main() {
     roleName: '浮士德',
     worldview: '充满契约的世界',
     background: '求道者',
-    state: [
-      StateItem(key: '灵魂完整度', value: IntValue(50)),
-    ],
+    state: [StateItem(key: '灵魂完整度', value: IntValue(50))],
   );
 
   test('保存默认子版生成 faust.child.meph', () async {
@@ -292,6 +290,9 @@ void main() {
       history: const [],
     );
     expect(darkInSession, 'faust.dark.child2.meph');
-    expect(File('${tempDir.path}/faust.dark.child3.meph').existsSync(), isFalse);
+    expect(
+      File('${tempDir.path}/faust.dark.child3.meph').existsSync(),
+      isFalse,
+    );
   });
 }

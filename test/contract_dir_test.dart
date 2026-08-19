@@ -65,7 +65,9 @@ void main() {
     expect(kurukshetraDir.existsSync(), isTrue);
     expect(File('${kurukshetraDir.path}/Arjuna.meph').existsSync(), isTrue);
     expect(File('${kurukshetraDir.path}/Karna.meph').existsSync(), isTrue);
-    final arjuna = File('${kurukshetraDir.path}/Arjuna.meph').readAsStringSync();
+    final arjuna = File(
+      '${kurukshetraDir.path}/Arjuna.meph',
+    ).readAsStringSync();
     expect(arjuna, contains('【角色名】'));
     expect(arjuna, contains('阿周那'));
 
@@ -74,12 +76,24 @@ void main() {
     expect(camlannDir.existsSync(), isTrue);
     expect(File('${camlannDir.path}/Arthur.meph').existsSync(), isTrue);
     expect(File('${camlannDir.path}/Mordred.meph').existsSync(), isTrue);
-    final camlannArthur = File('${camlannDir.path}/Arthur.meph').readAsStringSync();
+    final camlannArthur = File(
+      '${camlannDir.path}/Arthur.meph',
+    ).readAsStringSync();
     expect(camlannArthur, contains('【角色名】'));
     expect(camlannArthur, contains('亚瑟'));
     final mordred = File('${camlannDir.path}/Mordred.meph').readAsStringSync();
     expect(mordred, contains('【角色名】'));
     expect(mordred, contains('莫德雷德'));
+
+    // 新内置舞台（三位主演）：Lundao 目录 + 三角色卡
+    final lundaoDir = Directory('${tempDir.path}/Lundao');
+    expect(lundaoDir.existsSync(), isTrue);
+    expect(File('${lundaoDir.path}/Kongzi.meph').existsSync(), isTrue);
+    expect(File('${lundaoDir.path}/Laozhi.meph').existsSync(), isTrue);
+    expect(File('${lundaoDir.path}/Shijiamouni.meph').existsSync(), isTrue);
+    final kongzi = File('${lundaoDir.path}/Kongzi.meph').readAsStringSync();
+    expect(kongzi, contains('【角色名】'));
+    expect(kongzi, contains('孔子'));
   });
 
   test('force: true → 恢复缺失的内置舞台', () async {
@@ -107,6 +121,11 @@ void main() {
     expect(camlannDir.existsSync(), isTrue);
     expect(File('${camlannDir.path}/Arthur.meph').existsSync(), isTrue);
     expect(File('${camlannDir.path}/Mordred.meph').existsSync(), isTrue);
+    final lundaoDir = Directory('${tempDir.path}/Lundao');
+    expect(lundaoDir.existsSync(), isTrue);
+    expect(File('${lundaoDir.path}/Kongzi.meph').existsSync(), isTrue);
+    expect(File('${lundaoDir.path}/Laozhi.meph').existsSync(), isTrue);
+    expect(File('${lundaoDir.path}/Shijiamouni.meph').existsSync(), isTrue);
   });
 
   test('目录已种子 → 不自动恢复被删除的模板', () async {

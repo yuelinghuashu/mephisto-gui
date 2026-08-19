@@ -7,6 +7,12 @@ import 'package:mephisto/services/engine/executor.dart';
 import 'package:mephisto/services/engine/rule_engine.dart';
 
 void main() {
+  // 测试隔离：条件编译缓存是模块级全局 Map（LRU），跨用例/跨文件共享。
+  // 每个用例前清空，避免「同一条件返回同一实例」等缓存语义断言受
+  // 先前用例污染。不做注入式改造——condition.dart 是纯引擎层，
+  // 保持模块级缓存是其「无框架依赖、轻量」定位的一部分。
+  setUp(clearConditionCache);
+
   group('条件编译缓存', () {
     test('compileCondition 返回可复用的 AST 节点', () {
       // 同一条件字符串重复编译返回同一实例（缓存命中）
@@ -51,8 +57,14 @@ void main() {
       // 整个条件被一对括号完整包裹
       final node = compileCondition('(包含 "攻击" || 包含 "战斗")');
       expect(node, isA<OrNode>());
-      expect(node!.eval(input: '战斗开始', state: const <String, StateValue>{}), isTrue);
-      expect(node.eval(input: '我在休息', state: const <String, StateValue>{}), isFalse);
+      expect(
+        node!.eval(input: '战斗开始', state: const <String, StateValue>{}),
+        isTrue,
+      );
+      expect(
+        node.eval(input: '我在休息', state: const <String, StateValue>{}),
+        isFalse,
+      );
     });
 
     test('括号分组：&& 与括号内的 || 组合求值', () {
@@ -150,10 +162,7 @@ void main() {
         isTrue,
         reason: '|| 在引号内是字符串数据，整体应作为包含匹配',
       );
-      expect(
-        evalCondition('包含 "a||b"', input: '只有a', state: state),
-        isFalse,
-      );
+      expect(evalCondition('包含 "a||b"', input: '只有a', state: state), isFalse);
       expect(
         evalCondition('包含 "x&&y"', input: 'x&&y', state: state),
         isTrue,
@@ -182,8 +191,11 @@ void main() {
       final total = rs.roll('roll(1d2)');
       final (matched, _) = evalRoll('roll(1d2)', rs);
       expect(total, inInclusiveRange(1, 2));
-      expect(matched, total == 1,
-        reason: '安科 1d2 判定：掷出 1 = 成功（是），掷出 2 = 失败（否）');
+      expect(
+        matched,
+        total == 1,
+        reason: '安科 1d2 判定：掷出 1 = 成功（是），掷出 2 = 失败（否）',
+      );
     });
 
     test('1d2 自定义阈值：>= 2 表示掷出 2 才成功（显式指定方向）', () {
@@ -267,7 +279,13 @@ void main() {
 
   group('规则引擎', () {
     Rule rule(String name, String cond, String action, {String group = ''}) =>
-        Rule(name: name, condition: cond, action: action, group: group, line: 1);
+        Rule(
+          name: name,
+          condition: cond,
+          action: action,
+          group: group,
+          line: 1,
+        );
 
     test('被动规则批量执行：状态变更 + 记忆注入', () {
       final engine = RuleEngine(
@@ -289,13 +307,13 @@ void main() {
 
     test('主动规则互斥匹配：只取第一个', () {
       final engine = RuleEngine(
-        rules: [
-          rule('攻击', '包含 "攻击"', '全力攻击'),
-          rule('防御', '包含 "攻击"', '防御姿态'),
-        ],
+        rules: [rule('攻击', '包含 "攻击"', '全力攻击'), rule('防御', '包含 "攻击"', '防御姿态')],
         roleName: '埃德蒙·唐泰斯',
       );
-      final result = engine.run(input: '攻击敌人', state: const <String, StateValue>{});
+      final result = engine.run(
+        input: '攻击敌人',
+        state: const <String, StateValue>{},
+      );
       expect(result.activeRule?.name, '攻击');
     });
 
@@ -307,7 +325,10 @@ void main() {
         ],
         roleName: '埃德蒙·唐泰斯',
       );
-      final result = engine.run(input: '攻击敌人', state: const <String, StateValue>{});
+      final result = engine.run(
+        input: '攻击敌人',
+        state: const <String, StateValue>{},
+      );
       expect(result.activeRule?.name, '攻击');
       expect(result.activeRule?.action, '全力攻击');
     });
@@ -320,7 +341,10 @@ void main() {
         ],
         roleName: '埃德蒙·唐泰斯',
       );
-      final result = engine.run(input: '采取防御姿态', state: const <String, StateValue>{});
+      final result = engine.run(
+        input: '采取防御姿态',
+        state: const <String, StateValue>{},
+      );
       expect(result.activeRule?.name, '防御');
       expect(result.activeRule?.action, '防御姿态');
     });
@@ -368,7 +392,10 @@ void main() {
         rules: [rule('无关', '包含 "xyz"', '指令')],
         roleName: '浮士德',
       );
-      final result = engine.run(input: '你好', state: const <String, StateValue>{});
+      final result = engine.run(
+        input: '你好',
+        state: const <String, StateValue>{},
+      );
       expect(result.activeRule, isNull);
       expect(result.rollInfo, isEmpty);
     });
@@ -378,7 +405,10 @@ void main() {
         rules: [rule('归航', '包含 "码头"', '大笑')],
         roleName: '埃德蒙·唐泰斯',
       );
-      final result = engine.run(input: '船已靠上码头', state: const <String, StateValue>{});
+      final result = engine.run(
+        input: '船已靠上码头',
+        state: const <String, StateValue>{},
+      );
       expect(result.activeRule?.action, '大笑');
     });
 
@@ -424,6 +454,5 @@ void main() {
       expect(result.injectedMemories, contains('浮士德签订契约'));
       expect(result.actionOutputs, isEmpty);
     });
-
   });
 }

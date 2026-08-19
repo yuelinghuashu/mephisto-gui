@@ -16,8 +16,11 @@ void main() {
     test('基础名去 .meph 后按 . 分段', () {
       expect(splitBaseName('faust.meph'), ['faust']);
       expect(splitBaseName('faust.dark.meph'), ['faust', 'dark']);
-      expect(splitBaseName('faust.dark.light.meph'),
-          ['faust', 'dark', 'light']);
+      expect(splitBaseName('faust.dark.light.meph'), [
+        'faust',
+        'dark',
+        'light',
+      ]);
       expect(splitBaseName('faust.child.meph'), ['faust', 'child']);
     });
 
@@ -73,8 +76,10 @@ void main() {
       expect(stripChildSuffix('faust.child.meph'), 'faust');
       expect(stripChildSuffix('faust.dark.child.meph'), 'faust.dark');
       // 存档自身再保留层级前缀
-      expect(stripChildSuffix('faust.dark.light.child.meph'),
-          'faust.dark.light');
+      expect(
+        stripChildSuffix('faust.dark.light.child.meph'),
+        'faust.dark.light',
+      );
     });
 
     test('不含 .child 时原样返回基础名', () {
@@ -91,22 +96,25 @@ void main() {
     test('分支 → 分支.child.meph（非母版根）', () {
       expect(defaultChildFileName('faust.dark.meph'), 'faust.dark.child.meph');
       expect(
-          defaultChildFileName('faust.dark.light.meph'),
-          'faust.dark.light.child.meph');
+        defaultChildFileName('faust.dark.light.meph'),
+        'faust.dark.light.child.meph',
+      );
     });
 
     test('存档自身 → 不再追加 .child（防 child.child 嵌套）', () {
       expect(
-          defaultChildFileName('faust.dark.child.meph'),
-          'faust.dark.child.meph',
-          reason: '已是存档则返回自身，避免生成 faust.dark.child.child.meph');
+        defaultChildFileName('faust.dark.child.meph'),
+        'faust.dark.child.meph',
+        reason: '已是存档则返回自身，避免生成 faust.dark.child.child.meph',
+      );
     });
 
     test('中文/带下划线文件名兼容', () {
       expect(defaultChildFileName('浮士德.meph'), '浮士德.child.meph');
       expect(
-          defaultChildFileName('joan_of_arc.meph'),
-          'joan_of_arc.child.meph');
+        defaultChildFileName('joan_of_arc.meph'),
+        'joan_of_arc.child.meph',
+      );
     });
   });
 

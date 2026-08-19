@@ -45,11 +45,7 @@ void main() {
     return buildApp(
       platform: platform,
       home: Scaffold(
-        body: InputBar(
-          isGenerating: false,
-          onSend: onSend,
-          onStop: () {},
-        ),
+        body: InputBar(isGenerating: false, onSend: onSend, onStop: () {}),
       ),
     );
   }
@@ -76,7 +72,10 @@ void main() {
     await tester.pumpWidget(buildInputBar(onSend: sent.add));
 
     await tester.enterText(find.byType(TextField), '调查地窖');
-    await tester.sendKeyEvent(LogicalKeyboardKey.numpadEnter, platform: 'linux');
+    await tester.sendKeyEvent(
+      LogicalKeyboardKey.numpadEnter,
+      platform: 'linux',
+    );
     await tester.pump();
 
     // Numpad Enter 同样触发发送（修复：漏匹配 numpadEnter 导致换行）
@@ -98,7 +97,10 @@ void main() {
       platform: 'linux',
     );
     await tester.sendKeyEvent(LogicalKeyboardKey.enter, platform: 'linux');
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft, platform: 'linux');
+    await tester.sendKeyUpEvent(
+      LogicalKeyboardKey.shiftLeft,
+      platform: 'linux',
+    );
     await tester.pump();
 
     // 核心断言：Shift 按下时 Enter 不触发发送
@@ -143,10 +145,7 @@ void main() {
   testWidgets('移动端：软键盘提交动作触发发送（走 onSubmitted）', (tester) async {
     final sent = <String>[];
     await tester.pumpWidget(
-      buildInputBar(
-        onSend: sent.add,
-        platform: TargetPlatform.android,
-      ),
+      buildInputBar(onSend: sent.add, platform: TargetPlatform.android),
     );
 
     await tester.enterText(find.byType(TextField), '移动端输入');

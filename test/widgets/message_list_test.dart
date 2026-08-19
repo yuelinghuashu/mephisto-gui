@@ -13,8 +13,8 @@ import 'test_helpers.dart';
 void main() {
   /// 构造 [count] 条角色消息（用于撑起可滚动的高度）。
   List<Message> buildMessages(int count) => [
-        for (var i = 1; i <= count; i++) Message.assistant('消息 $i'),
-      ];
+    for (var i = 1; i <= count; i++) Message.assistant('消息 $i'),
+  ];
 
   /// 读取 [MessageList] 内 ListView 的滚动位置。
   ScrollPosition positionOf(WidgetTester tester) {

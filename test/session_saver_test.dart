@@ -27,9 +27,7 @@ void main() {
       'mephisto_contracts_directory': tempDir.path,
     });
     // 仅写入母版；默认子版由 saveCurrent(母版) 生成，测试保持干净状态
-    await File('${tempDir.path}/faust.meph').writeAsString(
-      '【角色名】\n浮士德\n',
-    );
+    await File('${tempDir.path}/faust.meph').writeAsString('【角色名】\n浮士德\n');
   });
 
   tearDown(() async {
@@ -64,9 +62,9 @@ void main() {
 
     test('子版文件名 → 直接覆盖原文件而非生成递增新文件', () async {
       // 先存在默认子版，验证 saveCurrent 覆盖而非递增
-      await File('${tempDir.path}/faust.child.meph').writeAsString(
-        '【角色名】\n浮士德\n',
-      );
+      await File(
+        '${tempDir.path}/faust.child.meph',
+      ).writeAsString('【角色名】\n浮士德\n');
       final saved = await ChildSaveStore.saveCurrent(
         sourceFileName: 'faust.child.meph',
         contract: contract,
@@ -118,9 +116,9 @@ void main() {
 
     test('从子版另存为分支 → 以母版前缀命名，不产生 child.dark', () async {
       // 先存在默认子版，验证其不受另存为分支影响
-      await File('${tempDir.path}/faust.child.meph').writeAsString(
-        '【角色名】\n浮士德\n',
-      );
+      await File(
+        '${tempDir.path}/faust.child.meph',
+      ).writeAsString('【角色名】\n浮士德\n');
       final saved = await ChildSaveStore.saveAsBranch(
         sourceFileName: 'faust.child.meph',
         branchName: 'dark',

@@ -56,7 +56,11 @@ void main() {
     }
   });
 
-  void resetFlowState({String name = 'faust.meph', bool showFate = false, String? fateTitle}) {
+  void resetFlowState({
+    String name = 'faust.meph',
+    bool showFate = false,
+    String? fateTitle,
+  }) {
     currentName = name;
     showFateField = showFate;
     initialFateTitle = fateTitle;
@@ -180,7 +184,11 @@ void main() {
   });
 
   testWidgets('子版显示命运说明输入框并返回修改后的值', (tester) async {
-    resetFlowState(name: 'faust.dark.meph', showFate: true, fateTitle: '旧的命运说明');
+    resetFlowState(
+      name: 'faust.dark.meph',
+      showFate: true,
+      fateTitle: '旧的命运说明',
+    );
     await openDialog(tester);
 
     // 两个输入框：文件名 + 命运说明

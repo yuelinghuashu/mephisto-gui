@@ -102,7 +102,10 @@ void main() {
 裸露的胸膛只余束胸布带。“因陀罗啊，你赐我的神枪……”他触摸腰间低语。
 阿周那的箭尖在落日中微微颤动。
 ''';
-      final result = parseStageMentions(reply: reply, roleNames: ['阿周那', '迦尔纳']);
+      final result = parseStageMentions(
+        reply: reply,
+        roleNames: ['阿周那', '迦尔纳'],
+      );
       expect(result.sections['阿周那'], contains('阿周那'));
       expect(result.sections['迦尔纳'], contains('迦尔纳'));
       // 被提及者共享同一段全文
